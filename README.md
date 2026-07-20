@@ -1,5 +1,5 @@
 # Fennec
-[[ Matrix ]](https://matrix.org/) Client in C# / [.NET MAUI](https://dotnet.microsoft.com/en-us/apps/maui) using [Matrix-SDK-Rust](https://github.com/matrix-org/matrix-rust-sdk)
+Cross-platform [[Matrix]](https://matrix.org/) Client in C# / [.NET MAUI](https://dotnet.microsoft.com/en-us/apps/maui) using [Matrix-SDK-Rust](https://github.com/matrix-org/matrix-rust-sdk)
 
 ## Natives
 Fennec uses UniFFI bindings to matrix-sdk-rust to communicate with your homeserver. Because I couldn't be bothered documenting building natives right now, natives are included in the repository.
