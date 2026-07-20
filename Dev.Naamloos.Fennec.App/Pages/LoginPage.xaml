@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="Dev.Naamloos.Fennec.App.Pages.LoginPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewModels="clr-namespace:Dev.Naamloos.Fennec.App.ViewModels"
+    x:DataType="viewModels:LoginViewModel"
+    SafeAreaEdges="All"
+    Title="Sign in">
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="14" VerticalOptions="Center" MaximumWidthRequest="480">
+            <Label Text="Fennec" FontSize="32" FontAttributes="Bold" />
+            <Label Text="Instance" FontAttributes="Bold" />
+            <Picker
+                Title="Choose an instance"
+                ItemsSource="{x:Static viewModels:LoginViewModel.Instances}"
+                SelectedItem="{Binding SelectedInstance}" />
+            <Entry
+                Placeholder="Or enter a homeserver manually"
+                Text="{Binding Homeserver}"
+                Keyboard="Url" />
+            <Label Text="Username" FontAttributes="Bold" />
+            <Entry
+                Placeholder="naamloos or @naamloos:m.naamloos.dev"
+                Text="{Binding Username}"
+                Keyboard="Email" />
+            <Entry
+                Placeholder="Password"
+                Text="{Binding Password}"
+                IsPassword="True" />
+            <Label Text="{Binding ErrorMessage}" TextColor="Red" IsVisible="{Binding HasError}" />
+            <Button Text="Sign in" Command="{Binding LoginCommand}" />
+            <ActivityIndicator IsVisible="{Binding IsBusy}" IsRunning="{Binding IsBusy}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

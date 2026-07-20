@@ -1,4 +1,11 @@
 <Solution>
-  <Project Path="Dev.Naamloos.Fennec/Dev.Naamloos.Fennec.csproj" />
-  <Project Path="meenzen-matrix/src/Matrix.RustSdk.Bindings/Matrix.RustSdk.Bindings.csproj" />
+  <Folder Name="/Repo Files/">
+    <File Path=".gitignore" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="Dev.Naamloos.Fennec.App/Dev.Naamloos.Fennec.App.csproj" Id="a3e4996b-1b2c-45bd-abd3-3e852323686f">
+    <Deploy Solution="Debug|*" />
+  </Project>
+  <Project Path="Dev.Naamloos.Fennec.Sdk/Dev.Naamloos.Fennec.Sdk.csproj" Id="11c9859c-f295-4151-b361-2b8f3b99d8d7" />
 </Solution>

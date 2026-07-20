@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="Dev.Naamloos.Fennec.App.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:Dev.Naamloos.Fennec.App.Controls"
+    xmlns:models="clr-namespace:Dev.Naamloos.Fennec.App.Models"
+    xmlns:viewModels="clr-namespace:Dev.Naamloos.Fennec.App.ViewModels"
+    x:DataType="viewModels:AppShellViewModel"
+    BackgroundColor="{DynamicResource AppBackground}"
+    FlyoutBackgroundColor="{DynamicResource Surface}"
+    FlyoutBehavior="Flyout"
+    FlyoutWidth="320">
+    <Shell.FlyoutContent>
+        <Grid Padding="16" RowDefinitions="Auto,*,Auto" RowSpacing="16">
+            <VerticalStackLayout Spacing="2">
+                <Label Text="Fennec" FontSize="26" FontAttributes="Bold" />
+                <Label Text="{Binding UserId}" FontSize="12" Opacity="0.7" LineBreakMode="TailTruncation" />
+            </VerticalStackLayout>
+            <CollectionView
+                x:Name="RoomsCollectionView"
+                Grid.Row="1"
+                ItemsSource="{Binding Groups}"
+                IsGrouped="True"
+                SelectionMode="Single"
+                SelectedItem="{Binding SelectedRoom, Mode=TwoWay}"
+                EmptyView="Waiting for rooms…">
+                <CollectionView.GroupHeaderTemplate>
+                    <DataTemplate x:DataType="models:RoomGroup">
+                        <controls:RoomGroupHeader />
+                    </DataTemplate>
+                </CollectionView.GroupHeaderTemplate>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:RoomListItem">
+                        <Grid ColumnDefinitions="36,*" ColumnSpacing="10" Padding="8,7">
+                            <Border WidthRequest="32" HeightRequest="32" StrokeThickness="0" BackgroundColor="{DynamicResource SurfaceContainerHigh}" StrokeShape="RoundRectangle 16">
+                                <Grid>
+                                    <Label Text="{Binding Initials}" FontSize="12" FontAttributes="Bold" HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
+                                    <Image Source="{Binding Avatar}" Aspect="AspectFill" />
+                                </Grid>
+                            </Border>
+                            <Label Grid.Column="1" Text="{Binding Name}" VerticalTextAlignment="Center" LineBreakMode="TailTruncation" />
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+            <VerticalStackLayout Grid.Row="2" Spacing="8">
+                <Button Text="Settings" Command="{Binding OpenSettingsCommand}" />
+                <Button Text="Sign out" Command="{Binding LogoutCommand}" />
+            </VerticalStackLayout>
+        </Grid>
+    </Shell.FlyoutContent>
+</Shell>
