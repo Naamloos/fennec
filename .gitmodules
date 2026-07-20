@@ -1,6 +1,3 @@
-[submodule "meenzen-matrix"]
-	path = meenzen-matrix
-	url = https://github.com/meenzen/Matrix
 [submodule "matrix-rust-sdk"]
 	path = matrix-rust-sdk
 	url = https://github.com/matrix-org/matrix-rust-sdk.git
