@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Application
+    x:Class="Dev.Naamloos.Fennec.App.App"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <Color x:Key="AppBackground">#F7FAF7</Color>
+            <Color x:Key="Surface">#FFFFFF</Color>
+            <Color x:Key="SurfaceContainer">#EEF3EE</Color>
+            <Color x:Key="SurfaceContainerHigh">#E4EBE4</Color>
+            <Color x:Key="Outline">#727971</Color>
+            <Color x:Key="OnSurface">#171D18</Color>
+            <Color x:Key="OnSurfaceVariant">#424942</Color>
+            <Color x:Key="Primary">#216C46</Color>
+            <Color x:Key="OnPrimary">#FFFFFF</Color>
+            <Color x:Key="PrimaryContainer">#A1F2C2</Color>
+            <Color x:Key="OnPrimaryContainer">#002111</Color>
+            <Color x:Key="Scrim">#B3000000</Color>
+
+            <Style TargetType="ContentPage">
+                <Setter Property="BackgroundColor" Value="{DynamicResource AppBackground}" />
+            </Style>
+            <Style TargetType="Label">
+                <Setter Property="TextColor" Value="{DynamicResource OnSurface}" />
+                <Setter Property="FontFamily" Value="OpenSansRegular" />
+            </Style>
+            <Style TargetType="Button">
+                <Setter Property="BackgroundColor" Value="{DynamicResource PrimaryContainer}" />
+                <Setter Property="TextColor" Value="{DynamicResource OnPrimaryContainer}" />
+                <Setter Property="CornerRadius" Value="18" />
+                <Setter Property="FontFamily" Value="OpenSansSemibold" />
+                <Setter Property="MinimumHeightRequest" Value="40" />
+            </Style>
+            <Style TargetType="Entry">
+                <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceContainer}" />
+                <Setter Property="TextColor" Value="{DynamicResource OnSurface}" />
+                <Setter Property="PlaceholderColor" Value="{DynamicResource OnSurfaceVariant}" />
+            </Style>
+            <Style TargetType="Editor">
+                <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceContainer}" />
+                <Setter Property="TextColor" Value="{DynamicResource OnSurface}" />
+                <Setter Property="PlaceholderColor" Value="{DynamicResource OnSurfaceVariant}" />
+            </Style>
+            <Style TargetType="Picker">
+                <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceContainer}" />
+                <Setter Property="TextColor" Value="{DynamicResource OnSurface}" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

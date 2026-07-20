@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+	<None
+	    Include="native\win-x64\matrix_sdk_ffi.dll"
+	    Pack="true"
+	    PackagePath="runtimes/win-x64/native/matrix_sdk_ffi.dll" />
+	
+    <None Include="native\android-arm64\libmatrix_sdk_ffi.so" Pack="true" PackagePath="native\android-arm64\" />
+	
+	<None Include="native\android-x64\libmatrix_sdk_ffi.so" Pack="true" PackagePath="native\android-x64\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="native\android-arm64\" />
+    <Folder Include="native\android-x64\" />
+    <Folder Include="native\linux-x64\" />
+    <Folder Include="native\linux-arm64\" />
+  </ItemGroup>
+
+</Project>

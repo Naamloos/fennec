@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="Dev.Naamloos.Fennec.App.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:Dev.Naamloos.Fennec.App.Models"
+    xmlns:viewModels="clr-namespace:Dev.Naamloos.Fennec.App.ViewModels"
+    x:DataType="viewModels:SettingsViewModel"
+    SafeAreaEdges="All"
+    Title="Settings">
+    <Grid>
+        <ScrollView>
+            <VerticalStackLayout Padding="24" Spacing="22" MaximumWidthRequest="760" HorizontalOptions="Center">
+                <Label Text="Account" FontSize="28" FontAttributes="Bold" />
+                <Border Padding="18" StrokeThickness="0" BackgroundColor="{DynamicResource SurfaceContainer}" StrokeShape="RoundRectangle 20">
+                    <Grid ColumnDefinitions="72,*" ColumnSpacing="16">
+                        <Border WidthRequest="72" HeightRequest="72" StrokeThickness="0" BackgroundColor="{DynamicResource SurfaceContainerHigh}" StrokeShape="RoundRectangle 36">
+                            <Image Source="{Binding Avatar}" Aspect="AspectFill" />
+                        </Border>
+                        <VerticalStackLayout Grid.Column="1" Spacing="8">
+                            <Label Text="{Binding UserId}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                            <Entry Text="{Binding DisplayName}" Placeholder="Display name" />
+                            <HorizontalStackLayout Spacing="8">
+                                <Button Text="Save profile" Command="{Binding SaveProfileCommand}" />
+                                <Button Text="Change avatar" Command="{Binding ChangeAvatarCommand}" />
+                                <Button Text="Manage account" Command="{Binding ManageAccountCommand}" />
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+                    </Grid>
+                </Border>
+
+                <Label Text="Security" FontSize="22" FontAttributes="Bold" />
+                <Border Padding="18" StrokeThickness="0" BackgroundColor="{DynamicResource SurfaceContainer}" StrokeShape="RoundRectangle 20">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Session verification" FontAttributes="Bold" />
+                        <Label Text="{Binding VerificationStatus, StringFormat='Status: {0}'}" />
+                        <Label Text="{Binding VerificationMessage}" IsVisible="{Binding HasVerificationMessage}" Opacity="0.75" />
+                        <Button Text="Verify this session" Command="{Binding StartVerificationCommand}" HorizontalOptions="Start" />
+                        <HorizontalStackLayout IsVisible="{Binding HasIncomingVerification}" Spacing="10">
+                            <Button Text="Accept request" Command="{Binding AcceptVerificationCommand}" />
+                            <Button Text="Decline" Command="{Binding DeclineVerificationCommand}" />
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Label Text="Devices" FontSize="22" FontAttributes="Bold" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Devices}" Spacing="10">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="models:MatrixDevice">
+                            <Border Padding="16" StrokeThickness="0" BackgroundColor="{DynamicResource Surface}" StrokeShape="RoundRectangle 18">
+                                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" RowSpacing="6">
+                                    <Entry Text="{Binding DisplayName}" FontAttributes="Bold" />
+                                    <Button
+                                        Grid.Column="1"
+                                        Text="Save"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SaveDeviceCommand}"
+                                        CommandParameter="{Binding .}" />
+                                    <Button
+                                        Grid.Column="2"
+                                        Text="Manage"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ManageDeviceCommand}"
+                                        CommandParameter="{Binding .}" />
+                                    <VerticalStackLayout Grid.Row="1" Grid.ColumnSpan="3" Spacing="2">
+                                        <Label Text="{Binding DeviceId}" FontSize="12" Opacity="0.75" />
+                                        <Label Text="{Binding LastSeenText, StringFormat='Last seen: {0}'}" FontSize="12" Opacity="0.75" />
+                                        <Label Text="This device" IsVisible="{Binding IsCurrent}" FontSize="12" FontAttributes="Bold" />
+                                    </VerticalStackLayout>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+                <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextColor="Red" />
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Grid IsVisible="{Binding IsVerificationModalOpen}" BackgroundColor="{DynamicResource Scrim}" ZIndex="100" Padding="24">
+            <Border
+                Padding="24"
+                MaximumWidthRequest="520"
+                HorizontalOptions="Center"
+                VerticalOptions="Center"
+                BackgroundColor="{DynamicResource Surface}"
+                StrokeThickness="0"
+                StrokeShape="RoundRectangle 24">
+                <VerticalStackLayout Spacing="18">
+                    <Label Text="Do these emoji match?" FontSize="24" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                    <Label Text="Compare them with the other device. Confirm only if every emoji matches in the same order." HorizontalTextAlignment="Center" />
+                    <FlexLayout
+                        BindableLayout.ItemsSource="{Binding VerificationEmojis}"
+                        Direction="Row"
+                        Wrap="Wrap"
+                        JustifyContent="Center">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="models:VerificationEmoji">
+                                <VerticalStackLayout WidthRequest="92" Margin="4" Spacing="3">
+                                    <Label Text="{Binding Symbol}" FontSize="34" HorizontalTextAlignment="Center" />
+                                    <Label Text="{Binding Description}" FontSize="11" HorizontalTextAlignment="Center" />
+                                </VerticalStackLayout>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </FlexLayout>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <Button Text="They don't match" Command="{Binding DeclineVerificationCommand}" />
+                        <Button Grid.Column="1" Text="They match" Command="{Binding ApproveVerificationCommand}" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+    </Grid>
+</ContentPage>
