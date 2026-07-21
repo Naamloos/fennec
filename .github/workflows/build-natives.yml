@@ -1,4 +1,4 @@
-name: Build native Matrix SDK libraries
+name: Build Matrix SDK native libraries
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
       matrix_sdk_ref:
         description: Matrix Rust SDK tag, branch, or commit
         required: true
-        default: matrix-sdk-0.17.0
+        default: matrix-sdk-0.18.0
         type: string
 
 permissions:
@@ -14,42 +14,55 @@ permissions:
 
 env:
   MATRIX_SDK_REPOSITORY: https://github.com/matrix-org/matrix-rust-sdk.git
-  MATRIX_SDK_REF: ${{ inputs.matrix_sdk_ref }}
   MATRIX_SDK_PACKAGE: matrix-sdk-ffi
-  ANDROID_API_LEVEL: "21"
-  APPLE_DEPLOYMENT_TARGET: "15.0"
 
 jobs:
   android:
-    name: Android native libraries
+    name: Build Android natives
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 120
+
+    env:
+      MATRIX_SDK_REF: ${{ inputs.matrix_sdk_ref }}
+      ANDROID_API_LEVEL: "21"
 
     steps:
       - name: Checkout Fennec
         uses: actions/checkout@v4
 
       - name: Install system dependencies
+        shell: bash
         run: |
+          set -euxo pipefail
+
           sudo apt-get update
+
           sudo apt-get install --yes \
             build-essential \
             clang \
             cmake \
             libssl-dev \
+            lld \
+            llvm \
             nasm \
             ninja-build \
             pkg-config \
             protobuf-compiler
 
       - name: Install Rust targets
+        shell: bash
         run: |
+          set -euxo pipefail
+
           rustup target add \
             aarch64-linux-android \
             x86_64-linux-android
 
       - name: Install cargo-ndk
-        run: cargo install cargo-ndk --locked
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cargo install cargo-ndk --locked
 
       - name: Clone Matrix Rust SDK
         shell: bash
@@ -62,9 +75,17 @@ jobs:
             matrix-rust-sdk
 
           cd matrix-rust-sdk
-          git checkout "${MATRIX_SDK_REF}"
 
-      - name: Build Android libraries
+          if ! git checkout "${MATRIX_SDK_REF}"; then
+            echo "::error::Matrix Rust SDK ref '${MATRIX_SDK_REF}' does not exist."
+            echo "Check the tags at:"
+            echo "https://github.com/matrix-org/matrix-rust-sdk/tags"
+            exit 1
+          fi
+
+          git rev-parse HEAD
+
+      - name: Build Android native libraries
         working-directory: matrix-rust-sdk
         shell: bash
         run: |
@@ -89,18 +110,20 @@ jobs:
             native/android-arm64 \
             native/android-x64
 
-          cp \
+          install \
+            -m 0644 \
             android-build/arm64-v8a/libmatrix_sdk_ffi.so \
             native/android-arm64/libmatrix_sdk_ffi.so
 
-          cp \
+          install \
+            -m 0644 \
             android-build/x86_64/libmatrix_sdk_ffi.so \
             native/android-x64/libmatrix_sdk_ffi.so
 
           file native/android-arm64/libmatrix_sdk_ffi.so
           file native/android-x64/libmatrix_sdk_ffi.so
 
-      - name: Upload Android libraries
+      - name: Upload Android native libraries
         uses: actions/upload-artifact@v4
         with:
           name: matrix-sdk-ffi-android
@@ -109,9 +132,12 @@ jobs:
           retention-days: 14
 
   windows:
-    name: Windows native library
+    name: Build Windows natives
     runs-on: windows-2025
-    timeout-minutes: 90
+    timeout-minutes: 120
+
+    env:
+      MATRIX_SDK_REF: ${{ inputs.matrix_sdk_ref }}
 
     steps:
       - name: Checkout Fennec
@@ -120,6 +146,8 @@ jobs:
       - name: Install Rust target
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
+
           rustup target add x86_64-pc-windows-msvc
 
       - name: Clone Matrix Rust SDK
@@ -133,9 +161,17 @@ jobs:
             matrix-rust-sdk
 
           Set-Location matrix-rust-sdk
+
           git checkout $env:MATRIX_SDK_REF
 
-      - name: Build Windows library
+          if ($LASTEXITCODE -ne 0) {
+              Write-Error "Matrix Rust SDK ref '$env:MATRIX_SDK_REF' does not exist."
+              exit 1
+          }
+
+          git rev-parse HEAD
+
+      - name: Build Windows native library
         working-directory: matrix-rust-sdk
         shell: pwsh
         run: |
@@ -159,13 +195,13 @@ jobs:
             Out-Null
 
           Copy-Item `
-            "matrix-rust-sdk/target/x86_64-pc-windows-msvc/release/matrix_sdk_ffi.dll" `
-            "native/win-x64/matrix_sdk_ffi.dll"
+            -Path "matrix-rust-sdk/target/x86_64-pc-windows-msvc/release/matrix_sdk_ffi.dll" `
+            -Destination "native/win-x64/matrix_sdk_ffi.dll"
 
           Get-Item "native/win-x64/matrix_sdk_ffi.dll" |
             Format-List Name, Length, FullName
 
-      - name: Upload Windows library
+      - name: Upload Windows native library
         uses: actions/upload-artifact@v4
         with:
           name: matrix-sdk-ffi-windows
@@ -174,11 +210,14 @@ jobs:
           retention-days: 14
 
   macos:
-    name: macOS and Mac Catalyst libraries
+    name: Build macOS and Mac Catalyst natives
     runs-on: macos-15
-    timeout-minutes: 120
+    timeout-minutes: 180
 
     env:
+      MATRIX_SDK_REF: ${{ inputs.matrix_sdk_ref }}
+
+      # These must be literals here. Do not reference another env value.
       MACOSX_DEPLOYMENT_TARGET: "15.0"
       IPHONEOS_DEPLOYMENT_TARGET: "15.0"
 
@@ -186,16 +225,20 @@ jobs:
       - name: Checkout Fennec
         uses: actions/checkout@v4
 
-      - name: Select Xcode
+      - name: Show Xcode version
         shell: bash
         run: |
           set -euxo pipefail
-          sudo xcode-select --switch /Applications/Xcode.app
+
+          xcode-select --print-path
           xcodebuild -version
+          xcrun --sdk macosx --show-sdk-path
 
       - name: Install Rust targets
         shell: bash
         run: |
+          set -euxo pipefail
+
           rustup target add \
             aarch64-apple-darwin \
             x86_64-apple-darwin \
@@ -213,7 +256,15 @@ jobs:
             matrix-rust-sdk
 
           cd matrix-rust-sdk
-          git checkout "${MATRIX_SDK_REF}"
+
+          if ! git checkout "${MATRIX_SDK_REF}"; then
+            echo "::error::Matrix Rust SDK ref '${MATRIX_SDK_REF}' does not exist."
+            echo "Check the tags at:"
+            echo "https://github.com/matrix-org/matrix-rust-sdk/tags"
+            exit 1
+          fi
+
+          git rev-parse HEAD
 
       - name: Build macOS libraries
         working-directory: matrix-rust-sdk
@@ -221,16 +272,17 @@ jobs:
         run: |
           set -euxo pipefail
 
-          for target in \
-            aarch64-apple-darwin \
-            x86_64-apple-darwin
-          do
-            cargo build \
-              --release \
-              --locked \
-              --package "${MATRIX_SDK_PACKAGE}" \
-              --target "${target}"
-          done
+          cargo build \
+            --release \
+            --locked \
+            --package "${MATRIX_SDK_PACKAGE}" \
+            --target aarch64-apple-darwin
+
+          cargo build \
+            --release \
+            --locked \
+            --package "${MATRIX_SDK_PACKAGE}" \
+            --target x86_64-apple-darwin
 
       - name: Build Mac Catalyst libraries
         working-directory: matrix-rust-sdk
@@ -238,18 +290,19 @@ jobs:
         run: |
           set -euxo pipefail
 
-          for target in \
-            aarch64-apple-ios-macabi \
-            x86_64-apple-ios-macabi
-          do
-            cargo build \
-              --release \
-              --locked \
-              --package "${MATRIX_SDK_PACKAGE}" \
-              --target "${target}"
-          done
+          cargo build \
+            --release \
+            --locked \
+            --package "${MATRIX_SDK_PACKAGE}" \
+            --target aarch64-apple-ios-macabi
 
-      - name: Create universal Apple libraries
+          cargo build \
+            --release \
+            --locked \
+            --package "${MATRIX_SDK_PACKAGE}" \
+            --target x86_64-apple-ios-macabi
+
+      - name: Prepare macOS and Mac Catalyst artifacts
         shell: bash
         run: |
           set -euxo pipefail
@@ -280,7 +333,11 @@ jobs:
           lipo -info native/macos/libmatrix_sdk_ffi.dylib
           lipo -info native/maccatalyst/libmatrix_sdk_ffi.a
 
-      - name: Upload macOS libraries
+          file native/macos/libmatrix_sdk_ffi.a
+          file native/macos/libmatrix_sdk_ffi.dylib
+          file native/maccatalyst/libmatrix_sdk_ffi.a
+
+      - name: Upload macOS native libraries
         uses: actions/upload-artifact@v4
         with:
           name: matrix-sdk-ffi-macos
@@ -289,28 +346,36 @@ jobs:
           retention-days: 14
 
   ios:
-    name: iOS native libraries
+    name: Build iOS natives
     runs-on: macos-15
-    timeout-minutes: 120
+    timeout-minutes: 180
 
     env:
-      MACOSX_DEPLOYMENT_TARGET: ${{ env.APPLE_DEPLOYMENT_TARGET }}
-      IPHONEOS_DEPLOYMENT_TARGET: ${{ env.APPLE_DEPLOYMENT_TARGET }}
+      MATRIX_SDK_REF: ${{ inputs.matrix_sdk_ref }}
+
+      # These must be literals here. Do not reference another env value.
+      MACOSX_DEPLOYMENT_TARGET: "15.0"
+      IPHONEOS_DEPLOYMENT_TARGET: "15.0"
 
     steps:
       - name: Checkout Fennec
         uses: actions/checkout@v4
 
-      - name: Select Xcode
+      - name: Show Xcode version
         shell: bash
         run: |
           set -euxo pipefail
-          sudo xcode-select --switch /Applications/Xcode.app
+
+          xcode-select --print-path
           xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-path
+          xcrun --sdk iphonesimulator --show-sdk-path
 
       - name: Install Rust targets
         shell: bash
         run: |
+          set -euxo pipefail
+
           rustup target add \
             aarch64-apple-ios \
             aarch64-apple-ios-sim \
@@ -327,7 +392,15 @@ jobs:
             matrix-rust-sdk
 
           cd matrix-rust-sdk
-          git checkout "${MATRIX_SDK_REF}"
+
+          if ! git checkout "${MATRIX_SDK_REF}"; then
+            echo "::error::Matrix Rust SDK ref '${MATRIX_SDK_REF}' does not exist."
+            echo "Check the tags at:"
+            echo "https://github.com/matrix-org/matrix-rust-sdk/tags"
+            exit 1
+          fi
+
+          git rev-parse HEAD
 
       - name: Build iOS device library
         working-directory: matrix-rust-sdk
@@ -359,7 +432,7 @@ jobs:
             --package "${MATRIX_SDK_PACKAGE}" \
             --target x86_64-apple-ios
 
-      - name: Prepare iOS libraries
+      - name: Prepare iOS artifacts
         shell: bash
         run: |
           set -euxo pipefail
@@ -368,10 +441,13 @@ jobs:
             native/ios-arm64 \
             native/ios-simulator
 
-          cp \
+          # iOS physical devices are ARM64.
+          install \
+            -m 0644 \
             matrix-rust-sdk/target/aarch64-apple-ios/release/libmatrix_sdk_ffi.a \
             native/ios-arm64/libmatrix_sdk_ffi.a
 
+          # Universal simulator library supporting Apple Silicon and Intel.
           lipo -create \
             matrix-rust-sdk/target/aarch64-apple-ios-sim/release/libmatrix_sdk_ffi.a \
             matrix-rust-sdk/target/x86_64-apple-ios/release/libmatrix_sdk_ffi.a \
@@ -380,7 +456,10 @@ jobs:
           lipo -info native/ios-arm64/libmatrix_sdk_ffi.a
           lipo -info native/ios-simulator/libmatrix_sdk_ffi.a
 
-      - name: Upload iOS libraries
+          file native/ios-arm64/libmatrix_sdk_ffi.a
+          file native/ios-simulator/libmatrix_sdk_ffi.a
+
+      - name: Upload iOS native libraries
         uses: actions/upload-artifact@v4
         with:
           name: matrix-sdk-ffi-ios
@@ -391,6 +470,8 @@ jobs:
   package:
     name: Package all native libraries
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
     needs:
       - android
       - windows
@@ -398,51 +479,55 @@ jobs:
       - ios
 
     steps:
-      - name: Download Android libraries
+      - name: Download Android artifact
         uses: actions/download-artifact@v4
         with:
           name: matrix-sdk-ffi-android
           path: combined
 
-      - name: Download Windows library
+      - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
           name: matrix-sdk-ffi-windows
           path: combined
 
-      - name: Download macOS libraries
+      - name: Download macOS artifact
         uses: actions/download-artifact@v4
         with:
           name: matrix-sdk-ffi-macos
           path: combined
 
-      - name: Download iOS libraries
+      - name: Download iOS artifact
         uses: actions/download-artifact@v4
         with:
           name: matrix-sdk-ffi-ios
           path: combined
 
-      - name: Verify combined artifact
+      - name: Verify combined native bundle
         shell: bash
         run: |
           set -euxo pipefail
 
           required_files=(
-            combined/android-arm64/libmatrix_sdk_ffi.so
-            combined/android-x64/libmatrix_sdk_ffi.so
-            combined/win-x64/matrix_sdk_ffi.dll
-            combined/macos/libmatrix_sdk_ffi.a
-            combined/macos/libmatrix_sdk_ffi.dylib
-            combined/maccatalyst/libmatrix_sdk_ffi.a
-            combined/ios-arm64/libmatrix_sdk_ffi.a
-            combined/ios-simulator/libmatrix_sdk_ffi.a
+            "combined/android-arm64/libmatrix_sdk_ffi.so"
+            "combined/android-x64/libmatrix_sdk_ffi.so"
+            "combined/win-x64/matrix_sdk_ffi.dll"
+            "combined/macos/libmatrix_sdk_ffi.a"
+            "combined/macos/libmatrix_sdk_ffi.dylib"
+            "combined/maccatalyst/libmatrix_sdk_ffi.a"
+            "combined/ios-arm64/libmatrix_sdk_ffi.a"
+            "combined/ios-simulator/libmatrix_sdk_ffi.a"
           )
 
-          for file in "${required_files[@]}"; do
-            test -f "${file}"
+          for required_file in "${required_files[@]}"; do
+            if [[ ! -f "${required_file}" ]]; then
+              echo "::error::Missing expected file: ${required_file}"
+              exit 1
+            fi
           done
 
-          find combined -type f -print
+          echo "Complete native bundle:"
+          find combined -type f -print | sort
 
       - name: Upload complete native bundle
         uses: actions/upload-artifact@v4
