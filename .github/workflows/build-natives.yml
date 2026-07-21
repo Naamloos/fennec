@@ -1,0 +1,453 @@
+name: Build native Matrix SDK libraries
+
+on:
+  workflow_dispatch:
+    inputs:
+      matrix_sdk_ref:
+        description: Matrix Rust SDK tag, branch, or commit
+        required: true
+        default: matrix-sdk-0.17.0
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  MATRIX_SDK_REPOSITORY: https://github.com/matrix-org/matrix-rust-sdk.git
+  MATRIX_SDK_REF: ${{ inputs.matrix_sdk_ref }}
+  MATRIX_SDK_PACKAGE: matrix-sdk-ffi
+  ANDROID_API_LEVEL: "21"
+  APPLE_DEPLOYMENT_TARGET: "15.0"
+
+jobs:
+  android:
+    name: Android native libraries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout Fennec
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            build-essential \
+            clang \
+            cmake \
+            libssl-dev \
+            nasm \
+            ninja-build \
+            pkg-config \
+            protobuf-compiler
+
+      - name: Install Rust targets
+        run: |
+          rustup target add \
+            aarch64-linux-android \
+            x86_64-linux-android
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Clone Matrix Rust SDK
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          git clone \
+            --filter=blob:none \
+            "${MATRIX_SDK_REPOSITORY}" \
+            matrix-rust-sdk
+
+          cd matrix-rust-sdk
+          git checkout "${MATRIX_SDK_REF}"
+
+      - name: Build Android libraries
+        working-directory: matrix-rust-sdk
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          cargo ndk \
+            --platform "${ANDROID_API_LEVEL}" \
+            --target arm64-v8a \
+            --target x86_64 \
+            --output-dir ../android-build \
+            build \
+            --release \
+            --locked \
+            --package "${MATRIX_SDK_PACKAGE}"
+
+      - name: Prepare Android artifact
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          mkdir -p \
+            native/android-arm64 \
+            native/android-x64
+
+          cp \
+            android-build/arm64-v8a/libmatrix_sdk_ffi.so \
+            native/android-arm64/libmatrix_sdk_ffi.so
+
+          cp \
+            android-build/x86_64/libmatrix_sdk_ffi.so \
+            native/android-x64/libmatrix_sdk_ffi.so
+
+          file native/android-arm64/libmatrix_sdk_ffi.so
+          file native/android-x64/libmatrix_sdk_ffi.so
+
+      - name: Upload Android libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: matrix-sdk-ffi-android
+          path: native/
+          if-no-files-found: error
+          retention-days: 14
+
+  windows:
+    name: Windows native library
+    runs-on: windows-2025
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout Fennec
+        uses: actions/checkout@v4
+
+      - name: Install Rust target
+        shell: pwsh
+        run: |
+          rustup target add x86_64-pc-windows-msvc
+
+      - name: Clone Matrix Rust SDK
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          git clone `
+            --filter=blob:none `
+            $env:MATRIX_SDK_REPOSITORY `
+            matrix-rust-sdk
+
+          Set-Location matrix-rust-sdk
+          git checkout $env:MATRIX_SDK_REF
+
+      - name: Build Windows library
+        working-directory: matrix-rust-sdk
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          cargo build `
+            --release `
+            --locked `
+            --package $env:MATRIX_SDK_PACKAGE `
+            --target x86_64-pc-windows-msvc
+
+      - name: Prepare Windows artifact
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          New-Item `
+            -ItemType Directory `
+            -Force `
+            -Path "native/win-x64" |
+            Out-Null
+
+          Copy-Item `
+            "matrix-rust-sdk/target/x86_64-pc-windows-msvc/release/matrix_sdk_ffi.dll" `
+            "native/win-x64/matrix_sdk_ffi.dll"
+
+          Get-Item "native/win-x64/matrix_sdk_ffi.dll" |
+            Format-List Name, Length, FullName
+
+      - name: Upload Windows library
+        uses: actions/upload-artifact@v4
+        with:
+          name: matrix-sdk-ffi-windows
+          path: native/
+          if-no-files-found: error
+          retention-days: 14
+
+  macos:
+    name: macOS and Mac Catalyst libraries
+    runs-on: macos-15
+    timeout-minutes: 120
+
+    env:
+      MACOSX_DEPLOYMENT_TARGET: ${{ env.APPLE_DEPLOYMENT_TARGET }}
+      IPHONEOS_DEPLOYMENT_TARGET: ${{ env.APPLE_DEPLOYMENT_TARGET }}
+
+    steps:
+      - name: Checkout Fennec
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo xcode-select --switch /Applications/Xcode.app
+          xcodebuild -version
+
+      - name: Install Rust targets
+        shell: bash
+        run: |
+          rustup target add \
+            aarch64-apple-darwin \
+            x86_64-apple-darwin \
+            aarch64-apple-ios-macabi \
+            x86_64-apple-ios-macabi
+
+      - name: Clone Matrix Rust SDK
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          git clone \
+            --filter=blob:none \
+            "${MATRIX_SDK_REPOSITORY}" \
+            matrix-rust-sdk
+
+          cd matrix-rust-sdk
+          git checkout "${MATRIX_SDK_REF}"
+
+      - name: Build macOS libraries
+        working-directory: matrix-rust-sdk
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          for target in \
+            aarch64-apple-darwin \
+            x86_64-apple-darwin
+          do
+            cargo build \
+              --release \
+              --locked \
+              --package "${MATRIX_SDK_PACKAGE}" \
+              --target "${target}"
+          done
+
+      - name: Build Mac Catalyst libraries
+        working-directory: matrix-rust-sdk
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          for target in \
+            aarch64-apple-ios-macabi \
+            x86_64-apple-ios-macabi
+          do
+            cargo build \
+              --release \
+              --locked \
+              --package "${MATRIX_SDK_PACKAGE}" \
+              --target "${target}"
+          done
+
+      - name: Create universal Apple libraries
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          mkdir -p \
+            native/macos \
+            native/maccatalyst
+
+          # Universal macOS static library.
+          lipo -create \
+            matrix-rust-sdk/target/aarch64-apple-darwin/release/libmatrix_sdk_ffi.a \
+            matrix-rust-sdk/target/x86_64-apple-darwin/release/libmatrix_sdk_ffi.a \
+            -output native/macos/libmatrix_sdk_ffi.a
+
+          # Universal macOS dynamic library.
+          lipo -create \
+            matrix-rust-sdk/target/aarch64-apple-darwin/release/libmatrix_sdk_ffi.dylib \
+            matrix-rust-sdk/target/x86_64-apple-darwin/release/libmatrix_sdk_ffi.dylib \
+            -output native/macos/libmatrix_sdk_ffi.dylib
+
+          # Universal Mac Catalyst static library.
+          lipo -create \
+            matrix-rust-sdk/target/aarch64-apple-ios-macabi/release/libmatrix_sdk_ffi.a \
+            matrix-rust-sdk/target/x86_64-apple-ios-macabi/release/libmatrix_sdk_ffi.a \
+            -output native/maccatalyst/libmatrix_sdk_ffi.a
+
+          lipo -info native/macos/libmatrix_sdk_ffi.a
+          lipo -info native/macos/libmatrix_sdk_ffi.dylib
+          lipo -info native/maccatalyst/libmatrix_sdk_ffi.a
+
+      - name: Upload macOS libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: matrix-sdk-ffi-macos
+          path: native/
+          if-no-files-found: error
+          retention-days: 14
+
+  ios:
+    name: iOS native libraries
+    runs-on: macos-15
+    timeout-minutes: 120
+
+    env:
+      MACOSX_DEPLOYMENT_TARGET: ${{ env.APPLE_DEPLOYMENT_TARGET }}
+      IPHONEOS_DEPLOYMENT_TARGET: ${{ env.APPLE_DEPLOYMENT_TARGET }}
+
+    steps:
+      - name: Checkout Fennec
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo xcode-select --switch /Applications/Xcode.app
+          xcodebuild -version
+
+      - name: Install Rust targets
+        shell: bash
+        run: |
+          rustup target add \
+            aarch64-apple-ios \
+            aarch64-apple-ios-sim \
+            x86_64-apple-ios
+
+      - name: Clone Matrix Rust SDK
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          git clone \
+            --filter=blob:none \
+            "${MATRIX_SDK_REPOSITORY}" \
+            matrix-rust-sdk
+
+          cd matrix-rust-sdk
+          git checkout "${MATRIX_SDK_REF}"
+
+      - name: Build iOS device library
+        working-directory: matrix-rust-sdk
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          cargo build \
+            --release \
+            --locked \
+            --package "${MATRIX_SDK_PACKAGE}" \
+            --target aarch64-apple-ios
+
+      - name: Build iOS Simulator libraries
+        working-directory: matrix-rust-sdk
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          cargo build \
+            --release \
+            --locked \
+            --package "${MATRIX_SDK_PACKAGE}" \
+            --target aarch64-apple-ios-sim
+
+          cargo build \
+            --release \
+            --locked \
+            --package "${MATRIX_SDK_PACKAGE}" \
+            --target x86_64-apple-ios
+
+      - name: Prepare iOS libraries
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          mkdir -p \
+            native/ios-arm64 \
+            native/ios-simulator
+
+          cp \
+            matrix-rust-sdk/target/aarch64-apple-ios/release/libmatrix_sdk_ffi.a \
+            native/ios-arm64/libmatrix_sdk_ffi.a
+
+          lipo -create \
+            matrix-rust-sdk/target/aarch64-apple-ios-sim/release/libmatrix_sdk_ffi.a \
+            matrix-rust-sdk/target/x86_64-apple-ios/release/libmatrix_sdk_ffi.a \
+            -output native/ios-simulator/libmatrix_sdk_ffi.a
+
+          lipo -info native/ios-arm64/libmatrix_sdk_ffi.a
+          lipo -info native/ios-simulator/libmatrix_sdk_ffi.a
+
+      - name: Upload iOS libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: matrix-sdk-ffi-ios
+          path: native/
+          if-no-files-found: error
+          retention-days: 14
+
+  package:
+    name: Package all native libraries
+    runs-on: ubuntu-24.04
+    needs:
+      - android
+      - windows
+      - macos
+      - ios
+
+    steps:
+      - name: Download Android libraries
+        uses: actions/download-artifact@v4
+        with:
+          name: matrix-sdk-ffi-android
+          path: combined
+
+      - name: Download Windows library
+        uses: actions/download-artifact@v4
+        with:
+          name: matrix-sdk-ffi-windows
+          path: combined
+
+      - name: Download macOS libraries
+        uses: actions/download-artifact@v4
+        with:
+          name: matrix-sdk-ffi-macos
+          path: combined
+
+      - name: Download iOS libraries
+        uses: actions/download-artifact@v4
+        with:
+          name: matrix-sdk-ffi-ios
+          path: combined
+
+      - name: Verify combined artifact
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          required_files=(
+            combined/android-arm64/libmatrix_sdk_ffi.so
+            combined/android-x64/libmatrix_sdk_ffi.so
+            combined/win-x64/matrix_sdk_ffi.dll
+            combined/macos/libmatrix_sdk_ffi.a
+            combined/macos/libmatrix_sdk_ffi.dylib
+            combined/maccatalyst/libmatrix_sdk_ffi.a
+            combined/ios-arm64/libmatrix_sdk_ffi.a
+            combined/ios-simulator/libmatrix_sdk_ffi.a
+          )
+
+          for file in "${required_files[@]}"; do
+            test -f "${file}"
+          done
+
+          find combined -type f -print
+
+      - name: Upload complete native bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: matrix-sdk-ffi-all
+          path: combined/
+          if-no-files-found: error
+          retention-days: 14
