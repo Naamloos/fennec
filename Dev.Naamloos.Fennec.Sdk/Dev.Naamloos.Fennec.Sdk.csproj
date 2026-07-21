@@ -8,10 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-	<None
-	    Include="native\win-x64\matrix_sdk_ffi.dll"
-	    Pack="true"
-	    PackagePath="runtimes/win-x64/native/matrix_sdk_ffi.dll" />
+	<None Include="native\win-x64\matrix_sdk_ffi.dll" Pack="true" PackagePath="runtimes/win-x64/native/matrix_sdk_ffi.dll" />
 	
     <None Include="native\android-arm64\libmatrix_sdk_ffi.so" Pack="true" PackagePath="native\android-arm64\" />
 	
@@ -19,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Entities\" />
     <Folder Include="native\android-arm64\" />
     <Folder Include="native\android-x64\" />
     <Folder Include="native\linux-x64\" />
