@@ -1,2 +1,0 @@
-Dev.Naamloos.Fennec.Sdk/native/**/*.so filter=lfs diff=lfs merge=lfs -text
-Dev.Naamloos.Fennec.Sdk/native/**/*.dll filter=lfs diff=lfs merge=lfs -text
