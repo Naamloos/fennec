@@ -22,3 +22,53 @@ As of right now, support has been tested and confirmed for the following platfor
 
 ## Screenshots
 Soon, whenever I feel like the UI is presentable.
+
+## Spec compliance
+I will be tracking feature support in the following table. This table is based on the [matrix documentation at v1.19](https://spec.matrix.org/v1.19/client-server-api/#summary)
+
+| Feature | Desktop/Mobile Required? | Implemented | Notes |
+|---------|--------------------------|-------------|-------|
+| Content Repository | Both |   |   |
+| Direct Messaging | Both | ✅ |   |
+| Ignoring Users | Both |   |   |
+| Instant Messaging | Both | ✅ |   |
+| Presence | Both |   |   |
+| Push Notifications | Mobile |   |   |
+| Receipts | Both | ✅ | Needs UI improvement |
+| Room History Visibility | Both | ✅ | Needs UI improvement |
+| Room Upgrades | Both |   |   |
+| Third-party Invites | Mobile |   |   |
+| Typing Notifications | Both | ✅ |   |
+| User and Room Mentions | Both |   |   |
+| Voice over IP | Both |   |   |
+| Client Config | Optional |   |   |
+| Device Management | Optional | ✅ | Buggy, needs improvement |
+| End-to-End Encryption | Optional | ✅ | Has some issues, but E2EE validation works |
+| Event Annotations and reactions | Optional | ✅ | Very barebones, needs work |
+| Event Context | Optional |   |   |
+| Event Replacements | Optional |   |   |
+| Read and Unread Markers | Optional | ✅ | Needs major functional and UI improvements |
+| Guest Access | Optional |   |   |
+| Image Packs | Optional | ✅ | Not really tested yet, there may be bugs |
+| Moderation Policy Lists | Optional |   |   |
+| Policy Servers | Optional |   |   |
+| OpenID | Optional |   |   |
+| Recently used emoji | Optional |   |   |
+| Reference Relations | Optional |   |   |
+| Reporting Content | Optional |   |   |
+| Rich replies | Optional | ✅ | UI is ugly atm, needs improvement |
+| Room Previews | Optional |   |   |
+| Room Tagging | Optional |   |   |
+| SSO Client Login/Authentication | Optional |   |   |
+| Secrets | Optional |   |   |
+| Send-to-Device Messaging | Optional |   |   |
+| Server Access Control Lists (ACLs) | Optional |   |   |
+| Server Administration | Optional |   |   |
+| Server Notices | Optional |   |   |
+| Server Side Search | Optional |   |   |
+| Spaces | Optional | ✅ | No controls to modify spaces yet |
+| Sticker Messages | Optional | ✅ | Not really tested yet, there may be bugs |
+| Third-party Networks | Optional |   |   |
+| Threading | Optional |   |   |
+| Invite permission | Optional |   |   |
+| Mutual Rooms | Optional |   |   |
