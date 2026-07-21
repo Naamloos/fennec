@@ -427,3 +427,11 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+Dev.Naamloos.Fennec.Sdk/native/android-arm64/*
+Dev.Naamloos.Fennec.Sdk/native/android-x64/*
+Dev.Naamloos.Fennec.Sdk/native/ios-arm64/*
+Dev.Naamloos.Fennec.Sdk/native/ios-simulator/*
+Dev.Naamloos.Fennec.Sdk/native/maccatalyst/*
+Dev.Naamloos.Fennec.Sdk/native/macos/*
+Dev.Naamloos.Fennec.Sdk/native/macos/*
+Dev.Naamloos.Fennec.Sdk/native/win-x64/*
