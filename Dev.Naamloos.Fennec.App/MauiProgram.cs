@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
 using CommunityToolkit.Maui;
 using Plugin.Maui.Audio;
+using Dev.Naamloos.Fennec.Sdk;
+
 #if ANDROID || IOS || MACCATALYST
 using Nalu;
 #endif
@@ -25,22 +27,20 @@ public static class MauiProgram
         builder.UseNaluVirtualScroll();
 #endif
 
-#if DEBUG
-        builder.Logging.AddDebug();
-        MessageFormatter.AssertFormatting();
-#endif
-        builder.Services.AddSingleton<MatrixService>();
+        // Services
+        builder.Services.AddSingleton<AsyncSecureStorage>();
+        builder.Services.AddSingleton(sp =>
+        {
+            var secureStore = sp.GetRequiredService<AsyncSecureStorage>();
+            return new ManagedMatrixClient(DeviceInfo.Current.Platform.ToString(), Path.Combine(FileSystem.AppDataDirectory, "fennec"), secureStore);
+        });
         builder.Services.AddSingleton<AppNavigationService>();
-        builder.Services.AddSingleton<ChatViewModel>();
-        builder.Services.AddSingleton<StartupViewModel>();
-        builder.Services.AddTransient<LoginViewModel>();
-        builder.Services.AddTransient<AppShellViewModel>();
-        builder.Services.AddTransient<SettingsViewModel>();
+
+        // Pages
+        builder.Services.AddTransient<Login>();
         builder.Services.AddTransient<AppShell>();
-        builder.Services.AddTransient<StartupPage>();
-        builder.Services.AddTransient<LoginPage>();
-        builder.Services.AddTransient<MainPage>();
-        builder.Services.AddTransient<SettingsPage>();
+        builder.Services.AddTransient<Startup>();
+        builder.Services.AddTransient<RoomList>();
 
         return builder.Build();
     }

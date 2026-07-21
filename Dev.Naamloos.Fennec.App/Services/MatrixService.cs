@@ -1,4 +1,11 @@
-﻿using System;
+﻿///
+/// THIS IS THE OLD, LESS-HUMAN-WRITTEN, VERSION OF THE MATRIX CLIENT
+/// IT IS KEPT INTACT AS A REFERENCE FOR THE NEWER, MORE-HUMAN-WRITTEN VERSION
+/// AND WILL EVENTUALLY BE DELETED.
+/// WHENEVER THAT MAY BE
+///
+
+using System;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
