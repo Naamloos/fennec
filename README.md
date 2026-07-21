@@ -16,8 +16,8 @@ As of right now, support has been tested and confirmed for the following platfor
 | Android Arm64 | Working ✅ |   |
 | Android x64 | Untested ❓ | Might work, binaries are included |
 | Windows Arm64 | Unsupported ❌ | Feel free to open a PR to add support! |
-| MacOS | Unsupported ❌ | Feel free to open a PR to add support! |
-| iOS | Unsupported ❌ | Feel free to open a PR to add support! |
+| MacOS | Untested ❓ | Feel free to open a PR to add support! |
+| iOS | Untested ❓ | Feel free to open a PR to add support! |
 | Linux | Unsupported ❌ | Feel free to open a PR to add support! Needs a third party MAUI extension. |
 
 ## Screenshots
