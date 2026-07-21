@@ -20,6 +20,46 @@ As of right now, support has been tested and confirmed for the following platfor
 | iOS | Untested ❓ | Feel free to open a PR to add support! |
 | Linux | Unsupported ❌ | Feel free to open a PR to add support! Needs a third party MAUI extension. |
 
+## Building
+To build the project, you will need to have [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) installed.
+
+Next, make sure you have the .NET MAUI workload installed. You can do this by running the following command in your terminal:
+```bash
+dotnet workload install maui
+```
+
+> [!IMPORTANT]
+> If you want to build for Windows, you will also need to have Visual Studio 2022 or later installed with the .NET MAUI workload. You can download Visual Studio from [here](https://visualstudio.microsoft.com/downloads/).
+
+> [!IMPORTANT]
+> If you build for MacOS or iOS, you will need to have Xcode installed. You can download Xcode from the App Store.
+
+> [!IMPORTANT]
+> If you want to build for Android, you will need to have Android Studio installed. You can download Android Studio from [here](https://developer.android.com/studio).
+
+After this, you'll want to download the natives for your platform (or all platforms) from [GitHub Actions](https://github.com/Naamloos/fennec/actions/workflows/build-natives.yml)
+
+Extract natives in `Dev.Naamloos.Fennec.Sdk/native`. If you've downloaded only a single specific platform, extract it in `Dev.Naamloos.Fennec.Sdk/native/<platform>`. 
+Otherwise, extract it to the folder root. The combined package will have the following structure:
+
+```
+natives
+├── android-arm64
+├── android-x64
+├── ios-arm64
+├── ios-simulator
+├── maccatalyst
+├── macos
+├── win-x64
+```
+> [!NOTE]
+> Not all of these platforms are supported or planned to be supported, but the binaries are included for convenience.
+
+Finally, you can build the project by running the following command in your terminal:
+```bash
+dotnet build
+```
+
 ## Screenshots
 Soon, whenever I feel like the UI is presentable.
 
@@ -72,3 +112,5 @@ I will be tracking feature support in the following table. This table is based o
 | Threading | Optional |   |   |
 | Invite permission | Optional |   |   |
 | Mutual Rooms | Optional |   |   |
+
+Thank you 💖
