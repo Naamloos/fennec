@@ -1,4 +1,9 @@
-﻿using Dev.Naamloos.Fennec.Sdk;
+﻿using CommunityToolkit.Maui.Markup;
+using Dev.Naamloos.Fennec.Sdk;
+using Dev.Naamloos.Fennec.Sdk.Helpers;
+using Dev.Naamloos.Fennec.Sdk.NativeEventHandler;
+using System.Diagnostics;
+using System.Text.Json;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.App.Pages;
@@ -8,8 +13,24 @@ public sealed class RoomList : ContentPage
     private readonly ManagedMatrixClient _matrixClient;
     private readonly CollectionView _roomsCollectionView;
 
+    public ObservableRoomList? ObservableRoomList
+    {
+        get
+        {
+            return _observableRoomList;
+        }
+        private set
+        {
+            _observableRoomList = value; 
+            OnPropertyChanged(nameof(ObservableRoomList));
+        }
+    }
+    private ObservableRoomList? _observableRoomList = null;
+
     public RoomList(ManagedMatrixClient matrixClient)
     {
+        this.BindingContext = this;
+
         _matrixClient = matrixClient;
 
         Title = "Rooms";
@@ -19,7 +40,7 @@ public sealed class RoomList : ContentPage
             SelectionMode = SelectionMode.Single,
             EmptyView = CreateEmptyView(),
             ItemTemplate = new DataTemplate(CreateRoomItem),
-        };
+        }.Bind(CollectionView.ItemsSourceProperty, nameof(ObservableRoomList));
 
         Content = new Grid
         {
@@ -30,19 +51,21 @@ public sealed class RoomList : ContentPage
         };
     }
 
-    protected override void OnAppearing()
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
-
-        RefreshRooms();
+        if (ObservableRoomList is null)
+        {
+            ObservableRoomList = await _matrixClient.GetObservableRoomListAsync();
+        }
     }
 
-    private void RefreshRooms()
+    protected override void OnDisappearing()
     {
-        _roomsCollectionView.ItemsSource = _matrixClient
-            .GetRooms()
-            .Select(static room => new RoomRecord(room))
-            .ToArray();
+        ObservableRoomList?.Dispose();
+        ObservableRoomList = null;
+
+        base.OnDisappearing();
     }
 
     private static View CreateEmptyView()
@@ -72,11 +95,7 @@ public sealed class RoomList : ContentPage
         var nameLabel = new Label
         {
             FontSize = 18,
-        };
-
-        nameLabel.SetBinding(
-            Label.TextProperty,
-            nameof(RoomRecord.Name));
+        }.Bind(Label.TextProperty, nameof(RoomEntry.Name), BindingMode.OneWay);
 
         var border = new Border
         {
@@ -85,20 +104,6 @@ public sealed class RoomList : ContentPage
             Content = nameLabel,
         };
 
-        border.SetDynamicResource(
-            VisualElement.BackgroundColorProperty,
-            "SurfaceContainer");
-
         return border;
-    }
-
-    private sealed class RoomRecord(Room room)
-    {
-        public Room NativeRoom { get; } = room;
-
-        public string Name =>
-            room.DisplayName() ?? room.Id();
-
-        public override string ToString() => Name;
     }
 }

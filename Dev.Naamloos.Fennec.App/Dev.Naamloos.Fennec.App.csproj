@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net10.0-android</TargetFrameworks>
     <TargetFrameworks Condition="!$([MSBuild]::IsOSPlatform('linux'))">$(TargetFrameworks);net10.0-maccatalyst</TargetFrameworks>
@@ -37,18 +37,29 @@
   </ItemGroup>
   <ItemGroup>
     <AndroidResource Remove="Models\**" />
+    <AndroidResource Remove="Resources\NewFolder\**" />
     <Compile Remove="Models\**" />
+    <Compile Remove="Resources\NewFolder\**" />
     <EmbeddedResource Remove="Models\**" />
+    <EmbeddedResource Remove="Resources\NewFolder\**" />
     <MauiCss Remove="Models\**" />
+    <MauiCss Remove="Resources\NewFolder\**" />
     <MauiXaml Remove="Models\**" />
+    <MauiXaml Remove="Resources\NewFolder\**" />
     <None Remove="Models\**" />
+    <None Remove="Resources\NewFolder\**" />
   </ItemGroup>
   <ItemGroup>
     <Compile Remove="Services\MatrixService.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Remove="Platforms\Android\Resources\values-night\colors.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Maui.Markup" Version="7.0.1" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="CommunityToolkit.Maui" Version="14.2.2" />
+    <PackageReference Include="MaterialColorUtilities.Maui" Version="0.3.0" />
     <PackageReference Include="Nalu.Maui.VirtualScroll" Version="10.7.9" />
     <PackageReference Include="Plugin.Maui.Audio" Version="4.0.0" />
     <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.80" />
@@ -72,5 +83,16 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Services\MatrixService.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <MauiXaml Update="Resources\Styles\Colors.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </MauiXaml>
+    <MauiXaml Update="Resources\Styles\Style.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </MauiXaml>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Platforms\Android\Resources\values\" />
   </ItemGroup>
 </Project>

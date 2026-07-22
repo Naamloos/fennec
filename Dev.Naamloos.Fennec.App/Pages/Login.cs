@@ -1,4 +1,5 @@
 using CommunityToolkit.Maui.Converters;
+using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.Sdk;
@@ -177,6 +178,7 @@ public partial class Login : ContentPage
 	{
         Content = new ScrollView
         {
+            SafeAreaEdges = SafeAreaEdges.All,
             Content = new VerticalStackLayout
             {
                 VerticalOptions = LayoutOptions.Center,
@@ -233,7 +235,6 @@ public partial class Login : ContentPage
                     new ActivityIndicator()
                     {
                         IsRunning = true,
-                        Color = Colors.Blue,
                     }.Bind(ActivityIndicator.IsVisibleProperty, nameof(IsLoading))
                     .Bind(ActivityIndicator.IsRunningProperty, nameof(IsLoading))
                 }

@@ -1,10 +1,7 @@
-﻿using Dev.Naamloos.Fennec.Sdk.Interfaces;
-using Dev.Naamloos.Fennec.Sdk.NativeListeners;
-using System;
-using System.Collections.Generic;
+﻿using Dev.Naamloos.Fennec.Sdk.Helpers;
+using Dev.Naamloos.Fennec.Sdk.Interfaces;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using uniffi.matrix_sdk_ffi;
 
@@ -23,8 +20,6 @@ namespace Dev.Naamloos.Fennec.Sdk
         /// </summary>
         public bool IsLoggedIn => _client?.UserId() is not null;
 
-        public IAsyncObservable<SyncServiceState> SyncStateObservable { get; private set; } = new AsyncSubject<SyncServiceState>();
-
         private readonly SemaphoreSlim _initializationLock = new(1, 1);
 
         /// <summary>
@@ -41,11 +36,6 @@ namespace Dev.Naamloos.Fennec.Sdk
         /// The <see cref="SyncService"/> instance responsible for handling synchronization with the Matrix homeserver. This service manages the state of rooms, messages, and other data, ensuring that the client stays up-to-date with the server.
         /// </summary>
         private SyncService? _syncService;
-
-        /// <summary>
-        /// The <see cref="RoomListService"/> instance responsible for managing the list of rooms the user is a member of. This service provides functionality to retrieve, filter, and manage the user's rooms.
-        /// </summary>
-        private RoomListService? _roomListService;
 
         /// <summary>
         /// The secure storage interface used to store and retrieve sensitive data, such as session information and encryption keys. 
@@ -202,7 +192,7 @@ namespace Dev.Naamloos.Fennec.Sdk
 
         public Room[] GetRooms()
         {
-            return _client.Rooms();
+            return _client?.Rooms() ?? Array.Empty<Room>();
         }
 
         public SyncService GetSyncService()
@@ -212,6 +202,40 @@ namespace Dev.Naamloos.Fennec.Sdk
                 throw new InvalidOperationException("Sync service is not initialized.");
             }
             return _syncService;
+        }
+
+        public async Task<ObservableRoomList> GetObservableRoomListAsync()
+        {
+            if (_syncService is null)
+            {
+                throw new InvalidOperationException("Sync service is not initialized.");
+            }
+
+            var roomList = await _syncService.RoomListService().AllRooms();
+            return new ObservableRoomList(roomList);
+        }
+
+        public async Task<ObservableTimeline> GetObservableTimelineAsync(
+            Room room,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(room);
+
+            if (_syncService is null)
+            {
+                throw new InvalidOperationException(
+                    "Sync service is not initialized.");
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var timeline = await room.Timeline();
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return await ObservableTimeline.CreateAsync(
+                timeline,
+                cancellationToken: cancellationToken);
         }
 
         private async Task clearSavedSessionAsync()
@@ -230,13 +254,6 @@ namespace Dev.Naamloos.Fennec.Sdk
 
             _syncService = await _client.SyncService().Finish();
             await _syncService.Start();
-
-            if (SyncStateObservable is not null && SyncStateObservable is AsyncSubject<SyncServiceState> asyncSubject)
-            {
-                _syncService.State(new NativeSyncServiceStateObserver(asyncSubject));
-            }
-
-            _roomListService = _syncService.RoomListService();
         }
 
         private async Task<HttpResponseMessage> SendHttpRequestAsync(

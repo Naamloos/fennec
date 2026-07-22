@@ -1,0 +1,375 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+
+<ResourceDictionary
+    x:Class="Dev.Naamloos.Fennec.App.Resources.Styles.Colors"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <!--
+        Fennec Material 3 palette
+
+        Primary seed: #E6BB8B
+
+        Note:
+        For Android native fallback colors, also update:
+        Platforms/Android/Resources/values/colors.xml
+        Platforms/Android/Resources/values-night/colors.xml
+    -->
+
+    <!-- Primary -->
+
+    <Color x:Key="Primary">#875300</Color>
+    <Color x:Key="OnPrimary">#FFFFFF</Color>
+    <Color x:Key="PrimaryContainer">#FFDDAE</Color>
+    <Color x:Key="OnPrimaryContainer">#2B1700</Color>
+
+    <Color x:Key="PrimaryDark">#E6BB8B</Color>
+    <Color x:Key="OnPrimaryDark">#482900</Color>
+    <Color x:Key="PrimaryContainerDark">#673D00</Color>
+    <Color x:Key="OnPrimaryContainerDark">#FFDDAE</Color>
+
+    <!-- Secondary -->
+
+    <Color x:Key="Secondary">#735A36</Color>
+    <Color x:Key="OnSecondary">#FFFFFF</Color>
+    <Color x:Key="SecondaryContainer">#FFDEA9</Color>
+    <Color x:Key="OnSecondaryContainer">#281900</Color>
+
+    <Color x:Key="SecondaryDark">#E2C18D</Color>
+    <Color x:Key="OnSecondaryDark">#402D0C</Color>
+    <Color x:Key="SecondaryContainerDark">#594319</Color>
+    <Color x:Key="OnSecondaryContainerDark">#FFDEA9</Color>
+
+    <!-- Tertiary -->
+
+    <Color x:Key="Tertiary">#59633A</Color>
+    <Color x:Key="OnTertiary">#FFFFFF</Color>
+    <Color x:Key="TertiaryContainer">#DDE8B4</Color>
+    <Color x:Key="OnTertiaryContainer">#171E00</Color>
+
+    <Color x:Key="TertiaryDark">#C1CC9A</Color>
+    <Color x:Key="OnTertiaryDark">#2C3411</Color>
+    <Color x:Key="TertiaryContainerDark">#434B25</Color>
+    <Color x:Key="OnTertiaryContainerDark">#DDE8B4</Color>
+
+    <!-- Error -->
+
+    <Color x:Key="Error">#BA1A1A</Color>
+    <Color x:Key="OnError">#FFFFFF</Color>
+    <Color x:Key="ErrorContainer">#FFDAD6</Color>
+    <Color x:Key="OnErrorContainer">#410002</Color>
+
+    <Color x:Key="ErrorDark">#FFB4AB</Color>
+    <Color x:Key="OnErrorDark">#690005</Color>
+    <Color x:Key="ErrorContainerDark">#93000A</Color>
+    <Color x:Key="OnErrorContainerDark">#FFDAD6</Color>
+
+    <!-- Light surfaces -->
+
+    <Color x:Key="SurfaceLight">#FFF8F3</Color>
+    <Color x:Key="SurfaceContainerLowestLight">#FFFFFF</Color>
+    <Color x:Key="SurfaceContainerLowLight">#FEF2E7</Color>
+    <Color x:Key="SurfaceContainerLight">#F8ECE1</Color>
+    <Color x:Key="SurfaceContainerHighLight">#F2E6DB</Color>
+    <Color x:Key="SurfaceContainerHighestLight">#ECE0D5</Color>
+
+    <Color x:Key="SurfaceVariantLight">#EEE0CE</Color>
+    <Color x:Key="OnSurfaceLight">#211A13</Color>
+    <Color x:Key="OnSurfaceVariantLight">#4E4539</Color>
+
+    <Color x:Key="OutlineLight">#807568</Color>
+    <Color x:Key="OutlineVariantLight">#D2C4B5</Color>
+
+    <Color x:Key="InverseSurfaceLight">#372F27</Color>
+    <Color x:Key="InverseOnSurfaceLight">#FCEEE3</Color>
+    <Color x:Key="InversePrimaryLight">#E6BB8B</Color>
+
+    <!-- Dark surfaces -->
+
+    <Color x:Key="SurfaceDark">#18120C</Color>
+    <Color x:Key="SurfaceContainerLowestDark">#120D08</Color>
+    <Color x:Key="SurfaceContainerLowDark">#211A13</Color>
+    <Color x:Key="SurfaceContainerDark">#251E17</Color>
+    <Color x:Key="SurfaceContainerHighDark">#302820</Color>
+    <Color x:Key="SurfaceContainerHighestDark">#3B332B</Color>
+
+    <Color x:Key="SurfaceVariantDark">#4E4539</Color>
+    <Color x:Key="OnSurfaceDark">#ECE0D5</Color>
+    <Color x:Key="OnSurfaceVariantDark">#D2C4B5</Color>
+
+    <Color x:Key="OutlineDark">#9B8F81</Color>
+    <Color x:Key="OutlineVariantDark">#4E4539</Color>
+
+    <Color x:Key="InverseSurfaceDark">#ECE0D5</Color>
+    <Color x:Key="InverseOnSurfaceDark">#372F27</Color>
+    <Color x:Key="InversePrimaryDark">#875300</Color>
+
+    <!-- Semantic aliases -->
+
+    <Color x:Key="AppBackground">#FFF8F3</Color>
+    <Color x:Key="Surface">#FFF8F3</Color>
+    <Color x:Key="SurfaceContainer">#F8ECE1</Color>
+    <Color x:Key="SurfaceVariant">#EEE0CE</Color>
+    <Color x:Key="OnSurface">#211A13</Color>
+    <Color x:Key="OnSurfaceVariant">#4E4539</Color>
+    <Color x:Key="Outline">#807568</Color>
+    <Color x:Key="OutlineVariant">#D2C4B5</Color>
+
+    <!-- Backwards-compatible aliases -->
+
+    <Color x:Key="PrimaryDarkText">#482900</Color>
+    <Color x:Key="SecondaryDarkText">#ECE0D5</Color>
+
+    <Color x:Key="White">#FFFFFF</Color>
+    <Color x:Key="Black">#000000</Color>
+
+    <!-- Retained for compatibility; now uses the Fennec accent color. -->
+    <Color x:Key="Magenta">#E6BB8B</Color>
+
+    <Color x:Key="MidnightBlue">#211A13</Color>
+    <Color x:Key="OffBlack">#18120C</Color>
+
+    <!-- Neutral compatibility palette -->
+
+    <Color x:Key="Gray100">#F8ECE1</Color>
+    <Color x:Key="Gray200">#EEE0CE</Color>
+    <Color x:Key="Gray300">#D2C4B5</Color>
+    <Color x:Key="Gray400">#9B8F81</Color>
+    <Color x:Key="Gray500">#807568</Color>
+    <Color x:Key="Gray600">#665D52</Color>
+    <Color x:Key="Gray900">#211A13</Color>
+    <Color x:Key="Gray950">#18120C</Color>
+
+    <!-- Primary brushes -->
+
+    <SolidColorBrush
+        x:Key="PrimaryBrush"
+        Color="{StaticResource Primary}" />
+
+    <SolidColorBrush
+        x:Key="PrimaryDarkBrush"
+        Color="{StaticResource PrimaryDark}" />
+
+    <SolidColorBrush
+        x:Key="OnPrimaryBrush"
+        Color="{StaticResource OnPrimary}" />
+
+    <SolidColorBrush
+        x:Key="OnPrimaryDarkBrush"
+        Color="{StaticResource OnPrimaryDark}" />
+
+    <SolidColorBrush
+        x:Key="PrimaryContainerBrush"
+        Color="{StaticResource PrimaryContainer}" />
+
+    <SolidColorBrush
+        x:Key="PrimaryContainerDarkBrush"
+        Color="{StaticResource PrimaryContainerDark}" />
+
+    <!-- Secondary brushes -->
+
+    <SolidColorBrush
+        x:Key="SecondaryBrush"
+        Color="{StaticResource Secondary}" />
+
+    <SolidColorBrush
+        x:Key="SecondaryDarkBrush"
+        Color="{StaticResource SecondaryDark}" />
+
+    <SolidColorBrush
+        x:Key="SecondaryContainerBrush"
+        Color="{StaticResource SecondaryContainer}" />
+
+    <SolidColorBrush
+        x:Key="SecondaryContainerDarkBrush"
+        Color="{StaticResource SecondaryContainerDark}" />
+
+    <!-- Tertiary brushes -->
+
+    <SolidColorBrush
+        x:Key="TertiaryBrush"
+        Color="{StaticResource Tertiary}" />
+
+    <SolidColorBrush
+        x:Key="TertiaryDarkBrush"
+        Color="{StaticResource TertiaryDark}" />
+
+    <SolidColorBrush
+        x:Key="TertiaryContainerBrush"
+        Color="{StaticResource TertiaryContainer}" />
+
+    <SolidColorBrush
+        x:Key="TertiaryContainerDarkBrush"
+        Color="{StaticResource TertiaryContainerDark}" />
+
+    <!-- Error brushes -->
+
+    <SolidColorBrush
+        x:Key="ErrorBrush"
+        Color="{StaticResource Error}" />
+
+    <SolidColorBrush
+        x:Key="ErrorDarkBrush"
+        Color="{StaticResource ErrorDark}" />
+
+    <SolidColorBrush
+        x:Key="ErrorContainerBrush"
+        Color="{StaticResource ErrorContainer}" />
+
+    <SolidColorBrush
+        x:Key="ErrorContainerDarkBrush"
+        Color="{StaticResource ErrorContainerDark}" />
+
+    <!-- Surface brushes -->
+
+    <SolidColorBrush
+        x:Key="SurfaceLightBrush"
+        Color="{StaticResource SurfaceLight}" />
+
+    <SolidColorBrush
+        x:Key="SurfaceDarkBrush"
+        Color="{StaticResource SurfaceDark}" />
+
+    <SolidColorBrush
+        x:Key="SurfaceContainerLowestLightBrush"
+        Color="{StaticResource SurfaceContainerLowestLight}" />
+
+    <SolidColorBrush
+        x:Key="SurfaceContainerLowLightBrush"
+        Color="{StaticResource SurfaceContainerLowLight}" />
+
+    <SolidColorBrush
+        x:Key="SurfaceContainerLightBrush"
+        Color="{StaticResource SurfaceContainerLight}" />
+
+    <SolidColorBrush
+        x:Key="SurfaceContainerHighLightBrush"
+        Color="{StaticResource SurfaceContainerHighLight}" />
+
+    <SolidColorBrush
+        x:Key="SurfaceContainerHighestLightBrush"
+        Color="{StaticResource SurfaceContainerHighestLight}" />
+
+    <SolidColorBrush
+        x:Key="SurfaceContainerLowestDarkBrush"
+        Color="{StaticResource SurfaceContainerLowestDark}" />
+
+    <SolidColorBrush
+        x:Key="SurfaceContainerLowDarkBrush"
+        Color="{StaticResource SurfaceContainerLowDark}" />
+
+    <SolidColorBrush
+        x:Key="SurfaceContainerDarkBrush"
+        Color="{StaticResource SurfaceContainerDark}" />
+
+    <SolidColorBrush
+        x:Key="SurfaceContainerHighDarkBrush"
+        Color="{StaticResource SurfaceContainerHighDark}" />
+
+    <SolidColorBrush
+        x:Key="SurfaceContainerHighestDarkBrush"
+        Color="{StaticResource SurfaceContainerHighestDark}" />
+
+    <SolidColorBrush
+        x:Key="SurfaceVariantLightBrush"
+        Color="{StaticResource SurfaceVariantLight}" />
+
+    <SolidColorBrush
+        x:Key="SurfaceVariantDarkBrush"
+        Color="{StaticResource SurfaceVariantDark}" />
+
+    <SolidColorBrush
+        x:Key="OnSurfaceLightBrush"
+        Color="{StaticResource OnSurfaceLight}" />
+
+    <SolidColorBrush
+        x:Key="OnSurfaceDarkBrush"
+        Color="{StaticResource OnSurfaceDark}" />
+
+    <SolidColorBrush
+        x:Key="OnSurfaceVariantLightBrush"
+        Color="{StaticResource OnSurfaceVariantLight}" />
+
+    <SolidColorBrush
+        x:Key="OnSurfaceVariantDarkBrush"
+        Color="{StaticResource OnSurfaceVariantDark}" />
+
+    <!-- Semantic alias brushes -->
+
+    <SolidColorBrush
+        x:Key="AppBackgroundBrush"
+        Color="{StaticResource AppBackground}" />
+
+    <SolidColorBrush
+        x:Key="SurfaceBrush"
+        Color="{StaticResource Surface}" />
+
+    <SolidColorBrush
+        x:Key="SurfaceContainerBrush"
+        Color="{StaticResource SurfaceContainer}" />
+
+    <SolidColorBrush
+        x:Key="SurfaceVariantBrush"
+        Color="{StaticResource SurfaceVariant}" />
+
+    <SolidColorBrush
+        x:Key="OnSurfaceBrush"
+        Color="{StaticResource OnSurface}" />
+
+    <SolidColorBrush
+        x:Key="OnSurfaceVariantBrush"
+        Color="{StaticResource OnSurfaceVariant}" />
+
+    <SolidColorBrush
+        x:Key="OutlineBrush"
+        Color="{StaticResource Outline}" />
+
+    <SolidColorBrush
+        x:Key="OutlineVariantBrush"
+        Color="{StaticResource OutlineVariant}" />
+
+    <!-- Basic brushes -->
+
+    <SolidColorBrush
+        x:Key="WhiteBrush"
+        Color="{StaticResource White}" />
+
+    <SolidColorBrush
+        x:Key="BlackBrush"
+        Color="{StaticResource Black}" />
+
+    <!-- Neutral brushes -->
+
+    <SolidColorBrush
+        x:Key="Gray100Brush"
+        Color="{StaticResource Gray100}" />
+
+    <SolidColorBrush
+        x:Key="Gray200Brush"
+        Color="{StaticResource Gray200}" />
+
+    <SolidColorBrush
+        x:Key="Gray300Brush"
+        Color="{StaticResource Gray300}" />
+
+    <SolidColorBrush
+        x:Key="Gray400Brush"
+        Color="{StaticResource Gray400}" />
+
+    <SolidColorBrush
+        x:Key="Gray500Brush"
+        Color="{StaticResource Gray500}" />
+
+    <SolidColorBrush
+        x:Key="Gray600Brush"
+        Color="{StaticResource Gray600}" />
+
+    <SolidColorBrush
+        x:Key="Gray900Brush"
+        Color="{StaticResource Gray900}" />
+
+    <SolidColorBrush
+        x:Key="Gray950Brush"
+        Color="{StaticResource Gray950}" />
+
+</ResourceDictionary>
