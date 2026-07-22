@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using CommunityToolkit.Maui;
 using Plugin.Maui.Audio;
 using Dev.Naamloos.Fennec.Sdk;
+using MaterialColorUtilities.Maui;
 
 
 #if ANDROID || IOS || MACCATALYST
@@ -15,7 +16,9 @@ public static class MauiProgram
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder()
+            .UseMaterialColors()
             .UseMauiApp<App>()
+            .UseMauiCommunityToolkitMediaElement(true)
             .UseMauiCommunityToolkit(opt =>
             {
             })

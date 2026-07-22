@@ -7,11 +7,21 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using uniffi.matrix_sdk_ffi;
+using MediaElement = CommunityToolkit.Maui.Views.MediaElement;
+using PlaybackMediaSource = CommunityToolkit.Maui.Views.MediaSource;
 
 namespace Dev.Naamloos.Fennec.App.Pages;
 
 public sealed partial class Chat : ContentView, IDisposable
 {
+#if DEBUG
+    static Chat()
+    {
+        var size = FitMediaSize(1920, 1080, ChatMediaKind.Video);
+        Debug.Assert(size.Width == 280 && Math.Abs(size.Height - 157.5) < 0.01);
+    }
+#endif
+
     // Services
     private readonly ManagedMatrixClient _matrixClient;
 
@@ -380,18 +390,39 @@ public sealed partial class Chat : ContentView, IDisposable
             return null;
         }
 
-        if (msgLike.Content.Kind is not MsgLikeKind.Message message)
-        {
-            return null;
-        }
-
         var username = ResolveUsername(eventItem);
+        var avatarUrl = eventItem.SenderProfile is ProfileDetails.Ready ready
+            ? ready.AvatarUrl
+            : null;
+        var id = timelineItem.UniqueId().Id;
 
-        return new ChatMessage(
-            timelineItem.UniqueId().Id,
-            username,
-            message.Content.Body,
-            eventItem.IsOwn);
+        return msgLike.Content.Kind switch
+        {
+            MsgLikeKind.Message message => message.Content.MsgType switch
+            {
+                MessageType.Image image => new ChatMessage(
+                    id, username, image.Content.Caption ?? image.Content.Filename,
+                    eventItem.IsOwn, avatarUrl, ChatMediaKind.Image,
+                    image.Content.Source.ToJson(), image.Content.Filename,
+                    image.Content.Info?.Mimetype, image.Content.Info?.Width,
+                    image.Content.Info?.Height),
+                MessageType.Video video => new ChatMessage(
+                    id, username, video.Content.Caption ?? video.Content.Filename,
+                    eventItem.IsOwn, avatarUrl, ChatMediaKind.Video,
+                    video.Content.Source.ToJson(), video.Content.Filename,
+                    video.Content.Info?.Mimetype, video.Content.Info?.Width,
+                    video.Content.Info?.Height),
+                _ => new ChatMessage(
+                    id, username, message.Content.Body,
+                    eventItem.IsOwn, avatarUrl),
+            },
+            MsgLikeKind.Sticker sticker => new ChatMessage(
+                id, username, sticker.Body, eventItem.IsOwn, avatarUrl,
+                ChatMediaKind.Image, sticker.Source.ToJson(), sticker.Body,
+                sticker.Info.Mimetype, sticker.Info.Width,
+                sticker.Info.Height),
+            _ => null,
+        };
     }
 
     private static string ResolveUsername(
@@ -500,50 +531,87 @@ public sealed partial class Chat : ContentView, IDisposable
         Content = layout;
     }
 
-    private static View CreateMessageItem()
+    private View CreateMessageItem()
     {
         var usernameLabel = new Label
         {
             FontAttributes = FontAttributes.Bold,
             FontSize = 14,
             LineBreakMode = LineBreakMode.TailTruncation,
-        }.Bind(
-            Label.TextProperty,
-            nameof(ChatMessage.Username),
-            mode: BindingMode.OneWay);
-
-        var separator = new Label
-        {
-            Text = ":",
-            FontAttributes = FontAttributes.Bold,
-            FontSize = 14,
         };
 
         var bodyLabel = new Label
         {
             FontSize = 14,
             LineBreakMode = LineBreakMode.WordWrap,
-        }.Bind(
-            Label.TextProperty,
-            nameof(ChatMessage.Body),
-            mode: BindingMode.OneWay);
+        };
+
+        var avatar = new Image
+        {
+            WidthRequest = 36,
+            HeightRequest = 36,
+            Aspect = Aspect.AspectFill,
+        };
+        var avatarFallback = new Label
+        {
+            FontAttributes = FontAttributes.Bold,
+            HorizontalTextAlignment = TextAlignment.Center,
+            VerticalTextAlignment = TextAlignment.Center,
+        };
+        var avatarFrame = new Border
+        {
+            WidthRequest = 36,
+            HeightRequest = 36,
+            StrokeThickness = 0,
+            StrokeShape = new RoundRectangle { CornerRadius = 18 },
+            Content = new Grid { Children = { avatarFallback, avatar } },
+        };
+        avatarFrame.SetDynamicResource(
+            VisualElement.BackgroundColorProperty,
+            "PrimaryContainer");
+
+        var image = new Image
+        {
+            Aspect = Aspect.AspectFit,
+            HorizontalOptions = LayoutOptions.Start,
+            IsVisible = false,
+        };
+
+        var video = new MediaElement
+        {
+            Aspect = Aspect.AspectFit,
+            HorizontalOptions = LayoutOptions.Start,
+            ShouldAutoPlay = false,
+            ShouldShowPlaybackControls = true,
+            IsVisible = false,
+        };
+
+        var mediaLoading = new ActivityIndicator
+        {
+            IsRunning = true,
+            IsVisible = false,
+            HorizontalOptions = LayoutOptions.Start,
+        };
+
+        var messageContent = new VerticalStackLayout
+        {
+            Spacing = 4,
+            Children = { usernameLabel, bodyLabel, mediaLoading, image, video },
+        };
 
         var messageGrid = new Grid
         {
-            ColumnSpacing = 4,
+            ColumnSpacing = 10,
             ColumnDefinitions =
             {
-                new ColumnDefinition(GridLength.Auto),
                 new ColumnDefinition(GridLength.Auto),
                 new ColumnDefinition(GridLength.Star),
             },
         };
+        messageGrid.Add(avatarFrame, column: 0);
+        messageGrid.Add(messageContent, column: 1);
 
-        messageGrid.Add(usernameLabel, column: 0);
-        messageGrid.Add(separator, column: 1);
-        messageGrid.Add(bodyLabel, column: 2);
-
-        return new Border
+        var root = new Border
         {
             Margin = new Thickness(12, 2),
             Padding = new Thickness(10, 8),
@@ -554,6 +622,127 @@ public sealed partial class Chat : ContentView, IDisposable
             },
             Content = messageGrid,
         };
+
+        root.BindingContextChanged += async (_, _) =>
+        {
+            if (root.BindingContext is not ChatMessage message)
+            {
+                return;
+            }
+
+            usernameLabel.Text = message.Username;
+            bodyLabel.Text = message.Body;
+            avatarFallback.Text = message.Username[..1].ToUpperInvariant();
+            avatar.Source = null;
+            image.Source = null;
+            image.IsVisible = false;
+            video.Source = null;
+            video.IsVisible = false;
+            var mediaSize = FitMediaSize(
+                message.MediaWidth,
+                message.MediaHeight,
+                message.MediaKind);
+            image.WidthRequest = video.WidthRequest = mediaSize.Width;
+            image.HeightRequest = video.HeightRequest = mediaSize.Height;
+            mediaLoading.IsVisible = message.MediaKind is not ChatMediaKind.None;
+
+            var loads = new List<Task>();
+            if (!string.IsNullOrWhiteSpace(message.AvatarUrl))
+            {
+                loads.Add(LoadAvatarAsync(message));
+            }
+            if (!string.IsNullOrWhiteSpace(message.MediaSourceJson))
+            {
+                loads.Add(LoadMediaAsync(message));
+            }
+            await Task.WhenAll(loads);
+        };
+
+        return root;
+
+        async Task LoadAvatarAsync(ChatMessage message)
+        {
+            try
+            {
+                var bytes = await _matrixClient.GetThumbnailAsync(
+                    message.AvatarUrl!, 72, 72, isJson: false);
+                if (root.BindingContext is ChatMessage current &&
+                    current.Id == message.Id)
+                {
+                    avatar.Source = ImageSource.FromStream(
+                        () => new MemoryStream(bytes));
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine($"Could not load avatar: {exception}");
+            }
+        }
+
+        async Task LoadMediaAsync(ChatMessage message)
+        {
+            try
+            {
+                if (message.MediaKind is ChatMediaKind.Image)
+                {
+                    var bytes = await _matrixClient.GetThumbnailAsync(
+                        message.MediaSourceJson!, 560, 440);
+                    if (root.BindingContext is ChatMessage current &&
+                        current.Id == message.Id)
+                    {
+                        image.Source = ImageSource.FromStream(
+                            () => new MemoryStream(bytes));
+                        image.IsVisible = true;
+                    }
+                }
+                else if (message.MediaKind is ChatMediaKind.Video)
+                {
+                    var path = await _matrixClient.GetVideoFileAsync(
+                        message.MediaSourceJson!,
+                        message.Filename ?? "video",
+                        message.MimeType ?? "video/mp4");
+                    if (root.BindingContext is ChatMessage current &&
+                        current.Id == message.Id)
+                    {
+                        video.Source = PlaybackMediaSource.FromFile(path);
+                        video.IsVisible = true;
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine($"Could not load inline media: {exception}");
+            }
+            finally
+            {
+                if (root.BindingContext is ChatMessage current &&
+                    current.Id == message.Id)
+                {
+                    mediaLoading.IsVisible = false;
+                }
+            }
+        }
+    }
+
+    private static Size FitMediaSize(
+        ulong? width,
+        ulong? height,
+        ChatMediaKind kind)
+    {
+        const double maxWidth = 280;
+        const double maxHeight = 220;
+
+        if (width is > 0 && height is > 0)
+        {
+            var scale = Math.Min(
+                1,
+                Math.Min(maxWidth / width.Value, maxHeight / height.Value));
+            return new Size(width.Value * scale, height.Value * scale);
+        }
+
+        return kind is ChatMediaKind.Video
+            ? new Size(maxWidth, 157.5)
+            : new Size(maxWidth, 210);
     }
 
     private static View CreateEmptyView()
@@ -628,4 +817,18 @@ public sealed record ChatMessage(
     string Id,
     string Username,
     string Body,
-    bool IsOwn);
+    bool IsOwn,
+    string? AvatarUrl = null,
+    ChatMediaKind MediaKind = ChatMediaKind.None,
+    string? MediaSourceJson = null,
+    string? Filename = null,
+    string? MimeType = null,
+    ulong? MediaWidth = null,
+    ulong? MediaHeight = null);
+
+public enum ChatMediaKind
+{
+    None,
+    Image,
+    Video,
+}

@@ -1,5 +1,6 @@
 ﻿using Dev.Naamloos.Fennec.App.Components;
 using Dev.Naamloos.Fennec.Sdk;
+using CommunityToolkit.Maui.Extensions;
 using Microsoft.Maui.Controls.Shapes;
 using System.Diagnostics;
 using uniffi.matrix_sdk_ffi;
@@ -76,7 +77,7 @@ public sealed class AppShell : Shell
     {
         SetDynamicResource(
             VisualElement.BackgroundColorProperty,
-            "AppBackground");
+            "Surface");
 
         SetDynamicResource(
             FlyoutBackgroundColorProperty,
@@ -104,7 +105,7 @@ public sealed class AppShell : Shell
 
         SetDynamicResource(
             Shell.TabBarBackgroundColorProperty,
-            "SurfaceContainer");
+            "Surface2");
 
         SetDynamicResource(
             Shell.TabBarForegroundColorProperty,
@@ -179,6 +180,10 @@ public sealed class AppShell : Shell
             },
         };
 
+        layout.SetDynamicResource(
+            VisualElement.BackgroundColorProperty,
+            "Surface");
+
         layout.Add(CreateHeader(), row: 0);
         layout.Add(_roomList, row: 1);
         layout.Add(CreateFooter(), row: 2);
@@ -212,14 +217,42 @@ public sealed class AppShell : Shell
         };
     }
 
-    private static View CreateFooter()
+    private View CreateFooter()
     {
-        return new Button
+        return new VerticalStackLayout
         {
-            Text = "Settings",
-            HorizontalOptions = LayoutOptions.Fill,
-            Command = new Command(OpenSettings),
+            Spacing = 8,
+            Children =
+            {
+                new Button
+                {
+                    Text = "Verify this session",
+                    HorizontalOptions = LayoutOptions.Fill,
+                    Command = new Command(OpenVerification),
+                },
+                new Button
+                {
+                    Text = "Settings",
+                    HorizontalOptions = LayoutOptions.Fill,
+                    Command = new Command(OpenSettings),
+                },
+            },
         };
+    }
+
+    private async void OpenVerification()
+    {
+        try
+        {
+            var controller = await _matrixClient
+                .GetSessionVerificationControllerAsync();
+            await _mainPage.ShowPopupAsync(
+                new VerificationPopup(controller));
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Could not start verification: {exception}");
+        }
     }
 
     private static View CreateEmptyRoomView()
