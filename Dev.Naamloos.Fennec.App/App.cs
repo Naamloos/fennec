@@ -13,10 +13,9 @@ public sealed class App : Microsoft.Maui.Controls.Application
     {
         _startupPage = startupPage;
 
-        Resources = new ResourceDictionary();
-
         Resources.MergedDictionaries.Add(new Resources.Styles.Colors());
         Resources.MergedDictionaries.Add(new Resources.Styles.Style());
+        IMaterialColorService.Current.Initialize(Resources);
 
         On<Microsoft.Maui.Controls.PlatformConfiguration.Android>()
             .UseWindowSoftInputModeAdjust(

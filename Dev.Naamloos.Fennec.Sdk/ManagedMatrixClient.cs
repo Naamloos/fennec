@@ -1,7 +1,9 @@
 ﻿using Dev.Naamloos.Fennec.Sdk.Helpers;
 using Dev.Naamloos.Fennec.Sdk.Interfaces;
+using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using uniffi.matrix_sdk_ffi;
 
@@ -21,6 +23,8 @@ namespace Dev.Naamloos.Fennec.Sdk
         public bool IsLoggedIn => _client?.UserId() is not null;
 
         private readonly SemaphoreSlim _initializationLock = new(1, 1);
+        private readonly ConcurrentDictionary<string, Lazy<Task<byte[]>>> _thumbnailCache = [];
+        private readonly ConcurrentDictionary<string, Lazy<Task<string>>> _videoCache = [];
 
         /// <summary>
         /// The <see cref="HttpClient"/> instance used for making non-SDK HTTP requests.
@@ -238,6 +242,91 @@ namespace Dev.Naamloos.Fennec.Sdk
                 cancellationToken: cancellationToken);
         }
 
+        public Task<SessionVerificationController> GetSessionVerificationControllerAsync()
+        {
+            return (_client ?? throw new InvalidOperationException(
+                "The client is not logged in."))
+                .GetSessionVerificationController();
+        }
+
+        public Task<byte[]> GetThumbnailAsync(
+            string source,
+            ulong width,
+            ulong height,
+            bool isJson = true) =>
+            _thumbnailCache.GetOrAdd(
+                $"{width}x{height}:{source}",
+                _ => new(() => DownloadThumbnailAsync(
+                    source,
+                    width,
+                    height,
+                    isJson))).Value;
+
+        public Task<string> GetVideoFileAsync(
+            string sourceJson,
+            string filename,
+            string mimeType) =>
+            _videoCache.GetOrAdd(
+                sourceJson,
+                _ => new(() => DownloadVideoAsync(
+                    sourceJson,
+                    filename,
+                    mimeType))).Value;
+
+        private async Task<byte[]> DownloadThumbnailAsync(
+            string sourceValue,
+            ulong width,
+            ulong height,
+            bool isJson)
+        {
+            var client = _client ?? throw new InvalidOperationException(
+                "The client is not logged in.");
+            using var source = isJson
+                ? MediaSource.FromJson(sourceValue)
+                : MediaSource.FromUrl(sourceValue);
+            return await client.GetMediaThumbnail(source, width, height);
+        }
+
+        private async Task<string> DownloadVideoAsync(
+            string sourceJson,
+            string filename,
+            string mimeType)
+        {
+            var client = _client ?? throw new InvalidOperationException(
+                "The client is not logged in.");
+            var directory = Path.Combine(_accountPath, "cache", "media");
+            Directory.CreateDirectory(directory);
+
+            var extension = mimeType switch
+            {
+                "video/webm" => ".webm",
+                "video/quicktime" => ".mov",
+                _ => ".mp4",
+            };
+            var hash = Convert.ToHexString(SHA256.HashData(
+                Encoding.UTF8.GetBytes(sourceJson)));
+            var path = Path.Combine(directory, hash + extension);
+
+            if (File.Exists(path))
+            {
+                return path;
+            }
+
+            using var source = MediaSource.FromJson(sourceJson);
+            using var handle = await client.GetMediaFile(
+                source,
+                filename,
+                mimeType,
+                true,
+                directory);
+            if (!handle.Persist(path))
+            {
+                throw new IOException("Could not persist downloaded video.");
+            }
+
+            return path;
+        }
+
         private async Task clearSavedSessionAsync()
         {
             await _secureStore.RemoveAsync(SESSION_STORAGE_KEY);
@@ -331,6 +420,9 @@ namespace Dev.Naamloos.Fennec.Sdk
 
         private async Task nativeCleanupAsync()
         {
+            _thumbnailCache.Clear();
+            _videoCache.Clear();
+
             if (_syncService is not null)
             {
                 try
