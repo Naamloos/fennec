@@ -17,7 +17,6 @@ namespace Dev.Naamloos.Fennec.App
         public override void OnCreate()
         {
             base.OnCreate();
-            DynamicColors.ApplyToActivitiesIfAvailable(this);
         }
     }
 }

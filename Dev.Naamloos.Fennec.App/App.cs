@@ -1,4 +1,5 @@
-﻿using Microsoft.Maui.Controls.PlatformConfiguration;
+﻿using MaterialColorUtilities.Maui;
+using Microsoft.Maui.Controls.PlatformConfiguration;
 using Microsoft.Maui.Controls.PlatformConfiguration.AndroidSpecific;
 using AndroidSpecific = Microsoft.Maui.Controls.PlatformConfiguration.AndroidSpecific;
 
@@ -11,6 +12,11 @@ public sealed class App : Microsoft.Maui.Controls.Application
     public App(Startup startupPage)
     {
         _startupPage = startupPage;
+
+        Resources = new ResourceDictionary();
+
+        Resources.MergedDictionaries.Add(new Resources.Styles.Colors());
+        Resources.MergedDictionaries.Add(new Resources.Styles.Style());
 
         On<Microsoft.Maui.Controls.PlatformConfiguration.Android>()
             .UseWindowSoftInputModeAdjust(
