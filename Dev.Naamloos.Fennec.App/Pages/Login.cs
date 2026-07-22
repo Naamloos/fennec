@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.Sdk;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using static uniffi.matrix_sdk_ffi.AuthData;
 
 namespace Dev.Naamloos.Fennec.App.Pages;
@@ -184,6 +185,7 @@ public partial class Login : ContentPage
                 VerticalOptions = LayoutOptions.Center,
                 MaximumWidthRequest = 480,
                 Spacing = 12,
+                Padding = new Thickness(24, 0),
                 Children =
                 {
                     new Label()
@@ -194,7 +196,7 @@ public partial class Login : ContentPage
                     },
                     new Label()
                     {
-                        Text = "A Matrix client for .NET MAUI",
+                        Text = "A [Matrix] client for .NET MAUI",
                         FontSize = 16,
                         FontAttributes = FontAttributes.Italic
                     },
