@@ -205,6 +205,15 @@ namespace Dev.Naamloos.Fennec.Sdk
             return _client.Rooms();
         }
 
+        public SyncService GetSyncService()
+        {
+            if (_syncService is null)
+            {
+                throw new InvalidOperationException("Sync service is not initialized.");
+            }
+            return _syncService;
+        }
+
         private async Task clearSavedSessionAsync()
         {
             await _secureStore.RemoveAsync(SESSION_STORAGE_KEY);
@@ -218,8 +227,6 @@ namespace Dev.Naamloos.Fennec.Sdk
             {
                 throw new InvalidOperationException("Cannot start sync: client is not initialized.");
             }
-
-            await _client.SyncOnceV2(new SyncSettingsV2());
 
             _syncService = await _client.SyncService().Finish();
             await _syncService.Start();

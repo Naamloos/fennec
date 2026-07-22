@@ -15,7 +15,9 @@ public static class MauiProgram
     {
         var builder = MauiApp.CreateBuilder()
             .UseMauiApp<App>()
-            .UseMauiCommunityToolkit()
+            .UseMauiCommunityToolkit(opt =>
+            {
+            })
             .AddAudio()
             .ConfigureFonts(fonts =>
             {
@@ -35,6 +37,7 @@ public static class MauiProgram
             return new ManagedMatrixClient(DeviceInfo.Current.Platform.ToString(), Path.Combine(FileSystem.AppDataDirectory, "fennec"), secureStore);
         });
         builder.Services.AddSingleton<AppNavigationService>();
+        builder.Services.AddSingleton<ToastService>();
 
         // Pages
         builder.Services.AddTransient<Login>();

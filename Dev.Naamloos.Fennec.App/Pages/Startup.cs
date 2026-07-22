@@ -6,15 +6,18 @@ public sealed class Startup : ContentPage
 {
     private readonly ManagedMatrixClient _matrixClient;
     private readonly AppNavigationService _navigation;
+    private readonly ToastService _toastService;
 
     private bool _started;
 
     public Startup(
         ManagedMatrixClient matrixClient,
-        AppNavigationService navigation)
+        AppNavigationService navigation,
+        ToastService toastService)
     {
         _matrixClient = matrixClient;
         _navigation = navigation;
+        _toastService = toastService;
 
         Shell.SetNavBarIsVisible(this, false);
 
@@ -50,10 +53,6 @@ public sealed class Startup : ContentPage
         }
 
         _started = true;
-
-#if DEBUG
-        await _matrixClient.LogoutAsync();
-#endif
 
         try
         {

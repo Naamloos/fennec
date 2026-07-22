@@ -36,6 +36,14 @@
     <MauiFont Include="Resources\Fonts\*" />
   </ItemGroup>
   <ItemGroup>
+    <AndroidResource Remove="Models\**" />
+    <Compile Remove="Models\**" />
+    <EmbeddedResource Remove="Models\**" />
+    <MauiCss Remove="Models\**" />
+    <MauiXaml Remove="Models\**" />
+    <None Remove="Models\**" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Remove="Services\MatrixService.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -61,9 +69,6 @@
     <None Update="Pages\StartupPage.xaml">
       <Generator>MSBuild:Compile</Generator>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Models\" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Services\MatrixService.cs" />
