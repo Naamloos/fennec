@@ -12,6 +12,7 @@ public sealed class AppShell : Shell
 {
     // Services
     private readonly ManagedMatrixClient _matrixClient;
+    private readonly AppNavigationService _navigation;
 
     // UI
     private readonly ShellContent _mainContent;
@@ -24,6 +25,10 @@ public sealed class AppShell : Shell
     private Room? _selectedRoom;
     private int _roomSelectionVersion;
     private bool _disposed;
+    private ImageSource? _accountAvatarSource;
+    private string _accountDisplayName = "Account";
+    private string _accountUserId = string.Empty;
+    private string _accountInitial = "@";
 
     public Room? SelectedRoom
     {
@@ -45,9 +50,18 @@ public sealed class AppShell : Shell
         }
     }
 
-    public AppShell(ManagedMatrixClient matrixClient)
+    public ImageSource? AccountAvatarSource => _accountAvatarSource;
+    public string AccountDisplayName => _accountDisplayName;
+    public string AccountUserId => _accountUserId;
+    public string AccountInitial => _accountInitial;
+
+    public AppShell(
+        ManagedMatrixClient matrixClient,
+        AppNavigationService navigation)
     {
         _matrixClient = matrixClient;
+        _navigation = navigation;
+        _matrixClient.SessionInvalidated += OnSessionInvalidated;
 
         BindingContext = this;
 
@@ -70,6 +84,13 @@ public sealed class AppShell : Shell
         ConfigureShell();
         Build();
 
+        Loaded += (_, _) =>
+        {
+#if WINDOWS || MACCATALYST
+            ConfigureTitleBar();
+#endif
+            _ = LoadOwnAvatarAsync();
+        };
         Unloaded += OnUnloaded;
     }
 
@@ -142,6 +163,86 @@ public sealed class AppShell : Shell
         CurrentItem = mainItem;
     }
 
+    private void ConfigureTitleBar()
+    {
+        if (Window is null)
+        {
+            return;
+        }
+
+        Window.TitleBar = new TitleBar
+        {
+            Title = "Fennec",
+            HeightRequest = 48,
+            TrailingContent = CreateAccountButton(false, true),
+        };
+    }
+
+    private async Task LoadOwnAvatarAsync()
+    {
+        try
+        {
+            var profile = await _matrixClient.GetOwnProfileAsync();
+            _accountDisplayName = profile.DisplayName ?? profile.UserId;
+            _accountUserId = profile.UserId;
+            _accountInitial = string.IsNullOrWhiteSpace(profile.DisplayName)
+                ? "@" : profile.DisplayName[..1].ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(profile.AvatarUrl))
+            {
+                OnPropertyChanged(nameof(AccountDisplayName));
+                OnPropertyChanged(nameof(AccountUserId));
+                OnPropertyChanged(nameof(AccountInitial));
+                return;
+            }
+
+            var bytes = await _matrixClient.GetThumbnailAsync(profile.AvatarUrl, 60, 60, isJson: false);
+            _accountAvatarSource = ImageSource.FromStream(() => new MemoryStream(bytes));
+            OnPropertyChanged(nameof(AccountAvatarSource));
+            OnPropertyChanged(nameof(AccountDisplayName));
+            OnPropertyChanged(nameof(AccountUserId));
+            OnPropertyChanged(nameof(AccountInitial));
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Could not load account avatar: {exception}");
+        }
+    }
+
+    private View CreateAccountButton(bool showUserId, bool titleBar)
+    {
+        var button = new AccountButton
+        {
+            Margin = titleBar ? new Thickness(0, 0, 8, 0) : new Thickness(0, 0, 0, 8),
+            ShowUserId = showUserId,
+            TransparentBackground = titleBar,
+        };
+        button.SetBinding(AccountButton.AvatarSourceProperty, new Binding(nameof(AccountAvatarSource), source: this));
+        button.SetBinding(AccountButton.DisplayNameProperty, new Binding(nameof(AccountDisplayName), source: this));
+        button.SetBinding(AccountButton.UserIdProperty, new Binding(nameof(AccountUserId), source: this));
+        button.SetBinding(AccountButton.InitialProperty, new Binding(nameof(AccountInitial), source: this));
+        button.Clicked += async (_, _) => await ShowUserSettingsAsync();
+        return button;
+    }
+
+    private async Task ShowUserSettingsAsync()
+    {
+        await _mainPage.ShowPopupAsync(new UserSettingsPopup(
+            AccountAvatarSource,
+            AccountInitial,
+            AccountDisplayName,
+            AccountUserId,
+            LogoutAsync));
+    }
+
+    private async Task LogoutAsync()
+    {
+        await _matrixClient.LogoutAsync();
+        _navigation.ShowLogin();
+    }
+
+    private void OnSessionInvalidated(object? sender, EventArgs e) =>
+        MainThread.BeginInvokeOnMainThread(_navigation.ShowLogin);
+
     private ShellContent CreateMainContent()
     {
         return new ShellContent
@@ -193,7 +294,7 @@ public sealed class AppShell : Shell
 
     private View CreateHeader()
     {
-        return new VerticalStackLayout
+        var header = new VerticalStackLayout
         {
             Spacing = 2,
             Children =
@@ -215,6 +316,11 @@ public sealed class AppShell : Shell
                 },
             },
         };
+
+#if !WINDOWS && !MACCATALYST
+        header.Children.Insert(0, CreateAccountButton(true, false));
+#endif
+        return header;
     }
 
     private View CreateFooter()
@@ -337,6 +443,13 @@ public sealed class AppShell : Shell
             Interlocked.Increment(ref _roomSelectionVersion);
 
         FlyoutIsPresented = false;
+        var roomName = room.DisplayName() ?? room.Id();
+        _mainContent.Title = roomName;
+        _mainPage.Title = roomName;
+
+        // SetRoomAsync turns on Chat's request-scoped loader before its first await.
+        // Attach the view now so an empty, still-loading timeline has feedback.
+        _mainHost.Content = _chatPage.Content;
 
         try
         {
@@ -349,13 +462,6 @@ public sealed class AppShell : Shell
                 return;
             }
 
-            var roomName = room.DisplayName() ?? room.Id();
-
-            _mainContent.Title = roomName;
-            _mainPage.Title = roomName;
-
-            // Swap the content inside the already-displayed page.
-            _mainHost.Content = _chatPage.Content;
         }
         catch (Exception exception)
         {
@@ -368,10 +474,6 @@ public sealed class AppShell : Shell
             Debug.WriteLine(
                 $"Failed to open room {room.Id()}: {exception}");
 
-            var roomName = room.DisplayName() ?? room.Id();
-
-            _mainContent.Title = roomName;
-            _mainPage.Title = roomName;
             _mainHost.Content = CreateRoomErrorView(exception);
         }
     }
@@ -400,6 +502,7 @@ public sealed class AppShell : Shell
         Interlocked.Increment(ref _roomSelectionVersion);
 
         Unloaded -= OnUnloaded;
+        _matrixClient.SessionInvalidated -= OnSessionInvalidated;
 
         _roomList.Dispose();
         _chatPage.Dispose();
@@ -407,4 +510,5 @@ public sealed class AppShell : Shell
         _mainHost.Content = null;
         _selectedRoom = null;
     }
+
 }

@@ -3,21 +3,42 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Text;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.Sdk.Helpers
 {
+    public sealed record RoomSpace(
+        string Id,
+        string Name,
+        string? AvatarUrl);
+
     public sealed class RoomEntry : INotifyPropertyChanged
     {
         private Room _room;
         private string _name;
+        private string? _avatarUrl;
+        private bool _isSpace;
+        private bool _isDirectMessage;
+        private bool _hasUnread;
+        private IReadOnlyList<RoomSpace> _spaces = [];
+        private int _refreshVersion;
 
-        public RoomEntry(Room room)
+        internal RoomEntry(
+            Room room,
+            SpaceService spaceService)
         {
             _room = room;
             _name = GetName(room);
+            _avatarUrl = room.AvatarUrl();
+            _isSpace = room.IsSpace();
+            _ = RefreshInfoAsync(room);
+
+            if (!_isSpace)
+            {
+                _ = LoadSpacesAsync(room, spaceService);
+            }
         }
 
         public Room Room => _room;
@@ -39,7 +60,35 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
             }
         }
 
-        public bool IsSpace => _room.IsSpace();
+        public string? AvatarUrl
+        {
+            get => _avatarUrl;
+            private set => SetField(ref _avatarUrl, value);
+        }
+
+        public bool IsSpace
+        {
+            get => _isSpace;
+            private set => SetField(ref _isSpace, value);
+        }
+
+        public bool HasUnread
+        {
+            get => _hasUnread;
+            private set => SetField(ref _hasUnread, value);
+        }
+
+        public bool IsDirectMessage
+        {
+            get => _isDirectMessage;
+            private set => SetField(ref _isDirectMessage, value);
+        }
+
+        public IReadOnlyList<RoomSpace> Spaces
+        {
+            get => _spaces;
+            private set => SetField(ref _spaces, value);
+        }
 
         internal void Update(Room room)
         {
@@ -47,16 +96,87 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
 
             OnPropertyChanged(nameof(Room));
             Name = GetName(room);
-        }
-
-        internal void Refresh()
-        {
-            Name = GetName(_room);
+            AvatarUrl = room.AvatarUrl();
+            IsSpace = room.IsSpace();
+            _ = RefreshInfoAsync(room);
         }
 
         private static string GetName(Room room)
         {
             return room.DisplayName() ?? room.Id();
+        }
+
+        private async Task RefreshInfoAsync(Room room)
+        {
+            var version = Interlocked.Increment(ref _refreshVersion);
+
+            try
+            {
+                using var info = await room.RoomInfo();
+
+                if (version != _refreshVersion)
+                {
+                    return;
+                }
+
+                Name = info.DisplayName ?? room.Id();
+                AvatarUrl = info.AvatarUrl;
+                IsSpace = info.IsSpace;
+                IsDirectMessage = info.IsDm || info.IsDirect;
+                HasUnread =
+                    info.IsMarkedUnread ||
+                    info.NumUnreadMessages > 0 ||
+                    info.NumUnreadNotifications > 0;
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine(
+                    $"Could not refresh room {room.Id()}: {exception}");
+            }
+        }
+
+        public async Task MarkAsReadAsync()
+        {
+            Interlocked.Increment(ref _refreshVersion);
+            HasUnread = false;
+
+            await Task.WhenAll(
+                _room.MarkAsRead(ReceiptType.Read),
+                _room.SetUnreadFlag(false));
+        }
+
+        private async Task LoadSpacesAsync(
+            Room room,
+            SpaceService spaceService)
+        {
+            try
+            {
+                Spaces = (await spaceService.JoinedParentsOfChild(room.Id()))
+                    .Select(space => new RoomSpace(
+                        space.RoomId,
+                        space.DisplayName,
+                        space.AvatarUrl))
+                    .ToArray();
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine(
+                    $"Could not load spaces for {room.Id()}: {exception}");
+            }
+        }
+
+        private void SetField<T>(
+            ref T field,
+            T value,
+            [CallerMemberName] string? propertyName = null)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value))
+            {
+                return;
+            }
+
+            field = value;
+            OnPropertyChanged(propertyName);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -73,15 +193,19 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
     public sealed class ObservableRoomList : ObservableCollection<RoomEntry>, IDisposable
     {
         private readonly SynchronizationContext? _synchronizationContext;
+        private readonly SpaceService _spaceService;
 
         private RoomListEntriesEvent? _listener;
         private RoomListEntriesWithDynamicAdaptersResult? _adapterResult;
 
         private bool _disposed;
 
-        internal ObservableRoomList(RoomList roomList)
+        internal ObservableRoomList(
+            RoomList roomList,
+            SpaceService spaceService)
         {
             _synchronizationContext = SynchronizationContext.Current;
+            _spaceService = spaceService;
             _listener = new RoomListEntriesEvent(this.updateEntries);
 
             _adapterResult = roomList.EntriesWithDynamicAdapters(5000, _listener);
@@ -162,7 +286,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
         {
             foreach (var room in append.Values)
             {
-                Add(new RoomEntry(room));
+                Add(new RoomEntry(room, _spaceService));
             }
         }
 
@@ -175,13 +299,13 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
         // an element was added at the front
         private void pushFront(RoomListEntriesUpdate.PushFront pushFront)
         {
-            Insert(0, new RoomEntry(pushFront.Value));
+            Insert(0, new RoomEntry(pushFront.Value, _spaceService));
         }
 
         // an element was added at the back
         private void pushBack(RoomListEntriesUpdate.PushBack pushBack)
         {
-            Add(new RoomEntry(pushBack.Value));
+            Add(new RoomEntry(pushBack.Value, _spaceService));
         }
 
         // the element at the front was removed
@@ -199,7 +323,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
         // an element was inserted at a specific index
         private void insert(RoomListEntriesUpdate.Insert insert)
         {
-            Insert((int)insert.Index, new RoomEntry(insert.Value));
+            Insert((int)insert.Index, new RoomEntry(insert.Value, _spaceService));
         }
 
         // an element was set at a specific index
@@ -214,7 +338,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
                 return;
             }
 
-            this[index] = new RoomEntry(set.Value);
+            this[index] = new RoomEntry(set.Value, _spaceService);
         }
 
         // an element was removed at a specific index
@@ -249,7 +373,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
                 }
                 else
                 {
-                    Add(new RoomEntry(room));
+                    Add(new RoomEntry(room, _spaceService));
                 }
             }
         }
@@ -265,6 +389,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
 
             _adapterResult?.EntriesStream().Cancel();
             _adapterResult?.Dispose();
+            _spaceService.Dispose();
 
             _adapterResult = null;
             _listener = null;
