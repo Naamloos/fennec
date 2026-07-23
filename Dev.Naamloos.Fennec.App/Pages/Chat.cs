@@ -3,9 +3,9 @@ using CommunityToolkit.Maui.Behaviors;
 using CommunityToolkit.Maui.Converters;
 using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Mvvm.Input;
+using Dev.Naamloos.Fennec.App.Components;
 using Dev.Naamloos.Fennec.Sdk;
 using Dev.Naamloos.Fennec.Sdk.Helpers;
-using Dev.Naamloos.Fennec.App.Components;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
@@ -17,26 +17,27 @@ public sealed partial class Chat : ContentView, IDisposable
 {
     private readonly ChatTypingController _typingController;
 
-    // State
     private ObservableTimeline? _observableTimeline;
     private Room? _room;
+
+    private CancellationTokenSource? _roomLoadCancellation;
 
     private bool _isLoading;
     private bool _isSending;
     private bool _isLoadingMoreHistory;
+    private bool _reconcileQueued;
     private bool _disposed;
 
-    // Backing fields
     private string _messageText = string.Empty;
     private string _errorMessage = string.Empty;
     private ChatMessage? _replyTo;
 
-    // Binding properties
     [BindableProperty]
     public partial ManagedMatrixClient? MatrixClient { get; set; }
 
     [BindableProperty]
-    public partial string TypingText { get; set; } = string.Empty;
+    public partial string TypingText { get; set; } =
+        string.Empty;
 
     [BindableProperty]
     public partial int TimelineResetRequest { get; set; }
@@ -48,25 +49,28 @@ public sealed partial class Chat : ContentView, IDisposable
     public partial int TimelineScrollAfterLayoutRequest { get; set; }
 
     [BindableProperty]
-    public partial int ComposerFocusRequest { get; set; }
-
-    [BindableProperty]
     public partial bool TimelineIsNearBottom { get; set; } = true;
 
-    [BindableProperty(PropertyChangedMethodName = nameof(OnSelectedRoomChanged))]
+    [BindableProperty(
+        PropertyChangedMethodName = nameof(OnSelectedRoomChanged))]
     public partial Room? SelectedRoom { get; set; }
 
     [BindableProperty]
-    public partial string RoomLoadError { get; set; } = string.Empty;
+    public partial string RoomLoadError { get; set; } =
+        string.Empty;
 
-    public ObservableCollection<ChatMessage> Messages { get; } = [];
-    public Room? CurrentRoom => _room;
-    public bool HasTypingText =>
-        !string.IsNullOrEmpty(TypingText);
+    public ObservableCollection<ChatMessage> Messages
+    {
+        get;
+    } = [];
+
+    public Room? CurrentRoom =>
+        _room;
 
     public string MessageText
     {
         get => _messageText;
+
         set
         {
             if (_messageText == value)
@@ -79,15 +83,18 @@ public sealed partial class Chat : ContentView, IDisposable
             OnPropertyChanged();
             OnPropertyChanged(nameof(CanSend));
 
-            SendMessageCommand.NotifyCanExecuteChanged();
+            SendMessageCommand
+                .NotifyCanExecuteChanged();
 
-            _typingController?.SetTyping(!string.IsNullOrWhiteSpace(value));
+            _typingController.SetTyping(
+                !string.IsNullOrWhiteSpace(value));
         }
     }
 
     public bool IsLoading
     {
         get => _isLoading;
+
         private set
         {
             if (_isLoading == value)
@@ -100,13 +107,15 @@ public sealed partial class Chat : ContentView, IDisposable
             OnPropertyChanged();
             OnPropertyChanged(nameof(CanSend));
 
-            SendMessageCommand.NotifyCanExecuteChanged();
+            SendMessageCommand
+                .NotifyCanExecuteChanged();
         }
     }
 
     public bool IsSending
     {
         get => _isSending;
+
         private set
         {
             if (_isSending == value)
@@ -119,7 +128,8 @@ public sealed partial class Chat : ContentView, IDisposable
             OnPropertyChanged();
             OnPropertyChanged(nameof(CanSend));
 
-            SendMessageCommand.NotifyCanExecuteChanged();
+            SendMessageCommand
+                .NotifyCanExecuteChanged();
         }
     }
 
@@ -127,11 +137,13 @@ public sealed partial class Chat : ContentView, IDisposable
         !IsLoading &&
         !IsSending &&
         _observableTimeline is not null &&
-        !string.IsNullOrWhiteSpace(MessageText);
+        !string.IsNullOrWhiteSpace(
+            MessageText);
 
     public string ErrorMessage
     {
         get => _errorMessage;
+
         private set
         {
             if (_errorMessage == value)
@@ -147,20 +159,21 @@ public sealed partial class Chat : ContentView, IDisposable
     }
 
     public bool HasError =>
-        !string.IsNullOrWhiteSpace(ErrorMessage);
+        !string.IsNullOrWhiteSpace(
+            ErrorMessage);
 
-    public ChatMessage? ReplyTarget => _replyTo;
+    public ChatMessage? ReplyTarget =>
+        _replyTo;
 
     public Chat()
     {
-        BindingContext = this;
+        _typingController =
+            new ChatTypingController(
+                Dispatcher,
+                () => _room,
+                text => TypingText = text);
 
-        _typingController = new ChatTypingController(
-            Dispatcher,
-            () => _room,
-            SetTypingText);
-
-        build();
+        Build();
     }
 
     public async Task SetRoomAsync(
@@ -168,7 +181,9 @@ public sealed partial class Chat : ContentView, IDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(room);
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(
+            _disposed,
+            this);
 
         if (_room?.Id() == room.Id() &&
             _observableTimeline is not null)
@@ -176,8 +191,16 @@ public sealed partial class Chat : ContentView, IDisposable
             return;
         }
 
-        Debug.WriteLine(
-            $"Opening timeline for {room.Id()}");
+        _roomLoadCancellation?.Cancel();
+        _roomLoadCancellation?.Dispose();
+
+        _roomLoadCancellation =
+            CancellationTokenSource
+                .CreateLinkedTokenSource(
+                    cancellationToken);
+
+        var effectiveToken =
+            _roomLoadCancellation.Token;
 
         IsLoading = true;
         ErrorMessage = string.Empty;
@@ -188,59 +211,49 @@ public sealed partial class Chat : ContentView, IDisposable
             DisposeTimeline();
 
             _room = room;
-            OnPropertyChanged(nameof(CurrentRoom));
+            OnPropertyChanged(
+                nameof(CurrentRoom));
 
-            /*
-             * A newly opened room should start at its newest message.
-             */
-            _isLoadingMoreHistory = false;
-            TimelineResetRequest++;
             Messages.Clear();
+            TimelineIsNearBottom = true;
+            TimelineResetRequest++;
 
-            cancellationToken.ThrowIfCancellationRequested();
+            var matrixClient =
+                MatrixClient ??
+                throw new InvalidOperationException(
+                    "Matrix client is required.");
 
-            Debug.WriteLine(
-                "Creating ObservableTimeline...");
+            var timeline =
+                await matrixClient
+                    .GetObservableTimelineAsync(
+                        room);
 
-            var observableTimeline =
-                await (MatrixClient ??
-                    throw new InvalidOperationException(
-                        "Matrix client is required."))
-                    .GetObservableTimelineAsync(room);
-
-            cancellationToken.ThrowIfCancellationRequested();
+            effectiveToken
+                .ThrowIfCancellationRequested();
 
             if (_disposed)
             {
-                observableTimeline.Dispose();
+                timeline.Dispose();
                 return;
             }
 
-            _observableTimeline = observableTimeline;
+            _observableTimeline = timeline;
 
             _observableTimeline.CollectionChanged +=
                 OnTimelineCollectionChanged;
 
+            ReconcileMessages();
+
             _typingController.Start(
                 room,
-                !string.IsNullOrWhiteSpace(MessageText));
-
-            Debug.WriteLine(
-                "ObservableTimeline created.");
-
-            SynchronizeMessages();
-
-            Debug.WriteLine(
-                $"Timeline loaded with {_observableTimeline.Count} items.");
+                !string.IsNullOrWhiteSpace(
+                    MessageText));
 
             TimelineScrollAfterLayoutRequest++;
         }
         catch (OperationCanceledException)
         {
-            Debug.WriteLine(
-                $"Timeline loading cancelled for {room.Id()}.");
-
-            throw;
+            // A newer room selection superseded this load.
         }
         catch (Exception exception)
         {
@@ -248,21 +261,150 @@ public sealed partial class Chat : ContentView, IDisposable
             RoomLoadError = exception.Message;
 
             Debug.WriteLine(
-                $"Failed to load timeline for {room.Id()}: {exception}");
+                $"Could not open room {room.Id()}: " +
+                exception);
         }
         finally
         {
-            Debug.WriteLine(
-                "Timeline loading completed.");
-
             IsLoading = false;
 
             OnPropertyChanged(nameof(CanSend));
-            SendMessageCommand.NotifyCanExecuteChanged();
+
+            SendMessageCommand
+                .NotifyCanExecuteChanged();
         }
     }
 
-    [RelayCommand(CanExecute = nameof(CanSend))]
+    private void OnTimelineCollectionChanged(
+        object? sender,
+        NotifyCollectionChangedEventArgs eventArgs)
+    {
+        if (_disposed ||
+            !ReferenceEquals(
+                sender,
+                _observableTimeline))
+        {
+            return;
+        }
+
+        QueueMessageReconciliation();
+    }
+
+    private void QueueMessageReconciliation()
+    {
+        if (_reconcileQueued)
+        {
+            return;
+        }
+
+        _reconcileQueued = true;
+
+        /*
+         * Reset currently arrives as Clear followed by many Add events.
+         * Coalesce the complete burst into one stable-ID reconciliation.
+         */
+        Dispatcher.Dispatch(() =>
+        {
+            _reconcileQueued = false;
+
+            if (!_disposed)
+            {
+                ReconcileMessages();
+            }
+        });
+    }
+
+    private void ReconcileMessages()
+    {
+        if (_observableTimeline is null)
+        {
+            Messages.Clear();
+            return;
+        }
+
+        var desired =
+            _observableTimeline
+                .Select(TryCreateChatMessage)
+                .Where(message =>
+                    message is not null)
+                .Cast<ChatMessage>()
+                .ToArray();
+
+        for (var desiredIndex = 0;
+             desiredIndex < desired.Length;
+             desiredIndex++)
+        {
+            var desiredMessage =
+                desired[desiredIndex];
+
+            if (desiredIndex < Messages.Count &&
+                Messages[desiredIndex].Id ==
+                desiredMessage.Id)
+            {
+                if (Messages[desiredIndex] !=
+                    desiredMessage)
+                {
+                    Messages[desiredIndex] =
+                        desiredMessage;
+                }
+
+                continue;
+            }
+
+            var existingIndex =
+                FindMessageIndex(
+                    desiredMessage.Id,
+                    desiredIndex + 1);
+
+            if (existingIndex >= 0)
+            {
+                Messages.Move(
+                    existingIndex,
+                    desiredIndex);
+
+                if (Messages[desiredIndex] !=
+                    desiredMessage)
+                {
+                    Messages[desiredIndex] =
+                        desiredMessage;
+                }
+
+                continue;
+            }
+
+            Messages.Insert(
+                desiredIndex,
+                desiredMessage);
+        }
+
+        while (Messages.Count >
+               desired.Length)
+        {
+            Messages.RemoveAt(
+                Messages.Count - 1);
+        }
+    }
+
+    private int FindMessageIndex(
+        string id,
+        int startIndex)
+    {
+        for (var index =
+                 Math.Max(0, startIndex);
+             index < Messages.Count;
+             index++)
+        {
+            if (Messages[index].Id == id)
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    [RelayCommand(
+        CanExecute = nameof(CanSend))]
     private async Task SendMessageAsync()
     {
         if (_observableTimeline is null)
@@ -270,7 +412,8 @@ public sealed partial class Chat : ContentView, IDisposable
             return;
         }
 
-        var text = MessageText.Trim();
+        var text =
+            MessageText.Trim();
 
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -282,28 +425,30 @@ public sealed partial class Chat : ContentView, IDisposable
 
         try
         {
-            var content = CreateTextMessageContent(
-                _observableTimeline.Timeline,
-                text);
+            var content =
+                CreateTextMessageContent(
+                    _observableTimeline.Timeline,
+                    text);
 
-            if (_replyTo?.EventId is { } eventId)
+            if (_replyTo?.EventId is
+                { } eventId)
             {
-                await _observableTimeline.Timeline.SendReply(content, eventId);
+                await _observableTimeline
+                    .Timeline
+                    .SendReply(
+                        content,
+                        eventId);
             }
             else
             {
-                await _observableTimeline.Timeline.Send(content);
+                await _observableTimeline
+                    .Timeline
+                    .Send(content);
             }
 
             MessageText = string.Empty;
             SetReplyTarget(null);
 
-            ComposerFocusRequest++;
-
-            /*
-             * Sending a message should always return the sender to the
-             * newest part of the timeline.
-             */
             TimelineScrollRequest++;
         }
         catch (Exception exception)
@@ -311,7 +456,8 @@ public sealed partial class Chat : ContentView, IDisposable
             ErrorMessage = exception.Message;
 
             Debug.WriteLine(
-                $"Failed to send message to {_room?.Id()}: {exception}");
+                $"Could not send message: " +
+                exception);
         }
         finally
         {
@@ -319,66 +465,96 @@ public sealed partial class Chat : ContentView, IDisposable
         }
     }
 
-    private static RoomMessageEventContentWithoutRelation
+    private static
+        RoomMessageEventContentWithoutRelation
         CreateTextMessageContent(
             Timeline timeline,
             string text)
     {
-        var content = timeline.CreateMessageContent(
+        return timeline.CreateMessageContent(
             new MessageType.Text(
                 new TextMessageContent(
                     text,
-                    null)));
-
-        return content
+                    null)))
             ?? throw new InvalidOperationException(
-                "Could not create Matrix text-message content.");
+                "Could not create message content.");
     }
 
     [RelayCommand]
     private async Task AttachFileAsync()
     {
-        if (_observableTimeline is null || IsSending)
+        if (_observableTimeline is null ||
+            IsSending)
         {
             return;
         }
 
         try
         {
-            var file = await FilePicker.Default.PickAsync();
-            if (file is null || _observableTimeline is null)
+            var file =
+                await FilePicker.Default
+                    .PickAsync();
+
+            if (file is null ||
+                _observableTimeline is null)
             {
                 return;
             }
 
-            await using var stream = await file.OpenReadAsync();
-            using var data = new MemoryStream();
+            await using var stream =
+                await file.OpenReadAsync();
+
+            using var data =
+                new MemoryStream();
+
             await stream.CopyToAsync(data);
 
             IsSending = true;
             ErrorMessage = string.Empty;
-            var mimeType = string.IsNullOrWhiteSpace(file.ContentType)
-                ? "application/octet-stream"
-                : file.ContentType;
-            var url = await (MatrixClient ??
+
+            var mimeType =
+                string.IsNullOrWhiteSpace(
+                    file.ContentType)
+                    ? "application/octet-stream"
+                    : file.ContentType;
+
+            var matrixClient =
+                MatrixClient ??
                 throw new InvalidOperationException(
-                    "Matrix client is required."))
-                .UploadMediaAsync(mimeType, data.ToArray());
-            using var source = MediaSource.FromUrl(url);
-            var content = _observableTimeline.Timeline.CreateMessageContent(
-                CreateAttachmentMessage(
-                    file.FileName,
+                    "Matrix client is required.");
+
+            var url =
+                await matrixClient.UploadMediaAsync(
                     mimeType,
-                    (ulong)data.Length,
-                    source))
-                ?? throw new InvalidOperationException("Could not create attachment content.");
-            await _observableTimeline.Timeline.Send(content);
+                    data.ToArray());
+
+            using var source =
+                MediaSource.FromUrl(url);
+
+            var content =
+                _observableTimeline.Timeline
+                    .CreateMessageContent(
+                        CreateAttachmentMessage(
+                            file.FileName,
+                            mimeType,
+                            (ulong)data.Length,
+                            source))
+                ?? throw new InvalidOperationException(
+                    "Could not create attachment content.");
+
+            await _observableTimeline
+                .Timeline
+                .Send(content);
+
             TimelineScrollRequest++;
         }
         catch (Exception exception)
         {
             ErrorMessage = exception.Message;
-            Debug.WriteLine($"Failed to upload attachment: {exception}");
+
+            Debug.WriteLine(
+                $"Could not upload attachment: " +
+                exception);
         }
         finally
         {
@@ -386,206 +562,328 @@ public sealed partial class Chat : ContentView, IDisposable
         }
     }
 
-    private static MessageType CreateAttachmentMessage(
-        string filename,
-        string mimeType,
-        ulong size,
-        MediaSource source) =>
-        mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
-            ? new MessageType.Image(new ImageMessageContent(
-                filename, null, null, source,
-                new ImageInfo(null, null, mimeType, size, null, null, null, null)))
-            : mimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
-                ? new MessageType.Video(new VideoMessageContent(
-                    filename, null, null, source,
-                    new VideoInfo(null, null, null, mimeType, size, null, null, null)))
-                : new MessageType.File(new FileMessageContent(
-                    filename, null, null, source,
-                    new uniffi.matrix_sdk_ffi.FileInfo(mimeType, size, null, null)));
-
-    [RelayCommand]
-    private void Reply(ChatMessage? message) => SetReplyTarget(message);
-
-    [RelayCommand]
-    private Task OpenMessageMenuAsync(ChatMessage? message) =>
-        message is null ? Task.CompletedTask : ShowMessageMenuAsync(message);
-
-    [RelayCommand]
-    private Task SaveMessageMediaAsync(ChatMessage? message) =>
-        message is null ? Task.CompletedTask : SaveMediaAsync(message);
-
-    private void SetReplyTarget(ChatMessage? message)
+    private static MessageType
+        CreateAttachmentMessage(
+            string filename,
+            string mimeType,
+            ulong size,
+            MediaSource source)
     {
-        _replyTo = message;
-        OnPropertyChanged(nameof(ReplyTarget));
-        ComposerFocusRequest++;
+        if (mimeType.StartsWith(
+                "image/",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return new MessageType.Image(
+                new ImageMessageContent(
+                    filename,
+                    null,
+                    null,
+                    source,
+                    new ImageInfo(
+                        null,
+                        null,
+                        mimeType,
+                        size,
+                        null,
+                        null,
+                        null,
+                        null)));
+        }
+
+        if (mimeType.StartsWith(
+                "video/",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return new MessageType.Video(
+                new VideoMessageContent(
+                    filename,
+                    null,
+                    null,
+                    source,
+                    new VideoInfo(
+                        null,
+                        null,
+                        null,
+                        mimeType,
+                        size,
+                        null,
+                        null,
+                        null)));
+        }
+
+        return new MessageType.File(
+            new FileMessageContent(
+                filename,
+                null,
+                null,
+                source,
+                new uniffi.matrix_sdk_ffi
+                    .FileInfo(
+                        mimeType,
+                        size,
+                        null,
+                        null)));
     }
 
-    private async Task ShowMessageMenuAsync(ChatMessage message)
+    [RelayCommand]
+    private void Reply(
+        ChatMessage? message)
     {
-        var page = Application.Current?.Windows.FirstOrDefault()?.Page;
+        SetReplyTarget(message);
+    }
+
+    [RelayCommand]
+    private async Task OpenMessageMenuAsync(
+        ChatMessage? message)
+    {
+        if (message is null)
+        {
+            return;
+        }
+
+        var page =
+            Application.Current?
+                .Windows
+                .FirstOrDefault()?
+                .Page;
+
         if (page is null)
         {
             return;
         }
 
-        var actions = new List<string> { "Copy text" };
+        var actions =
+            new List<string>
+            {
+                "Copy text",
+            };
+
         if (message.EventId is not null)
         {
             actions.Insert(0, "Reply");
         }
-        if (!string.IsNullOrWhiteSpace(message.MediaSourceJson))
+
+        if (!string.IsNullOrWhiteSpace(
+                message.MediaSourceJson))
         {
             actions.Add("Save file");
         }
-        var action = await page.DisplayActionSheetAsync(
-            "Message", "Cancel", null, actions.ToArray());
-        if (action == "Reply")
+
+        var action =
+            await page.DisplayActionSheetAsync(
+                "Message",
+                "Cancel",
+                null,
+                actions.ToArray());
+
+        switch (action)
         {
-            SetReplyTarget(message);
-        }
-        else if (action == "Copy text")
-        {
-            await Clipboard.Default.SetTextAsync(message.Body);
-        }
-        else if (action == "Save file")
-        {
-            await SaveMediaAsync(message);
+            case "Reply":
+                SetReplyTarget(message);
+                break;
+
+            case "Copy text":
+                await Clipboard.Default
+                    .SetTextAsync(
+                        message.Body);
+                break;
+
+            case "Save file":
+                await SaveMediaAsync(message);
+                break;
         }
     }
 
-    private void build()
+    [RelayCommand]
+    private Task SaveMessageMediaAsync(
+        ChatMessage? message)
+    {
+        return message is null
+            ? Task.CompletedTask
+            : SaveMediaAsync(message);
+    }
+
+    private void SetReplyTarget(
+        ChatMessage? message)
+    {
+        _replyTo = message;
+        OnPropertyChanged(
+            nameof(ReplyTarget));
+    }
+
+    private void Build()
     {
         Content = new Grid
         {
-            SafeAreaEdges = SafeAreaEdges.All,
+            SafeAreaEdges =
+                SafeAreaEdges.All,
+
+            RowDefinitions =
+            {
+                new RowDefinition(
+                    GridLength.Star),
+
+                new RowDefinition(
+                    GridLength.Auto),
+
+                new RowDefinition(
+                    GridLength.Auto),
+            },
+
             Behaviors =
             {
                 new EventToCommandBehavior
                 {
-                    BindingContext = this,
-                    EventName = nameof(Unloaded),
-                }.Bind(
-                    EventToCommandBehavior.CommandProperty,
-                    nameof(UnloadCommand)),
+                    EventName =
+                        nameof(Unloaded),
+                }
+                .Bind(
+                    EventToCommandBehavior
+                        .CommandProperty,
+                    nameof(UnloadCommand),
+                    source: this),
             },
-            RowDefinitions =
-            {
-                new RowDefinition(GridLength.Star),
-                new RowDefinition(GridLength.Auto),
-                new RowDefinition(GridLength.Auto),
-            },
+
             Children =
             {
                 new ChatTimeline()
-                .Bind(
-                    ChatTimeline.MessagesProperty,
-                    nameof(Messages),
-                    source: BindingContext)
-                .Bind(
-                    ChatTimeline.HistoryCommandProperty,
-                    nameof(LoadMoreHistoryCommand),
-                    source: BindingContext)
-                .Bind(
-                    ChatTimeline.MatrixClientProperty,
-                    nameof(MatrixClient),
-                    source: BindingContext)
-                .Bind(
-                    ChatTimeline.RoomProperty,
-                    nameof(CurrentRoom),
-                    source: BindingContext)
-                .Bind(
-                    ChatTimeline.ReplyCommandProperty,
-                    nameof(ReplyCommand),
-                    source: BindingContext)
-                .Bind(
-                    ChatTimeline.MessageMenuCommandProperty,
-                    nameof(OpenMessageMenuCommand),
-                    source: BindingContext)
-                .Bind(
-                    ChatTimeline.SaveMediaCommandProperty,
-                    nameof(SaveMessageMediaCommand),
-                    source: BindingContext)
-                .Bind(
-                    ChatTimeline.ResetRequestProperty,
-                    nameof(TimelineResetRequest),
-                    source: BindingContext)
-                .Bind(
-                    ChatTimeline.ScrollRequestProperty,
-                    nameof(TimelineScrollRequest),
-                    source: BindingContext)
-                .Bind(
-                    ChatTimeline.ScrollAfterLayoutRequestProperty,
-                    nameof(TimelineScrollAfterLayoutRequest),
-                    source: BindingContext)
-                .Bind(
-                    ChatTimeline.IsNearBottomProperty,
-                    nameof(TimelineIsNearBottom),
-                    BindingMode.TwoWay,
-                    source: BindingContext)
-                .Row(0),
+                    .Bind(
+                        ChatTimeline
+                            .MessagesProperty,
+                        nameof(Messages),
+                        source: this)
+                    .Bind(
+                        ChatTimeline
+                            .HistoryCommandProperty,
+                        nameof(
+                            LoadMoreHistoryCommand),
+                        source: this)
+                    .Bind(
+                        ChatTimeline
+                            .MatrixClientProperty,
+                        nameof(MatrixClient),
+                        source: this)
+                    .Bind(
+                        ChatTimeline
+                            .RoomProperty,
+                        nameof(CurrentRoom),
+                        source: this)
+                    .Bind(
+                        ChatTimeline
+                            .ReplyCommandProperty,
+                        nameof(ReplyCommand),
+                        source: this)
+                    .Bind(
+                        ChatTimeline
+                            .MessageMenuCommandProperty,
+                        nameof(OpenMessageMenuCommand),
+                        source: this)
+                    .Bind(
+                        ChatTimeline
+                            .SaveMediaCommandProperty,
+                        nameof(SaveMessageMediaCommand),
+                        source: this)
+                    .Bind(
+                        ChatTimeline
+                            .ResetRequestProperty,
+                        nameof(
+                            TimelineResetRequest),
+                        source: this)
+                    .Bind(
+                        ChatTimeline
+                            .ScrollRequestProperty,
+                        nameof(
+                            TimelineScrollRequest),
+                        source: this)
+                    .Bind(
+                        ChatTimeline
+                            .ScrollAfterLayoutRequestProperty,
+                        nameof(
+                            TimelineScrollAfterLayoutRequest),
+                        source: this)
+                    .Bind(
+                        ChatTimeline
+                            .IsNearBottomProperty,
+                        nameof(
+                            TimelineIsNearBottom),
+                        BindingMode.TwoWay,
+                        source: this)
+                    .Row(0),
+
                 new Label
                 {
-                    Margin = new Thickness(12, 2),
+                    Margin =
+                        new Thickness(12, 2),
+
                     FontSize = 12,
                     Opacity = .7,
-                    LineBreakMode = LineBreakMode.TailTruncation,
+
+                    LineBreakMode =
+                        LineBreakMode
+                            .TailTruncation,
                 }
-                .Bind(Label.TextProperty, nameof(TypingText))
+                .Bind(
+                    Label.TextProperty,
+                    nameof(TypingText),
+                    source: this)
                 .Bind(
                     IsVisibleProperty,
                     nameof(TypingText),
-                    converter: new IsStringNotNullOrEmptyConverter())
+                    converter:
+                        new IsStringNotNullOrEmptyConverter(),
+                    source: this)
                 .Row(1),
+
                 new ChatComposer()
                     .Bind(
                         ChatComposer.TextProperty,
                         nameof(MessageText),
                         BindingMode.TwoWay,
-                        source: BindingContext)
+                        source: this)
                     .Bind(
                         ChatComposer.ReplyToProperty,
                         nameof(ReplyTarget),
-                        source: BindingContext)
+                        source: this)
                     .Bind(
                         ChatComposer.ErrorMessageProperty,
                         nameof(ErrorMessage),
-                        source: BindingContext)
+                        source: this)
                     .Bind(
                         ChatComposer.HasErrorProperty,
                         nameof(HasError),
-                        source: BindingContext)
+                        source: this)
                     .Bind(
                         ChatComposer.SendCommandProperty,
                         nameof(SendMessageCommand),
-                        source: BindingContext)
+                        source: this)
                     .Bind(
                         ChatComposer.AttachCommandProperty,
                         nameof(AttachFileCommand),
-                        source: BindingContext)
-                    .Bind(
-                        ChatComposer.FocusRequestProperty,
-                        nameof(ComposerFocusRequest),
-                        source: BindingContext)
+                        source: this)
                     .Row(2),
+
                 new Grid
                 {
-                    BackgroundColor = Color.FromArgb("#66000000"),
+                    BackgroundColor =
+                        Color.FromArgb(
+                            "#66000000"),
+
                     Children =
                     {
                         new ActivityIndicator
                         {
                             IsRunning = true,
-                            HorizontalOptions = LayoutOptions.Center,
-                            VerticalOptions = LayoutOptions.Center,
+                            HorizontalOptions =
+                                LayoutOptions.Center,
+                            VerticalOptions =
+                                LayoutOptions.Center,
                         },
                     },
                 }
-                .Bind(IsVisibleProperty, nameof(IsLoading))
                 .Bind(
-                    InputTransparentProperty,
+                    IsVisibleProperty,
                     nameof(IsLoading),
-                    converter: new InvertedBoolConverter())
+                    source: this)
                 .RowSpan(3),
             },
         };
@@ -598,247 +896,15 @@ public sealed partial class Chat : ContentView, IDisposable
     {
         if (newValue is Room room)
         {
-            _ = ((Chat)bindable).SetRoomAsync(room);
+            _ = ((Chat)bindable)
+                .SetRoomAsync(room);
         }
     }
 
     [RelayCommand]
-    private void Unload() => Dispose();
-
-    private async Task SaveMediaAsync(ChatMessage message)
+    private void Unload()
     {
-        // TODO implement mac catalyst file saving
-#if MACCATALYST
-        return;
-#endif
-
-#if WINDOWS || ANDROID
-        if (string.IsNullOrWhiteSpace(message.MediaSourceJson))
-        {
-            return;
-        }
-
-#if WINDOWS
-        var extension = System.IO.Path.GetExtension(message.Filename);
-        if (string.IsNullOrWhiteSpace(extension))
-        {
-            extension = ".bin";
-        }
-
-        try
-        {
-            var picker = new Windows.Storage.Pickers.FileSavePicker
-            {
-                SuggestedFileName = System.IO.Path.GetFileNameWithoutExtension(
-                    message.Filename ?? "attachment"),
-            };
-            picker.FileTypeChoices.Add("File", [extension]);
-            var platformWindow = Application.Current?.Windows.FirstOrDefault()
-                ?.Handler?.PlatformView as Microsoft.UI.Xaml.Window
-                ?? throw new InvalidOperationException("The application window is unavailable.");
-            WinRT.Interop.InitializeWithWindow.Initialize(
-                picker,
-                WinRT.Interop.WindowNative.GetWindowHandle(platformWindow));
-            var destination = await picker.PickSaveFileAsync();
-            if (destination is null)
-            {
-                return;
-            }
-
-            var data = await (MatrixClient ??
-                throw new InvalidOperationException(
-                    "Matrix client is required."))
-                .GetMediaContentAsync(message.MediaSourceJson);
-            await Windows.Storage.FileIO.WriteBytesAsync(destination, data);
-        }
-        catch (Exception exception)
-        {
-            ErrorMessage = $"Could not save file: {exception.Message}";
-            Debug.WriteLine($"Could not save file: {exception}");
-        }
-#elif ANDROID
-        try
-        {
-            if (!OperatingSystem.IsAndroidVersionAtLeast(29))
-            {
-                throw new PlatformNotSupportedException(
-                    "Saving files requires Android 10 or newer.");
-            }
-
-            var values = new Android.Content.ContentValues();
-            values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName,
-                message.Filename ?? "attachment");
-            values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType,
-                message.MimeType ?? "application/octet-stream");
-            values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath,
-                Android.OS.Environment.DirectoryDownloads);
-            var resolver = Android.App.Application.Context!.ContentResolver!;
-            var destination = resolver.Insert(
-                Android.Provider.MediaStore.Downloads.ExternalContentUri,
-                values) ?? throw new IOException("Could not create the download.");
-            await using var output = resolver.OpenOutputStream(destination)
-                ?? throw new IOException("Could not open the download.");
-            var data = await (MatrixClient ??
-                throw new InvalidOperationException(
-                    "Matrix client is required."))
-                .GetMediaContentAsync(message.MediaSourceJson);
-            await output.WriteAsync(data);
-        }
-        catch (Exception exception)
-        {
-            ErrorMessage = $"Could not save file: {exception.Message}";
-            Debug.WriteLine($"Could not save file: {exception}");
-        }
-#endif
-#endif
-    }
-
-    private void DisposeTimeline()
-    {
-        _typingController.Stop();
-
-        if (_observableTimeline is null)
-        {
-            return;
-        }
-
-        _observableTimeline.CollectionChanged -=
-            OnTimelineCollectionChanged;
-
-        _observableTimeline.Dispose();
-        _observableTimeline = null;
-
-        _isLoadingMoreHistory = false;
-
-        OnPropertyChanged(nameof(CanSend));
-        SendMessageCommand.NotifyCanExecuteChanged();
-    }
-
-    public void Dispose()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-
-        DisposeTimeline();
-
-        Messages.Clear();
-
-        _room = null;
-        OnPropertyChanged(nameof(CurrentRoom));
-
-        GC.SuppressFinalize(this);
-    }
-
-    private void OnTimelineCollectionChanged(
-        object? sender,
-        NotifyCollectionChangedEventArgs e)
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        /*
-         * Capture the current follow state before modifying Messages.
-         *
-         * When the user is reading older messages, incoming events and
-         * timeline replacements must not pull the view back to the bottom.
-         */
-        var shouldFollowBottom = TimelineIsNearBottom;
-
-        SynchronizeMessages();
-
-        if (shouldFollowBottom)
-        {
-            TimelineScrollRequest++;
-        }
-    }
-
-    private void SynchronizeMessages()
-    {
-        if (_observableTimeline is null)
-        {
-            Messages.Clear();
-            return;
-        }
-
-        var desiredMessages = _observableTimeline
-            .Select(TryCreateChatMessage)
-            .Where(message => message is not null)
-            .Cast<ChatMessage>()
-            .ToArray();
-
-        /*
-         * Reconcile by the stable Matrix timeline-item ID.
-         *
-         * Do not clear and repopulate the collection. Clearing causes the
-         * CollectionView to discard its visible-item anchor and jump.
-         */
-        for (var desiredIndex = 0;
-             desiredIndex < desiredMessages.Length;
-             desiredIndex++)
-        {
-            var desiredMessage = desiredMessages[desiredIndex];
-
-            if (desiredIndex < Messages.Count &&
-                Messages[desiredIndex].Id == desiredMessage.Id)
-            {
-                /*
-                 * Timeline Set updates may change send state, profile data,
-                 * edited content or media metadata.
-                 */
-                if (Messages[desiredIndex] != desiredMessage)
-                {
-                    Messages[desiredIndex] = desiredMessage;
-                }
-
-                continue;
-            }
-
-            var existingIndex = FindMessageIndex(
-                desiredMessage.Id, desiredIndex + 1);
-
-            if (existingIndex >= 0)
-            {
-                Messages.Move(existingIndex, desiredIndex);
-
-                if (Messages[desiredIndex] != desiredMessage)
-                {
-                    Messages[desiredIndex] = desiredMessage;
-                }
-            }
-            else
-            {
-                Messages.Insert(desiredIndex, desiredMessage);
-            }
-        }
-
-        while (Messages.Count > desiredMessages.Length)
-        {
-            Messages.RemoveAt(Messages.Count - 1);
-        }
-
-    }
-
-    private int FindMessageIndex(
-        string id,
-        int startIndex)
-    {
-        for (var index = Math.Max(0, startIndex);
-             index < Messages.Count;
-             index++)
-        {
-            if (Messages[index].Id == id)
-            {
-                return index;
-            }
-        }
-
-        return -1;
+        Dispose();
     }
 
     [RelayCommand]
@@ -857,20 +923,19 @@ public sealed partial class Chat : ContentView, IDisposable
 
         try
         {
-            await _observableTimeline.LoadMoreHistoryAsync();
+            await _observableTimeline
+                .LoadMoreHistoryAsync();
         }
         catch (ObjectDisposedException)
         {
-            /*
-             * The active room changed while pagination was running.
-             */
+            // The active room changed.
         }
         catch (Exception exception)
         {
             ErrorMessage = exception.Message;
 
             Debug.WriteLine(
-                $"Failed to load older messages for {_room?.Id()}: " +
+                $"Could not load history: " +
                 exception);
         }
         finally
@@ -879,46 +944,250 @@ public sealed partial class Chat : ContentView, IDisposable
         }
     }
 
-    private static ChatMessage? TryCreateChatMessage(
-        TimelineItem timelineItem)
+    private async Task SaveMediaAsync(
+        ChatMessage message)
     {
-        var eventItem = timelineItem.AsEvent();
+#if MACCATALYST
+        await Task.CompletedTask;
+        return;
+#endif
 
-        if (eventItem is null)
+#if WINDOWS || ANDROID
+        if (string.IsNullOrWhiteSpace(
+                message.MediaSourceJson))
+        {
+            return;
+        }
+
+        var matrixClient =
+            MatrixClient ??
+            throw new InvalidOperationException(
+                "Matrix client is required.");
+
+#if WINDOWS
+        var extension =
+            Path.GetExtension(
+                message.Filename);
+
+        if (string.IsNullOrWhiteSpace(
+                extension))
+        {
+            extension = ".bin";
+        }
+
+        var picker =
+            new Windows.Storage.Pickers
+                .FileSavePicker
+            {
+                SuggestedFileName =
+                    Path.GetFileNameWithoutExtension(
+                        message.Filename ??
+                        "attachment"),
+            };
+
+        picker.FileTypeChoices.Add(
+            "File",
+            [extension]);
+
+        var platformWindow =
+            Application.Current?
+                .Windows
+                .FirstOrDefault()?
+                .Handler?
+                .PlatformView as
+                Microsoft.UI.Xaml.Window
+            ?? throw new InvalidOperationException(
+                "Application window unavailable.");
+
+        WinRT.Interop
+            .InitializeWithWindow
+            .Initialize(
+                picker,
+                WinRT.Interop.WindowNative
+                    .GetWindowHandle(
+                        platformWindow));
+
+        var destination =
+            await picker.PickSaveFileAsync();
+
+        if (destination is null)
+        {
+            return;
+        }
+
+        var data =
+            await matrixClient
+                .GetMediaContentAsync(
+                    message.MediaSourceJson);
+
+        await Windows.Storage.FileIO
+            .WriteBytesAsync(
+                destination,
+                data);
+#elif ANDROID
+        if (!OperatingSystem
+                .IsAndroidVersionAtLeast(29))
+        {
+            throw new PlatformNotSupportedException(
+                "Saving files requires Android 10 or newer.");
+        }
+
+        var values =
+            new Android.Content
+                .ContentValues();
+
+        values.Put(
+            Android.Provider.MediaStore
+                .IMediaColumns.DisplayName,
+            message.Filename ??
+            "attachment");
+
+        values.Put(
+            Android.Provider.MediaStore
+                .IMediaColumns.MimeType,
+            message.MimeType ??
+            "application/octet-stream");
+
+        values.Put(
+            Android.Provider.MediaStore
+                .IMediaColumns.RelativePath,
+            Android.OS.Environment
+                .DirectoryDownloads);
+
+        var resolver =
+            Android.App.Application
+                .Context!
+                .ContentResolver!;
+
+        var destination =
+            resolver.Insert(
+                Android.Provider.MediaStore
+                    .Downloads
+                    .ExternalContentUri,
+                values)
+            ?? throw new IOException(
+                "Could not create download.");
+
+        await using var output =
+            resolver.OpenOutputStream(
+                destination)
+            ?? throw new IOException(
+                "Could not open download.");
+
+        var data =
+            await matrixClient
+                .GetMediaContentAsync(
+                    message.MediaSourceJson);
+
+        await output.WriteAsync(data);
+#endif
+#else
+        await Task.CompletedTask;
+#endif
+    }
+
+    private static ChatMessage?
+        TryCreateChatMessage(
+            TimelineItem timelineItem)
+    {
+        var eventItem =
+            timelineItem.AsEvent();
+
+        if (eventItem?.Content is not
+            TimelineItemContent.MsgLike msgLike)
         {
             return null;
         }
 
-        if (eventItem.Content is not TimelineItemContent.MsgLike msgLike)
-        {
-            return null;
-        }
-
-        var username = ResolveUsername(eventItem);
+        var username =
+            eventItem.SenderProfile is
+                ProfileDetails.Ready ready &&
+            !string.IsNullOrWhiteSpace(
+                ready.DisplayName)
+                ? ready.DisplayName
+                : eventItem.Sender;
 
         var avatarUrl =
-            eventItem.SenderProfile is ProfileDetails.Ready ready
-                ? ready.AvatarUrl
+            eventItem.SenderProfile is
+                ProfileDetails.Ready profile
+                ? profile.AvatarUrl
                 : null;
 
-        var id = timelineItem.UniqueId().Id;
-        var eventId = (eventItem.EventOrTransactionId as EventOrTransactionId.EventId)?.EventIdValue;
-        var readByUserIds = string.Join(
-            '\n',
-            eventItem.ReadReceipts.Keys
-                .Where(userId => userId != eventItem.Sender)
-                .Order(StringComparer.Ordinal));
-        var replyTo = FormatReplyPreview(msgLike.Content.InReplyTo);
+        var id =
+            timelineItem.UniqueId().Id;
+
+        var eventId =
+            (eventItem.EventOrTransactionId as
+                EventOrTransactionId.EventId)
+            ?.EventIdValue;
+
+        var readByUserIds =
+            string.Join(
+                '\n',
+                eventItem.ReadReceipts.Keys
+                    .Where(userId =>
+                        userId !=
+                        eventItem.Sender)
+                    .Order(
+                        StringComparer.Ordinal));
+
+        var replyTo =
+            FormatReplyPreview(
+                msgLike.Content.InReplyTo);
 
         return msgLike.Content.Kind switch
         {
-            MsgLikeKind.Message message => message.Content.MsgType switch
-            {
-                MessageType.Image image => new ChatMessage(
+            MsgLikeKind.Message message =>
+                CreateMessage(
                     id,
                     username,
-                    image.Content.Caption ?? image.Content.Filename,
+                    avatarUrl,
+                    eventId,
+                    readByUserIds,
+                    replyTo,
                     eventItem.IsOwn,
+                    message),
+
+            MsgLikeKind.Sticker sticker =>
+                new ChatMessage(
+                    id,
+                    username,
+                    sticker.Body,
+                    eventItem.IsOwn,
+                    avatarUrl,
+                    ChatMediaKind.Image,
+                    sticker.Source.ToJson(),
+                    sticker.Body,
+                    sticker.Info.Mimetype,
+                    sticker.Info.Width,
+                    sticker.Info.Height,
+                    readByUserIds,
+                    eventId,
+                    replyTo),
+
+            _ => null,
+        };
+    }
+
+    private static ChatMessage CreateMessage(
+        string id,
+        string username,
+        string? avatarUrl,
+        string? eventId,
+        string readByUserIds,
+        string? replyTo,
+        bool isOwn,
+        MsgLikeKind.Message message)
+    {
+        return message.Content.MsgType switch
+        {
+            MessageType.Image image =>
+                new ChatMessage(
+                    id,
+                    username,
+                    image.Content.Caption ??
+                    image.Content.Filename,
+                    isOwn,
                     avatarUrl,
                     ChatMediaKind.Image,
                     image.Content.Source.ToJson(),
@@ -930,11 +1199,13 @@ public sealed partial class Chat : ContentView, IDisposable
                     eventId,
                     replyTo),
 
-                MessageType.Video video => new ChatMessage(
+            MessageType.Video video =>
+                new ChatMessage(
                     id,
                     username,
-                    video.Content.Caption ?? video.Content.Filename,
-                    eventItem.IsOwn,
+                    video.Content.Caption ??
+                    video.Content.Filename,
+                    isOwn,
                     avatarUrl,
                     ChatMediaKind.Video,
                     video.Content.Source.ToJson(),
@@ -946,76 +1217,60 @@ public sealed partial class Chat : ContentView, IDisposable
                     eventId,
                     replyTo),
 
-                MessageType.File file => new ChatMessage(
+            MessageType.File file =>
+                new ChatMessage(
                     id,
                     username,
-                    file.Content.Caption ?? file.Content.Filename,
-                    eventItem.IsOwn,
+                    file.Content.Caption ??
+                    file.Content.Filename,
+                    isOwn,
                     avatarUrl,
                     ChatMediaKind.File,
                     file.Content.Source.ToJson(),
                     file.Content.Filename,
                     file.Content.Info?.Mimetype,
-                    ReadByUserIds: readByUserIds,
-                    EventId: eventId,
-                    ReplyTo: replyTo),
+                    ReadByUserIds:
+                        readByUserIds,
+                    EventId:
+                        eventId,
+                    ReplyTo:
+                        replyTo),
 
-                _ => new ChatMessage(
+            _ =>
+                new ChatMessage(
                     id,
                     username,
                     message.Content.Body,
-                    eventItem.IsOwn,
+                    isOwn,
                     avatarUrl,
-                    ReadByUserIds: readByUserIds,
-                    EventId: eventId,
-                    ReplyTo: replyTo),
-            },
-
-            MsgLikeKind.Sticker sticker => new ChatMessage(
-                id,
-                username,
-                sticker.Body,
-                eventItem.IsOwn,
-                avatarUrl,
-                ChatMediaKind.Image,
-                sticker.Source.ToJson(),
-                sticker.Body,
-                sticker.Info.Mimetype,
-                sticker.Info.Width,
-                sticker.Info.Height,
-                readByUserIds,
-                eventId,
-                replyTo),
-
-            _ => null,
+                    ReadByUserIds:
+                        readByUserIds,
+                    EventId:
+                        eventId,
+                    ReplyTo:
+                        replyTo),
         };
     }
 
-    private static string ResolveUsername(
-        EventTimelineItem eventItem)
-    {
-        if (eventItem.SenderProfile is ProfileDetails.Ready ready &&
-            !string.IsNullOrWhiteSpace(ready.DisplayName))
-        {
-            return ready.DisplayName;
-        }
-
-        return eventItem.Sender;
-    }
-
-    private static string? FormatReplyPreview(InReplyToDetails? reply)
+    private static string? FormatReplyPreview(
+        InReplyToDetails? reply)
     {
         if (reply is null)
         {
             return null;
         }
 
-        using var details = reply.Event();
-        var body = details is EmbeddedEventDetails.Ready
+        using var details =
+            reply.Event();
+
+        var body = details is
+        EmbeddedEventDetails.Ready
         {
-            Content: TimelineItemContent.MsgLike
+            Content:
+                TimelineItemContent.MsgLike
             {
-                Content.Kind: MsgLikeKind.Message message,
+                Content.Kind:
+                        MsgLikeKind.Message message,
             },
         }
             ? message.Content.Body
@@ -1023,17 +1278,58 @@ public sealed partial class Chat : ContentView, IDisposable
 
         return string.IsNullOrWhiteSpace(body)
             ? "Replying to a message"
-            : $"Replying to: {body.ReplaceLineEndings(" ")}";
+            : $"Replying to: " +
+              body.ReplaceLineEndings(" ");
     }
 
-    private void SetTypingText(string text)
+    private void DisposeTimeline()
     {
-        TypingText = text;
+        _typingController.Stop();
+
+        if (_observableTimeline is null)
+        {
+            return;
+        }
+
+        _observableTimeline.CollectionChanged -=
+            OnTimelineCollectionChanged;
+
+        _observableTimeline.Dispose();
+        _observableTimeline = null;
+
+        Messages.Clear();
+
+        _isLoadingMoreHistory = false;
+
+        OnPropertyChanged(nameof(CanSend));
+
+        SendMessageCommand
+            .NotifyCanExecuteChanged();
     }
 
-}
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
 
-public sealed record ChatMessageMeasurement(ChatMessage Message, double Height);
+        _disposed = true;
+
+        _roomLoadCancellation?.Cancel();
+        _roomLoadCancellation?.Dispose();
+        _roomLoadCancellation = null;
+
+        DisposeTimeline();
+
+        _typingController.Dispose();
+
+        _room = null;
+        OnPropertyChanged(nameof(CurrentRoom));
+
+        GC.SuppressFinalize(this);
+    }
+}
 
 public sealed record ChatMessage(
     string Id,
@@ -1058,3 +1354,4 @@ public enum ChatMediaKind
     Video,
     File,
 }
+

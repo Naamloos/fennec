@@ -50,16 +50,7 @@ public sealed partial class AppShell : Shell
     public string AccountDisplayName => _accountDisplayName;
     public string AccountUserId => _accountUserId;
     public string AccountInitial => _accountInitial;
-    [BindableProperty(PropertyChangedMethodName = nameof(OnMatrixClientChanged))]
-    public partial ManagedMatrixClient? MatrixClient { get; set; }
 
-    [BindableProperty]
-    public partial AppNavigationService? AppNavigation { get; set; }
-
-    public string SessionStatus =>
-        MatrixClient?.IsLoggedIn == true
-            ? "Signed in"
-            : "Not signed in";
     public bool ShowChat =>
         SelectedRoom is not null &&
         string.IsNullOrEmpty(RoomErrorMessage);
@@ -80,8 +71,14 @@ public sealed partial class AppShell : Shell
         }
     }
 
-    public AppShell()
+    private readonly ManagedMatrixClient _matrixClient;
+    private readonly AppNavigationService _appNavigation;
+
+    public AppShell(ManagedMatrixClient matrixClient, AppNavigationService appNavigation)
     {
+        _matrixClient = matrixClient;
+        _appNavigation = appNavigation;
+
         BindingContext = this;
 
         ConfigureShell();
@@ -123,8 +120,6 @@ public sealed partial class AppShell : Shell
             newClient.SessionInvalidated +=
                 shell.OnSessionInvalidated;
         }
-
-        shell.OnPropertyChanged(nameof(SessionStatus));
     }
 
     private void ConfigureShell()
@@ -214,27 +209,10 @@ public sealed partial class AppShell : Shell
                             nameof(ShowUserSettingsCommand),
                             source: BindingContext),
 #endif
-                        new Label
-                        {
-                            Text = "Fennec",
-                            FontSize = 26,
-                            FontAttributes = FontAttributes.Bold,
-                        },
-                        new Label
-                        {
-                            FontSize = 12,
-                            Opacity = .7,
-                            LineBreakMode = LineBreakMode.TailTruncation,
-                        }.Bind(
-                            Label.TextProperty,
-                            nameof(SessionStatus)),
                     },
                 }.Row(0),
                 new RoomListComponent()
-                    .Bind(
-                        RoomListComponent.MatrixClientProperty,
-                        nameof(MatrixClient),
-                        source: BindingContext)
+                    .BindService<ManagedMatrixClient, RoomListComponent>(RoomListComponent.MatrixClientProperty)
                     .Bind(
                         RoomListComponent.SelectedRoomProperty,
                         nameof(SelectedRoom),
@@ -284,10 +262,7 @@ public sealed partial class AppShell : Shell
                             Children =
                             {
                                 new Chat()
-                                    .Bind(
-                                        Chat.MatrixClientProperty,
-                                        nameof(MatrixClient),
-                                        source: BindingContext)
+                                    .BindService<ManagedMatrixClient, Chat>(Chat.MatrixClientProperty)
                                     .Bind(
                                         IsVisibleProperty,
                                         nameof(ShowChat),
@@ -393,7 +368,7 @@ public sealed partial class AppShell : Shell
         Window.TitleBar = new TitleBar
         {
             Title = "Fennec",
-            HeightRequest = 48,
+            HeightRequest = 42,
             TrailingContent = new AccountButton
             {
                 Margin = new Thickness(0, 0, 8, 0),
@@ -426,12 +401,12 @@ public sealed partial class AppShell : Shell
     {
         try
         {
-            if (MatrixClient is null)
+            if (_matrixClient is null)
             {
                 return;
             }
 
-            var profile = await MatrixClient.GetOwnProfileAsync();
+            var profile = await _matrixClient.GetOwnProfileAsync();
             _accountDisplayName = profile.DisplayName ?? profile.UserId;
             _accountUserId = profile.UserId;
             _accountInitial = string.IsNullOrWhiteSpace(profile.DisplayName)
@@ -444,7 +419,7 @@ public sealed partial class AppShell : Shell
                 return;
             }
 
-            var bytes = await MatrixClient.GetThumbnailAsync(
+            var bytes = await _matrixClient.GetThumbnailAsync(
                 profile.AvatarUrl,
                 60,
                 60,
@@ -467,6 +442,8 @@ public sealed partial class AppShell : Shell
         await CurrentPage.ShowPopupAsync(
             new Popup
             {
+                Padding = 0,
+                Margin = 0,
                 Content = new UserSettingsPopup()
                     .Bind(
                         UserSettingsPopup.AvatarSourceProperty,
@@ -490,24 +467,24 @@ public sealed partial class AppShell : Shell
     [RelayCommand]
     private async Task LogoutAsync()
     {
-        if (MatrixClient is not null)
+        if (_matrixClient is not null)
         {
-            await MatrixClient.LogoutAsync();
+            await _matrixClient.LogoutAsync();
         }
 
-        AppNavigation?.ShowLogin();
+        _appNavigation?.ShowLogin();
     }
 
     private void OnSessionInvalidated(object? sender, EventArgs e) =>
         MainThread.BeginInvokeOnMainThread(
-            () => AppNavigation?.ShowLogin());
+            () => _appNavigation?.ShowLogin());
 
     [RelayCommand]
     private async Task OpenVerificationAsync()
     {
         try
         {
-            var controller = await (MatrixClient ??
+            var controller = await (_matrixClient ??
                 throw new InvalidOperationException(
                     "Matrix client is required."))
                 .GetSessionVerificationControllerAsync();
@@ -567,9 +544,9 @@ public sealed partial class AppShell : Shell
 
         _disposed = true;
 
-        if (MatrixClient is not null)
+        if (_matrixClient is not null)
         {
-            MatrixClient.SessionInvalidated -=
+            _matrixClient.SessionInvalidated -=
                 OnSessionInvalidated;
         }
 

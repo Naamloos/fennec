@@ -1,26 +1,29 @@
 using CommunityToolkit.Maui;
-using CommunityToolkit.Maui.Behaviors;
 using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.App.Pages;
 using Dev.Naamloos.Fennec.Sdk;
-using System.Collections.ObjectModel;
+using System.Collections;
 using System.Windows.Input;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
-public sealed partial class ChatTimeline : ContentView
+public sealed partial class ChatTimeline : ContentView, IDisposable
 {
     private const int BottomFollowThreshold = 2;
     private const int HistoryLoadThreshold = 5;
-    private readonly Dictionary<string, double> _messageHeights = [];
+
+    private readonly CollectionView _collectionView;
+
     private bool _ignoreScrollEvents;
+    private bool _initialPositionApplied;
     private bool _scrollQueued;
+    private bool _historyRequestRaised;
+    private bool _disposed;
 
     [BindableProperty]
-    public partial ObservableCollection<ChatMessage>? Messages { get; set; }
+    public partial IList? Messages { get; set; }
 
     [BindableProperty]
     public partial ICommand? HistoryCommand { get; set; }
@@ -43,239 +46,230 @@ public sealed partial class ChatTimeline : ContentView
     [BindableProperty(DefaultBindingMode = BindingMode.TwoWay)]
     public partial bool IsNearBottom { get; set; } = true;
 
-    [BindableProperty(PropertyChangedMethodName = nameof(OnResetRequestChanged))]
+    [BindableProperty(
+        PropertyChangedMethodName = nameof(OnResetRequestChanged))]
     public partial int ResetRequest { get; set; }
 
-    [BindableProperty(PropertyChangedMethodName = nameof(OnScrollRequestChanged))]
+    [BindableProperty(
+        PropertyChangedMethodName = nameof(OnScrollRequestChanged))]
     public partial int ScrollRequest { get; set; }
 
-    [BindableProperty(PropertyChangedMethodName = nameof(OnScrollAfterLayoutRequestChanged))]
+    [BindableProperty(
+        PropertyChangedMethodName =
+            nameof(OnScrollAfterLayoutRequestChanged))]
     public partial int ScrollAfterLayoutRequest { get; set; }
 
     public ChatTimeline()
     {
-        BindingContext = this;
-        build();
+        _collectionView = CreateCollectionView();
+
+        _collectionView.Scrolled +=
+            OnCollectionViewScrolled;
+
+        _collectionView.SizeChanged +=
+            OnCollectionViewSizeChanged;
+
+        Content = _collectionView;
     }
 
-    private void build()
+    private CollectionView CreateCollectionView()
     {
-        Content = new CollectionView
+        var itemTemplate =
+            new DataTemplate(() =>
+                new ChatMessageView()
+                    .Bind(
+                        ChatMessageView.MessageProperty,
+                        ".")
+                    .Bind(
+                        ChatMessageView.MatrixClientProperty,
+                        nameof(MatrixClient),
+                        source: this)
+                    .Bind(
+                        ChatMessageView.RoomProperty,
+                        nameof(Room),
+                        source: this)
+                    .Bind(
+                        ChatMessageView.ReplyCommandProperty,
+                        nameof(ReplyCommand),
+                        source: this)
+                    .Bind(
+                        ChatMessageView.MessageMenuCommandProperty,
+                        nameof(MessageMenuCommand),
+                        source: this)
+                    .Bind(
+                        ChatMessageView.SaveMediaCommandProperty,
+                        nameof(SaveMediaCommand),
+                        source: this));
+
+        return new CollectionView
         {
             SelectionMode = SelectionMode.None,
-            EmptyView = new VerticalStackLayout
+
+            /*
+             * Message rows have uneven heights due to wrapping and media.
+             * CollectionView still virtualizes the rows natively.
+             */
+            ItemSizingStrategy =
+                ItemSizingStrategy.MeasureAllItems,
+
+            ItemsUpdatingScrollMode =
+                ItemsUpdatingScrollMode.KeepLastItemInView,
+
+            ItemsLayout =
+                new LinearItemsLayout(
+                    ItemsLayoutOrientation.Vertical)
+                {
+                    ItemSpacing = 0,
+                },
+
+            ItemTemplate = itemTemplate,
+
+            EmptyView = new Grid
             {
-                HorizontalOptions = LayoutOptions.Center,
-                VerticalOptions = LayoutOptions.Center,
-                Spacing = 8,
                 Children =
                 {
                     new Label
                     {
                         Text = "No messages yet",
-                        FontSize = 18,
-                        FontAttributes = FontAttributes.Bold,
-                        HorizontalTextAlignment = TextAlignment.Center,
-                    },
-                    new Label
-                    {
-                        Text = "Send the first message.",
                         Opacity = .7,
-                        HorizontalTextAlignment = TextAlignment.Center,
+                        HorizontalOptions =
+                            LayoutOptions.Center,
+                        VerticalOptions =
+                            LayoutOptions.Center,
                     },
                 },
             },
-            ItemsUpdatingScrollMode =
-                ItemsUpdatingScrollMode.KeepLastItemInView,
-            ItemsLayout = new LinearItemsLayout(
-                ItemsLayoutOrientation.Vertical)
-            {
-                ItemSpacing = 4,
-            },
-            Header = new BoxView
-            {
-                BackgroundColor = Colors.Transparent,
-            },
-            ItemTemplate = new DataTemplate(() =>
-                new ContentView
-                {
-                    Content = new ChatMessageView()
-                        .Bind(
-                            ChatMessageView.MessageProperty,
-                            nameof(BindingContext),
-                            source: new RelativeBindingSource(
-                                RelativeBindingSourceMode.FindAncestor,
-                                typeof(ContentView)))
-                        .Bind(
-                            ChatMessageView.MatrixClientProperty,
-                            nameof(MatrixClient),
-                            source: BindingContext)
-                        .Bind(
-                            ChatMessageView.RoomProperty,
-                            nameof(Room),
-                            source: BindingContext)
-                        .Bind(
-                            ChatMessageView.ReplyCommandProperty,
-                            nameof(ReplyCommand),
-                            source: BindingContext)
-                        .Bind(
-                            ChatMessageView.MessageMenuCommandProperty,
-                            nameof(MessageMenuCommand),
-                            source: BindingContext)
-                        .Bind(
-                            ChatMessageView.SaveMediaCommandProperty,
-                            nameof(SaveMediaCommand),
-                            source: BindingContext)
-                        .Bind(
-                            ChatMessageView.MessageMeasuredCommandProperty,
-                            nameof(UpdateMessageHeightCommand),
-                            source: BindingContext),
-                }),
-            Behaviors =
-            {
-                new EventToCommandBehavior
-                {
-                    BindingContext = this,
-                    EventName = nameof(CollectionView.Scrolled),
-                }.Bind(
-                    EventToCommandBehavior.CommandProperty,
-                    nameof(ScrolledCommand)),
-                new EventToCommandBehavior
-                {
-                    BindingContext = this,
-                    EventName = nameof(SizeChanged),
-                }.Bind(
-                    EventToCommandBehavior.CommandProperty,
-                    nameof(TimelineSizeChangedCommand)),
-            },
-        }.Bind(
+        }
+        .Bind(
             ItemsView.ItemsSourceProperty,
-            nameof(Messages));
+            nameof(Messages),
+            source: this);
     }
 
-    private void Reset()
+    private void OnCollectionViewScrolled(
+        object? sender,
+        ItemsViewScrolledEventArgs eventArgs)
     {
-        IsNearBottom = true;
-        _ignoreScrollEvents = true;
-        _messageHeights.Clear();
-        UpdateBottomSpacer();
-    }
-
-    [RelayCommand]
-    private void UpdateMessageHeight(
-        ChatMessageMeasurement measurement)
-    {
-        _messageHeights[measurement.Message.Id] =
-            measurement.Height;
-        UpdateBottomSpacer();
-    }
-
-    private async Task ScrollToBottomAsync()
-    {
-        if (Messages is not { Count: > 0 })
-        {
-            return;
-        }
-
-        await MainThread.InvokeOnMainThreadAsync(
-            QueueScrollToBottom);
-    }
-
-    private async Task ScrollToBottomAfterLayoutAsync()
-    {
-        if (Messages is not { Count: > 0 })
-        {
-            return;
-        }
-
-        var completion = new TaskCompletionSource<bool>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-
-        await MainThread.InvokeOnMainThreadAsync(() =>
-        {
-            if (Messages is not { Count: > 0 })
-            {
-                completion.TrySetResult(true);
-                return;
-            }
-
-            Dispatcher.DispatchDelayed(
-                TimeSpan.FromMilliseconds(50),
-                () =>
-                {
-                    try
-                    {
-                        if (Messages is { Count: > 0 })
-                        {
-                            QueueScrollToBottom();
-                        }
-
-                        completion.TrySetResult(true);
-                    }
-                    catch (Exception exception)
-                    {
-                        completion.TrySetException(exception);
-                    }
-                });
-        });
-
-        await completion.Task;
-    }
-
-    [RelayCommand]
-    private void Scrolled(ItemsViewScrolledEventArgs e)
-    {
-        if (_ignoreScrollEvents ||
-            Messages is not { Count: > 0 })
+        if (_disposed ||
+            _ignoreScrollEvents ||
+            !_initialPositionApplied ||
+            Messages is not { Count: > 0 } messages)
         {
             return;
         }
 
         IsNearBottom =
-            e.LastVisibleItemIndex >=
-            Messages.Count - 1 - BottomFollowThreshold;
+            eventArgs.LastVisibleItemIndex >=
+            messages.Count -
+            1 -
+            BottomFollowThreshold;
 
-        ((CollectionView)Content).ItemsUpdatingScrollMode =
+        _collectionView.ItemsUpdatingScrollMode =
             IsNearBottom
                 ? ItemsUpdatingScrollMode.KeepLastItemInView
                 : ItemsUpdatingScrollMode.KeepScrollOffset;
 
-        if (e.FirstVisibleItemIndex <= HistoryLoadThreshold &&
-            HistoryCommand?.CanExecute(null) == true)
+        if (eventArgs.FirstVisibleItemIndex >
+            HistoryLoadThreshold)
         {
-            HistoryCommand.Execute(null);
+            _historyRequestRaised = false;
+            return;
         }
+
+        if (_historyRequestRaised ||
+            HistoryCommand?.CanExecute(null) != true)
+        {
+            return;
+        }
+
+        _historyRequestRaised = true;
+        HistoryCommand.Execute(null);
     }
 
-    [RelayCommand]
-    private void TimelineSizeChanged()
+    private void OnCollectionViewSizeChanged(
+        object? sender,
+        EventArgs eventArgs)
     {
-        UpdateBottomSpacer();
-
-        if (!IsNearBottom ||
+        if (_disposed ||
             Messages is not { Count: > 0 })
         {
             return;
         }
 
+        if (!_initialPositionApplied)
+        {
+            _ = ApplyInitialBottomPositionAsync();
+            return;
+        }
+
+        if (IsNearBottom)
+        {
+            QueueScrollToBottom();
+        }
+    }
+
+    private void Reset()
+    {
+        _initialPositionApplied = false;
+        _historyRequestRaised = false;
+        IsNearBottom = true;
+
+        _collectionView.ItemsUpdatingScrollMode =
+            ItemsUpdatingScrollMode.KeepLastItemInView;
+    }
+
+    private async Task ApplyInitialBottomPositionAsync()
+    {
+        if (_disposed ||
+            Messages is not { Count: > 0 } messages)
+        {
+            return;
+        }
+
+        /*
+         * Wait two dispatcher turns so ItemsSource and the native layout have
+         * both received the projected message collection.
+         */
+        await WaitForLayoutAsync();
+
+        if (_disposed ||
+            Messages is not { Count: > 0 } current ||
+            !ReferenceEquals(messages, current))
+        {
+            return;
+        }
+
+        ScrollToBottomCore();
+        _initialPositionApplied = true;
+    }
+
+    private Task WaitForLayoutAsync()
+    {
+        var completion =
+            new TaskCompletionSource<bool>(
+                TaskCreationOptions
+                    .RunContinuationsAsynchronously);
+
         Dispatcher.Dispatch(() =>
         {
-            if (IsNearBottom &&
-                Messages is { Count: > 0 })
+            Dispatcher.Dispatch(() =>
             {
-                _ = ScrollToBottomAsync();
-            }
+                completion.TrySetResult(true);
+            });
         });
+
+        return completion.Task;
     }
 
     private void QueueScrollToBottom()
     {
-        if (_scrollQueued)
+        if (_disposed || _scrollQueued)
         {
             return;
         }
 
         _scrollQueued = true;
+
         Dispatcher.Dispatch(() =>
         {
             _scrollQueued = false;
@@ -285,20 +279,24 @@ public sealed partial class ChatTimeline : ContentView
 
     private void ScrollToBottomCore()
     {
-        if (Messages is not { Count: > 0 })
+        if (_disposed ||
+            Messages is not { Count: > 0 } messages)
         {
             return;
         }
 
         _ignoreScrollEvents = true;
         IsNearBottom = true;
-        ((CollectionView)Content).ItemsUpdatingScrollMode =
+
+        _collectionView.ItemsUpdatingScrollMode =
             ItemsUpdatingScrollMode.KeepLastItemInView;
-        ((CollectionView)Content).ScrollTo(
-            Messages.Count - 1,
+
+        _collectionView.ScrollTo(
+            messages.Count - 1,
             groupIndex: -1,
             position: ScrollToPosition.End,
             animate: false);
+
         Dispatcher.DispatchDelayed(
             TimeSpan.FromMilliseconds(75),
             () =>
@@ -308,46 +306,47 @@ public sealed partial class ChatTimeline : ContentView
             });
     }
 
-    private void UpdateBottomSpacer()
-    {
-        if (Messages is not { Count: > 0 and <= 12 } ||
-            Content.Height <= 0)
-        {
-            ((BoxView)((CollectionView)Content).Header)
-                .HeightRequest = 0;
-            return;
-        }
-
-        var contentHeight = Messages.Sum(
-            message => _messageHeights.TryGetValue(
-                message.Id,
-                out var height)
-                ? height
-                : 68d);
-
-        ((BoxView)((CollectionView)Content).Header)
-            .HeightRequest = Math.Max(
-                0,
-                Content.Height - contentHeight);
-    }
-
     private static void OnResetRequestChanged(
         BindableObject bindable,
         object oldValue,
-        object newValue) =>
+        object newValue)
+    {
         ((ChatTimeline)bindable).Reset();
+    }
 
     private static void OnScrollRequestChanged(
         BindableObject bindable,
         object oldValue,
-        object newValue) =>
-        _ = ((ChatTimeline)bindable)
-            .ScrollToBottomAsync();
+        object newValue)
+    {
+        ((ChatTimeline)bindable)
+            .QueueScrollToBottom();
+    }
 
     private static void OnScrollAfterLayoutRequestChanged(
         BindableObject bindable,
         object oldValue,
-        object newValue) =>
+        object newValue)
+    {
         _ = ((ChatTimeline)bindable)
-            .ScrollToBottomAfterLayoutAsync();
+            .ApplyInitialBottomPositionAsync();
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        _collectionView.Scrolled -=
+            OnCollectionViewScrolled;
+
+        _collectionView.SizeChanged -=
+            OnCollectionViewSizeChanged;
+
+        GC.SuppressFinalize(this);
+    }
 }

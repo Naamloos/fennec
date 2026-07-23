@@ -10,15 +10,14 @@ namespace Dev.Naamloos.Fennec.App.Pages;
 public sealed partial class Startup : ContentPage
 {
     private bool _started;
+    private readonly ManagedMatrixClient _matrixClient;
+    private readonly AppNavigationService _appNavigation;
 
-    [BindableProperty]
-    public partial ManagedMatrixClient? MatrixClient { get; set; }
-
-    [BindableProperty]
-    public partial AppNavigationService? AppNavigation { get; set; }
-
-    public Startup()
+    public Startup(ManagedMatrixClient matrixClient, AppNavigationService appNavigation)
     {
+        _matrixClient = matrixClient;
+        _appNavigation = appNavigation;
+
         BindingContext = this;
         Shell.SetNavBarIsVisible(this, false);
         build();
@@ -62,8 +61,8 @@ public sealed partial class Startup : ContentPage
     private async Task StartAsync()
     {
         if (_started ||
-            MatrixClient is null ||
-            AppNavigation is null)
+            _matrixClient is null ||
+            _appNavigation is null)
         {
             return;
         }
@@ -72,20 +71,20 @@ public sealed partial class Startup : ContentPage
 
         try
         {
-            if (await MatrixClient.RecoverSessionAsync())
+            if (await _matrixClient.RecoverSessionAsync())
             {
-                AppNavigation.ShowShell();
+                _appNavigation.ShowShell();
             }
             else
             {
-                AppNavigation.ShowLogin();
+                _appNavigation.ShowLogin();
             }
         }
         catch (Exception exception)
         {
             System.Diagnostics.Debug.WriteLine(exception);
-            await MatrixClient.LogoutAsync();
-            AppNavigation.ShowLogin();
+            await _matrixClient.LogoutAsync();
+            _appNavigation.ShowLogin();
         }
     }
 }

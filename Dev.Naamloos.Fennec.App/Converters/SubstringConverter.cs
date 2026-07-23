@@ -15,12 +15,9 @@ namespace Dev.Naamloos.Fennec.App.Converters
 
         public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
-            if (value is not string text)
-            {
-                throw new ArgumentException("Value must be a string.", nameof(value));
-            }
-
-            if (_start < 0 || _start >= text.Length)
+            if (value is not string text ||
+                _start < 0 ||
+                _start >= text.Length)
             {
                 return "?";
             }

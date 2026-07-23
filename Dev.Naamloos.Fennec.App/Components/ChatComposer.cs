@@ -1,20 +1,13 @@
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.App.Converters;
 using System.Windows.Input;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
-public partial class ChatComposer : ContentView
+public sealed partial class ChatComposer : ContentView
 {
-    [BindableProperty]
-    public partial string Text { get; set; } = string.Empty;
-
-    [BindableProperty]
-    public partial ChatMessage? ReplyTo { get; set; }
-
     [BindableProperty]
     public partial string ErrorMessage { get; set; } = string.Empty;
 
@@ -22,21 +15,23 @@ public partial class ChatComposer : ContentView
     public partial bool HasError { get; set; }
 
     [BindableProperty]
-    public partial ICommand? SendCommand { get; set; }
+    public partial ChatMessage? ReplyTo { get; set; }
 
     [BindableProperty]
     public partial ICommand? AttachCommand { get; set; }
 
-    [BindableProperty(PropertyChangedMethodName = nameof(OnFocusRequestChanged))]
-    public partial int FocusRequest { get; set; }
+    [BindableProperty]
+    public partial ICommand? SendCommand { get; set; }
+
+    [BindableProperty]
+    public partial string Text { get; set; } = string.Empty;
 
     public ChatComposer()
     {
-        BindingContext = this;
-        build();
+        Build();
     }
 
-    private void build()
+    private void Build()
     {
         Content = new Grid
         {
@@ -54,8 +49,16 @@ public partial class ChatComposer : ContentView
                     Margin = new Thickness(12, 4),
                     LineBreakMode = LineBreakMode.WordWrap
                 }
-                .Bind(Label.TextProperty, nameof(ErrorMessage))
-                .Bind(IsVisibleProperty, nameof(HasError))
+                .Bind(
+                    Label.TextProperty,
+                    nameof(ErrorMessage),
+                    source: this
+                )
+                .Bind(
+                    IsVisibleProperty,
+                    nameof(HasError),
+                    source: this
+                )
                 .Row(0),
 
                 new Label
@@ -66,8 +69,15 @@ public partial class ChatComposer : ContentView
                     IsVisible = false
                 }
                 .Bind(Label.TextProperty, $"{nameof(ReplyTo)}.{nameof(ChatMessage.Username)}",
-                    stringFormat: "Replying to {0}")
-                .Bind(IsVisibleProperty, nameof(ReplyTo), converter: new NotNullConverter())
+                    stringFormat: "Replying to {0}",
+                    source: this
+                )
+                .Bind(
+                    IsVisibleProperty,
+                    $"{nameof(ReplyTo)}",
+                    converter: new NotNullConverter(),
+                    source: this
+                )
                 .Row(1),
 
                 new Grid
@@ -88,11 +98,14 @@ public partial class ChatComposer : ContentView
                             FontSize = 24,
                             WidthRequest = 40,
                             HeightRequest = 40,
-                            CornerRadius = 20,
+                            CornerRadius = 999,
                             Padding = 0,
-                            VerticalOptions = LayoutOptions.Center
+                            VerticalOptions = LayoutOptions.Center,
                         }
-                        .BindCommand(nameof(AttachCommand))
+                        .BindCommand(
+                            nameof(AttachCommand),
+                            source: this
+                        )
                         .Invoke(b => SemanticProperties.SetDescription(b, "Attach a file"))
                         .Column(0),
                         new Entry
@@ -101,29 +114,31 @@ public partial class ChatComposer : ContentView
                             ReturnType = ReturnType.Send,
                             VerticalOptions = LayoutOptions.Center
                         }
-                        .Bind(Entry.TextProperty, nameof(Text), mode: BindingMode.TwoWay)
-                        .Bind(Entry.ReturnCommandProperty, nameof(SendCommand))
+                        .Bind(
+                            Entry.TextProperty,
+                            nameof(Text),
+                            mode: BindingMode.TwoWay,
+                            source: this
+                        )
+                        .Bind(
+                            Entry.ReturnCommandProperty,
+                            nameof(SendCommand),
+                            source: this
+                        )
                         .Column(1),
                         new Button
                         {
                             Text = "Send",
                             VerticalOptions = LayoutOptions.Center
                         }
-                        .BindCommand(nameof(SendCommand))
+                        .BindCommand(
+                            nameof(SendCommand),
+                            source: this
+                        )
                         .Column(2)
                     }
                 }.Row(2)
             }
         };
     }
-
-    private static void OnFocusRequestChanged(
-        BindableObject bindable,
-        object oldValue,
-        object newValue) =>
-        ((ChatComposer)bindable)
-            .GetVisualTreeDescendants()
-            .OfType<Entry>()
-            .FirstOrDefault()?
-            .Focus();
 }

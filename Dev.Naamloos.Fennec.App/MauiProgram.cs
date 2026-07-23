@@ -44,36 +44,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<ToastService>();
 
         // Pages
-        builder.Services.AddTransient(sp =>
-            new Login
-            {
-                MatrixClient =
-                    sp.GetRequiredService<ManagedMatrixClient>(),
-                AppNavigation =
-                    sp.GetRequiredService<AppNavigationService>(),
-            });
-        builder.Services.AddTransient(sp =>
-            new AppShell
-            {
-                MatrixClient =
-                    sp.GetRequiredService<ManagedMatrixClient>(),
-                AppNavigation =
-                    sp.GetRequiredService<AppNavigationService>(),
-            });
-        builder.Services.AddTransient(sp =>
-            new Startup
-            {
-                MatrixClient =
-                    sp.GetRequiredService<ManagedMatrixClient>(),
-                AppNavigation =
-                    sp.GetRequiredService<AppNavigationService>(),
-            });
-        builder.Services.AddTransient(sp =>
-            new RoomListPage
-            {
-                MatrixClient =
-                    sp.GetRequiredService<ManagedMatrixClient>(),
-            });
+        builder.Services.AddTransient<Login>();
+        builder.Services.AddTransient<AppShell>();
+        builder.Services.AddTransient<Startup>();
 
         return builder.Build();
     }

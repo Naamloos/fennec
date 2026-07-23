@@ -117,14 +117,14 @@ public partial class Login : ContentPage
     private bool _isLoading = false;
     private string _errorMessage = string.Empty;
 
-    [BindableProperty]
-    public partial ManagedMatrixClient? MatrixClient { get; set; }
+    private readonly ManagedMatrixClient _matrixClient;
+    private readonly AppNavigationService _appNavigation;
 
-    [BindableProperty]
-    public partial AppNavigationService? AppNavigation { get; set; }
-
-    public Login()
+    public Login(ManagedMatrixClient matrixClient, AppNavigationService appNavigation)
 	{
+        _matrixClient = matrixClient;
+        _appNavigation = appNavigation;
+
         BindingContext = this;
         build();
 	}
@@ -141,14 +141,14 @@ public partial class Login : ContentPage
                              normalizedHomeserver == NormalizeHomeserver(_selectedServer.Url)
                 ? _selectedServer.ServerName
                 : new Uri(normalizedHomeserver).Authority;
-            await (MatrixClient ??
+            await (_matrixClient ??
                 throw new InvalidOperationException(
                     "Matrix client is required."))
                 .LoginAsync(
                 normalizedHomeserver,
                 NormalizeUsername(_username, serverName),
                 _password);
-            (AppNavigation ??
+            (_appNavigation ??
                 throw new InvalidOperationException(
                     "Navigation is required."))
                 .ShowShell();

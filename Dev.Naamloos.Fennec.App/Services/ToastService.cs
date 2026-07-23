@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Maui.Alerts;
+using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Maui.Core;
 using Microsoft.Extensions.Logging;
 using System;
@@ -35,7 +35,7 @@ namespace Dev.Naamloos.Fennec.App.Services
                     DefaultFontSize);
 
                 // TODO fix windows toast issue
-                //await toast.Show(cancellationToken);
+                await toast.Show(cancellationToken);
             });
         }
     }
