@@ -486,14 +486,34 @@ public sealed partial class Chat : ContentView, IDisposable
 
     private async Task ShowMessageMenuAsync(ChatMessage message)
     {
-        if (message.EventId is null || Window?.Page is not Page page)
+        var page = Application.Current?.Windows.FirstOrDefault()?.Page;
+        if (page is null)
         {
             return;
         }
 
-        if (await page.DisplayActionSheetAsync("Message", "Cancel", null, "Reply") == "Reply")
+        var actions = new List<string> { "Copy text" };
+        if (message.EventId is not null)
+        {
+            actions.Insert(0, "Reply");
+        }
+        if (!string.IsNullOrWhiteSpace(message.MediaSourceJson))
+        {
+            actions.Add("Save file");
+        }
+        var action = await page.DisplayActionSheetAsync(
+            "Message", "Cancel", null, actions.ToArray());
+        if (action == "Reply")
         {
             SetReplyTarget(message);
+        }
+        else if (action == "Copy text")
+        {
+            await Clipboard.Default.SetTextAsync(message.Body);
+        }
+        else if (action == "Save file")
+        {
+            await SaveMediaAsync(message);
         }
     }
 
@@ -1263,7 +1283,11 @@ public sealed partial class Chat : ContentView, IDisposable
             }
         };
 
-        var longPress = new CommunityToolkit.Maui.Behaviors.TouchBehavior();
+        var longPress = new CommunityToolkit.Maui.Behaviors.TouchBehavior
+        {
+            LongPressDuration = 500,
+            ShouldMakeChildrenInputTransparent = true,
+        };
         longPress.LongPressCommand = new Command(async () =>
         {
             if (root.BindingContext is ChatMessage message)
@@ -1558,7 +1582,7 @@ public sealed partial class Chat : ContentView, IDisposable
             : new Size(maxWidth, 210);
     }
 
-#if WINDOWS
+#if WINDOWS || ANDROID
     private async Task SaveMediaAsync(ChatMessage message)
     {
         if (string.IsNullOrWhiteSpace(message.MediaSourceJson))
@@ -1566,6 +1590,7 @@ public sealed partial class Chat : ContentView, IDisposable
             return;
         }
 
+#if WINDOWS
         var extension = System.IO.Path.GetExtension(message.Filename);
         if (string.IsNullOrWhiteSpace(extension))
         {
@@ -1600,6 +1625,37 @@ public sealed partial class Chat : ContentView, IDisposable
             ErrorMessage = $"Could not save file: {exception.Message}";
             Debug.WriteLine($"Could not save file: {exception}");
         }
+#elif ANDROID
+        try
+        {
+            if (!OperatingSystem.IsAndroidVersionAtLeast(29))
+            {
+                throw new PlatformNotSupportedException(
+                    "Saving files requires Android 10 or newer.");
+            }
+
+            var values = new Android.Content.ContentValues();
+            values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName,
+                message.Filename ?? "attachment");
+            values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType,
+                message.MimeType ?? "application/octet-stream");
+            values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath,
+                Android.OS.Environment.DirectoryDownloads);
+            var resolver = Android.App.Application.Context!.ContentResolver!;
+            var destination = resolver.Insert(
+                Android.Provider.MediaStore.Downloads.ExternalContentUri,
+                values) ?? throw new IOException("Could not create the download.");
+            await using var output = resolver.OpenOutputStream(destination)
+                ?? throw new IOException("Could not open the download.");
+            var data = await _matrixClient.GetMediaContentAsync(message.MediaSourceJson);
+            await output.WriteAsync(data);
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = $"Could not save file: {exception.Message}";
+            Debug.WriteLine($"Could not save file: {exception}");
+        }
+#endif
     }
 #endif
 
