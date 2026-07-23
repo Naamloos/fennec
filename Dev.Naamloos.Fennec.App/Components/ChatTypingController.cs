@@ -29,21 +29,35 @@ public sealed class ChatTypingController : IDisposable
 
         var roomId = room.Id();
         var ownUserId = room.OwnUserId();
-        _listener = new TypingListener(userIds => _ = UpdateAsync(room, roomId, ownUserId, userIds));
+        _listener = new TypingListener(
+            userIds => _ = UpdateAsync(
+                room,
+                roomId,
+                ownUserId,
+                userIds));
         _handle = room.SubscribeToTypingNotifications(_listener);
 
-        if (isTyping) _ = SendNoticeAsync(room, true);
+        if (isTyping)
+        {
+            _ = SendNoticeAsync(room, true);
+        }
     }
 
     public void SetTyping(bool isTyping)
     {
-        if (_getCurrentRoom() is { } room) _ = SendNoticeAsync(room, isTyping);
+        if (_getCurrentRoom() is { } room)
+        {
+            _ = SendNoticeAsync(room, isTyping);
+        }
     }
 
     public void Stop()
     {
         Interlocked.Increment(ref _updateVersion);
-        if (_getCurrentRoom() is { } room) _ = SendNoticeAsync(room, false);
+        if (_getCurrentRoom() is { } room)
+        {
+            _ = SendNoticeAsync(room, false);
+        }
 
         try
         {

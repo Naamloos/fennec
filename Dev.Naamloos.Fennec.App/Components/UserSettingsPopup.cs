@@ -22,9 +22,14 @@ public partial class UserSettingsPopup : ContentView
     [BindableProperty]
     public partial ICommand LogoutCommand { get; set; }
 
+    [BindableProperty]
+    public partial ToastService ToastService { get; set; }
+
     public UserSettingsPopup()
     {
-        BindingContext = this;
+        // testing self-binding services
+        this.BindService<ToastService, UserSettingsPopup>(ToastServiceProperty);
+
         build();
     }
 
@@ -37,12 +42,22 @@ public partial class UserSettingsPopup : ContentView
         }
     }
 
+    [RelayCommand]
+    private async Task TestToast()
+    {
+        if(ToastService is not null)
+        {
+            await ToastService.ShowToastAsync("This is a test toast message!");
+        }
+    }
+
     private void build()
     {
         Content = new VerticalStackLayout
         {
             Padding = 20,
             Spacing = 12,
+            WidthRequest = 500,
             Children =
             {
                 // User avatar with fallback label
@@ -63,14 +78,14 @@ public partial class UserSettingsPopup : ContentView
                             HorizontalTextAlignment = TextAlignment.Center,
                             VerticalTextAlignment = TextAlignment.Center
                         }
-                        .Bind(Label.TextProperty, nameof(UserSettingsPopup.DisplayName), converter: new SubstringConverter(1, 0)),
+                        .Bind(Label.TextProperty, nameof(UserSettingsPopup.DisplayName), converter: new SubstringConverter(1, 0), source: this),
 
                         // Avatar Image
                         new Image
                         {
                             Aspect = Aspect.AspectFill,
                         }
-                        .Bind(Image.SourceProperty, nameof(UserSettingsPopup.AvatarSource))
+                        .Bind(Image.SourceProperty, nameof(UserSettingsPopup.AvatarSource), source: this)
                     }
                 }.DynamicResource(VisualElement.BackgroundColorProperty, "PrimaryContainer"),
 
@@ -80,14 +95,14 @@ public partial class UserSettingsPopup : ContentView
                     FontSize = 22,
                     FontAttributes = FontAttributes.Bold
                 }
-                .Bind(Label.TextProperty, nameof(UserSettingsPopup.DisplayName)),
+                .Bind(Label.TextProperty, nameof(UserSettingsPopup.DisplayName), source: this),
 
                 // User ID
                 new Label
                 {
                     Opacity = .7
                 }
-                .Bind(Label.TextProperty, nameof(UserSettingsPopup.UserId)),
+                .Bind(Label.TextProperty, nameof(UserSettingsPopup.UserId), source: this),
 
                 // Logout button
                 new Button
@@ -95,14 +110,19 @@ public partial class UserSettingsPopup : ContentView
                     Text = "Log out",
                     BackgroundColor = Colors.Transparent,
                     TextColor = Colors.Red,
-                }.BindCommand(nameof(UserSettingsPopup.LogoutCommand)),
+                }.BindCommand(nameof(UserSettingsPopup.LogoutCommand), source: this),
 
                 // Close button
                 new Button
                 {
                     Text = "Close"
-                }.BindCommand(nameof(UserSettingsPopup.CloseUserSettingsPopupCommand))
+                }.BindCommand(nameof(UserSettingsPopup.CloseUserSettingsPopupCommand), source: this),
+
+                new Button
+                {
+                    Text = "TestToast"
+                }.BindCommand(nameof(UserSettingsPopup.TestToastCommand), source: this)
             }
-        };
+        }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface");
     }
 }
