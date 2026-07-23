@@ -40,6 +40,11 @@ namespace Dev.Naamloos.Fennec.Sdk
         /// The <see cref="SyncService"/> instance responsible for handling synchronization with the Matrix homeserver. This service manages the state of rooms, messages, and other data, ensuring that the client stays up-to-date with the server.
         /// </summary>
         private SyncService? _syncService;
+        private SyncServiceStateObserver? _syncStateObserver;
+        private TaskHandle? _syncStateHandle;
+        private int _isCheckingSession;
+
+        public event EventHandler? SessionInvalidated;
 
         /// <summary>
         /// The secure storage interface used to store and retrieve sensitive data, such as session information and encryption keys. 
@@ -112,14 +117,18 @@ namespace Dev.Naamloos.Fennec.Sdk
             await _initializationLock.WaitAsync();
             try
             {
-                if (_client is not null)
-                    await _client.Logout();
-
-                await _secureStore.RemoveAsync(SESSION_STORAGE_KEY);
-                await _secureStore.RemoveAsync(STORE_KEY_STORAGE_KEY);
-                await clearSavedSessionAsync();
-                await nativeCleanupAsync();
-                ensureAccountDirectoriesExist(true);
+                try
+                {
+                    if (_client is not null)
+                        await _client.Logout();
+                }
+                finally
+                {
+                    await _secureStore.RemoveAsync(SESSION_STORAGE_KEY);
+                    await _secureStore.RemoveAsync(STORE_KEY_STORAGE_KEY);
+                    await nativeCleanupAsync();
+                    await resetAccountDirectoryAsync();
+                }
             }
             finally
             {
@@ -168,18 +177,12 @@ namespace Dev.Naamloos.Fennec.Sdk
 
                 await _client.RestoreSession(session);
 
-                await startSyncingAsync();
-
-                using var response = await SendHttpRequestAsync(
-                    HttpMethod.Get,
-                    "/_matrix/client/v3/account/whoami");
-
-                var result = response.IsSuccessStatusCode;
-
-                if (!result)
+                if (!await IsSessionValidAsync())
                 {
                     await nativeCleanupAsync(); return false;
                 }
+
+                await startSyncingAsync();
                 return true;
             }
             catch (Exception)
@@ -216,7 +219,9 @@ namespace Dev.Naamloos.Fennec.Sdk
             }
 
             var roomList = await _syncService.RoomListService().AllRooms();
-            return new ObservableRoomList(roomList);
+            var spaceService = await (_client ?? throw new InvalidOperationException(
+                "The client is not logged in.")).SpaceService();
+            return new ObservableRoomList(roomList, spaceService);
         }
 
         public async Task<ObservableTimeline> GetObservableTimelineAsync(
@@ -249,6 +254,18 @@ namespace Dev.Naamloos.Fennec.Sdk
                 .GetSessionVerificationController();
         }
 
+        public Task<string> UploadMediaAsync(string mimeType, byte[] data) =>
+            (_client ?? throw new InvalidOperationException(
+                "The client is not logged in."))
+            .UploadMedia(mimeType, data, null);
+
+        public Task<UserProfile> GetOwnProfileAsync()
+        {
+            var client = _client ?? throw new InvalidOperationException(
+                "The client is not logged in.");
+            return client.GetProfile(client.UserId());
+        }
+
         public Task<byte[]> GetThumbnailAsync(
             string source,
             ulong width,
@@ -260,7 +277,15 @@ namespace Dev.Naamloos.Fennec.Sdk
                     source,
                     width,
                     height,
-                    isJson))).Value;
+                isJson))).Value;
+
+        public async Task<byte[]> GetMediaContentAsync(string sourceJson)
+        {
+            var client = _client ?? throw new InvalidOperationException(
+                "The client is not logged in.");
+            using var source = MediaSource.FromJson(sourceJson);
+            return await client.GetMediaContent(source);
+        }
 
         public Task<string> GetVideoFileAsync(
             string sourceJson,
@@ -343,6 +368,55 @@ namespace Dev.Naamloos.Fennec.Sdk
 
             _syncService = await _client.SyncService().Finish();
             await _syncService.Start();
+            _syncStateObserver = new SyncStateObserver(OnSyncStateChanged);
+            _syncStateHandle = _syncService.State(_syncStateObserver);
+        }
+
+        private void OnSyncStateChanged(SyncServiceState state)
+        {
+            if (state is SyncServiceState.Error or SyncServiceState.Terminated)
+            {
+                _ = CheckSessionAfterSyncFailureAsync();
+            }
+        }
+
+        private async Task CheckSessionAfterSyncFailureAsync()
+        {
+            if (Interlocked.Exchange(ref _isCheckingSession, 1) != 0)
+                return;
+
+            try
+            {
+                if (!await IsSessionValidAsync())
+                {
+                    await LogoutAsync();
+                    SessionInvalidated?.Invoke(this, EventArgs.Empty);
+                }
+            }
+            catch
+            {
+                // The next sync state update retries transient network failures.
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _isCheckingSession, 0);
+            }
+        }
+
+        private async Task<bool> IsSessionValidAsync()
+        {
+            if (!IsLoggedIn)
+                return false;
+
+            var session = _client!.Session();
+            using var request = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"{session.HomeserverUrl.TrimEnd('/')}/_matrix/client/v3/account/whoami");
+            request.Headers.Authorization = new AuthenticationHeaderValue(
+                "Bearer", session.AccessToken);
+            _httpClient ??= new HttpClient();
+            using var response = await _httpClient.SendAsync(request);
+            return response.IsSuccessStatusCode;
         }
 
         private async Task<HttpResponseMessage> SendHttpRequestAsync(
@@ -423,6 +497,18 @@ namespace Dev.Naamloos.Fennec.Sdk
             _thumbnailCache.Clear();
             _videoCache.Clear();
 
+            try
+            {
+                _syncStateHandle?.Cancel();
+            }
+            catch
+            {
+                // The listener may already be stopped with its sync service.
+            }
+            _syncStateHandle?.Dispose();
+            _syncStateHandle = null;
+            _syncStateObserver = null;
+
             if (_syncService is not null)
             {
                 try
@@ -443,10 +529,37 @@ namespace Dev.Naamloos.Fennec.Sdk
             _httpClient = null;
         }
 
+        private async Task resetAccountDirectoryAsync()
+        {
+            for (var attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    if (Directory.Exists(_accountPath))
+                    {
+                        Directory.Delete(_accountPath, true);
+                    }
+
+                    ensureAccountDirectoriesExist();
+                    return;
+                }
+                catch (IOException) when (attempt < 5)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(100 * (attempt + 1)));
+                }
+            }
+        }
+
         public async ValueTask DisposeAsync()
         {
             await nativeCleanupAsync();
             _initializationLock.Dispose();
+        }
+
+        private sealed class SyncStateObserver(Action<SyncServiceState> onUpdate) :
+            SyncServiceStateObserver
+        {
+            public void OnUpdate(SyncServiceState state) => onUpdate(state);
         }
     }
 }
