@@ -1,58 +1,73 @@
+using CommunityToolkit.Maui;
+using CommunityToolkit.Maui.Behaviors;
+using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Maui.Views;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.Controls.Shapes;
 using System.Diagnostics;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
-public sealed class VerificationPopup : Popup, SessionVerificationControllerDelegate
+public sealed partial class VerificationPopup :
+    ContentView,
+    SessionVerificationControllerDelegate
 {
 #if DEBUG
     static VerificationPopup() =>
-        Debug.Assert(FormatDecimals([1, 2, 3]) == "1   2   3");
+        Debug.Assert(
+            FormatDecimals([1, 2, 3]) == "1   2   3");
 #endif
 
-    private readonly SessionVerificationController _controller;
-    private readonly Label _status = new()
-    {
-        Text = "Waiting for another signed-in session…",
-        HorizontalTextAlignment = TextAlignment.Center,
-    };
-    private readonly Label _sas = new()
-    {
-        FontSize = 20,
-        HorizontalTextAlignment = TextAlignment.Center,
-        IsVisible = false,
-    };
-    private readonly HorizontalStackLayout _actions;
     private bool _started;
 
-    public VerificationPopup(SessionVerificationController controller)
+    [BindableProperty(PropertyChangedMethodName = nameof(OnControllerChanged))]
+    public partial SessionVerificationController? Controller { get; set; }
+
+    [BindableProperty]
+    public partial string Status { get; set; } =
+        "Waiting for another signed-in session…";
+
+    [BindableProperty]
+    public partial string Sas { get; set; } = string.Empty;
+
+    [BindableProperty]
+    public partial bool ShowSas { get; set; }
+
+    [BindableProperty]
+    public partial bool ShowActions { get; set; }
+
+    public VerificationPopup()
     {
-        _controller = controller;
-        _controller.SetDelegate(this);
+        BindingContext = this;
+        build();
+    }
 
-        var match = new Button { Text = "They match" };
-        var mismatch = new Button { Text = "No match" };
-        match.Clicked += Approve;
-        mismatch.Clicked += Decline;
-
-        _actions = new HorizontalStackLayout
-        {
-            Spacing = 8,
-            HorizontalOptions = LayoutOptions.Center,
-            IsVisible = false,
-            Children = { mismatch, match },
-        };
-
-        var cancel = new Button { Text = "Cancel" };
-        cancel.Clicked += Cancel;
-
-        var card = new Border
+    private void build()
+    {
+        Content = new Border
         {
             Padding = 24,
             StrokeShape = new RoundRectangle { CornerRadius = 24 },
             MaximumWidthRequest = 440,
+            Behaviors =
+            {
+                new EventToCommandBehavior
+                {
+                    BindingContext = this,
+                    EventName = nameof(Loaded),
+                }.Bind(
+                    EventToCommandBehavior.CommandProperty,
+                    nameof(StartCommand)),
+                new EventToCommandBehavior
+                {
+                    BindingContext = this,
+                    EventName = nameof(Unloaded),
+                }.Bind(
+                    EventToCommandBehavior.CommandProperty,
+                    nameof(CleanupCommand)),
+            },
             Content = new VerticalStackLayout
             {
                 Spacing = 16,
@@ -70,57 +85,107 @@ public sealed class VerificationPopup : Popup, SessionVerificationControllerDele
                         Text = "Open Fennec on another verified session and compare the symbols shown on both devices.",
                         HorizontalTextAlignment = TextAlignment.Center,
                     },
-                    _status,
-                    _sas,
-                    _actions,
-                    cancel,
+                    new Label
+                    {
+                        HorizontalTextAlignment = TextAlignment.Center,
+                    }.Bind(Label.TextProperty, nameof(Status)),
+                    new Label
+                    {
+                        FontSize = 20,
+                        HorizontalTextAlignment = TextAlignment.Center,
+                    }
+                    .Bind(Label.TextProperty, nameof(Sas))
+                    .Bind(IsVisibleProperty, nameof(ShowSas)),
+                    new HorizontalStackLayout
+                    {
+                        Spacing = 8,
+                        HorizontalOptions = LayoutOptions.Center,
+                        Children =
+                        {
+                            new Button { Text = "No match" }
+                                .BindCommand(nameof(DeclineCommand)),
+                            new Button { Text = "They match" }
+                                .BindCommand(nameof(ApproveCommand)),
+                        },
+                    }.Bind(IsVisibleProperty, nameof(ShowActions)),
+                    new Button { Text = "Cancel" }
+                        .BindCommand(nameof(CancelCommand)),
                 },
             },
-        };
-        card.SetDynamicResource(
-            VisualElement.BackgroundColorProperty,
+        }.DynamicResource(
+            BackgroundColorProperty,
             "Surface");
-
-        Content = card;
-        CanBeDismissedByTappingOutsideOfPopup = false;
-        Loaded += Start;
-        Unloaded += Cleanup;
     }
 
-    private async void Start(object? sender, EventArgs e)
+    private static void OnControllerChanged(
+        BindableObject bindable,
+        object oldValue,
+        object newValue)
     {
-        if (_started)
+        if (oldValue is SessionVerificationController oldController)
+        {
+            oldController.SetDelegate(null);
+        }
+
+        if (newValue is SessionVerificationController newController)
+        {
+            newController.SetDelegate(
+                (VerificationPopup)bindable);
+        }
+    }
+
+    [RelayCommand]
+    private async Task StartAsync()
+    {
+        if (_started ||
+            Controller is null)
         {
             return;
         }
 
         _started = true;
-        await Run(_controller.RequestDeviceVerification);
+        await Run(Controller.RequestDeviceVerification);
     }
 
     public void DidReceiveVerificationRequest(
-        SessionVerificationRequestDetails details) => _ = Run(async () =>
-    {
-        SetStatus($"Verification requested by {details.DeviceDisplayName ?? details.DeviceId}.");
-        await _controller.AcknowledgeVerificationRequest(
-            details.SenderProfile.UserId,
-            details.FlowId);
-        await _controller.AcceptVerificationRequest();
-    });
+        SessionVerificationRequestDetails details) =>
+        _ = Run(async () =>
+        {
+            SetStatus(
+                $"Verification requested by {details.DeviceDisplayName ?? details.DeviceId}.");
 
-    public void DidAcceptVerificationRequest() =>
-        _ = Run(_controller.StartSasVerification);
+            if (Controller is null)
+            {
+                return;
+            }
+
+            await Controller.AcknowledgeVerificationRequest(
+                details.SenderProfile.UserId,
+                details.FlowId);
+            await Controller.AcceptVerificationRequest();
+        });
+
+    public void DidAcceptVerificationRequest()
+    {
+        if (Controller is not null)
+        {
+            _ = Run(Controller.StartSasVerification);
+        }
+    }
 
     public void DidStartSasVerification() =>
         SetStatus("Compare the symbols on both sessions.");
 
-    public void DidReceiveVerificationData(SessionVerificationData data)
+    public void DidReceiveVerificationData(
+        SessionVerificationData data)
     {
         var text = data switch
         {
-            SessionVerificationData.Emojis emojis => string.Join(
-                "   ",
-                emojis.EmojisValue.Select(emoji => emoji.Symbol())),
+            SessionVerificationData.Emojis emojis =>
+                string.Join(
+                    "   ",
+                    emojis.EmojisValue.Select(
+                        emoji => emoji.Symbol())),
             SessionVerificationData.Decimals decimals =>
                 FormatDecimals(decimals.Values),
             _ => string.Empty,
@@ -129,40 +194,67 @@ public sealed class VerificationPopup : Popup, SessionVerificationControllerDele
 
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            _sas.Text = text;
-            _sas.IsVisible = true;
-            _actions.IsVisible = true;
+            Sas = text;
+            ShowSas = true;
+            ShowActions = true;
         });
     }
 
-    public void DidFail() => Complete("Verification failed.");
-    public void DidCancel() => Complete("Verification was cancelled.");
-    public void DidFinish() => Complete("Session verified.");
+    public void DidFail() =>
+        Complete("Verification failed.");
 
-    private static string FormatDecimals(IEnumerable<ushort> values) =>
+    public void DidCancel() =>
+        Complete("Verification was cancelled.");
+
+    public void DidFinish() =>
+        Complete("Session verified.");
+
+    private static string FormatDecimals(
+        IEnumerable<ushort> values) =>
         string.Join("   ", values);
 
-    private async void Approve(object? sender, EventArgs e) =>
-        await Run(_controller.ApproveVerification);
-
-    private async void Decline(object? sender, EventArgs e) =>
-        await Run(_controller.DeclineVerification);
-
-    private async void Cancel(object? sender, EventArgs e)
+    [RelayCommand]
+    private async Task ApproveAsync()
     {
-        await Run(_controller.CancelVerification);
-        await CloseAsync();
+        if (Controller is not null)
+        {
+            await Run(Controller.ApproveVerification);
+        }
+    }
+
+    [RelayCommand]
+    private async Task DeclineAsync()
+    {
+        if (Controller is not null)
+        {
+            await Run(Controller.DeclineVerification);
+        }
+    }
+
+    [RelayCommand]
+    private async Task CancelAsync()
+    {
+        if (Controller is not null)
+        {
+            await Run(Controller.CancelVerification);
+        }
+
+        if (Parent is Popup popup)
+        {
+            await popup.CloseAsync();
+        }
     }
 
     private void SetStatus(string text) =>
-        MainThread.BeginInvokeOnMainThread(() => _status.Text = text);
+        MainThread.BeginInvokeOnMainThread(
+            () => Status = text);
 
     private void Complete(string text) =>
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            _status.Text = text;
-            _sas.IsVisible = false;
-            _actions.IsVisible = false;
+            Status = text;
+            ShowSas = false;
+            ShowActions = false;
         });
 
     private async Task Run(Func<Task> action)
@@ -177,11 +269,11 @@ public sealed class VerificationPopup : Popup, SessionVerificationControllerDele
         }
     }
 
-    private void Cleanup(object? sender, EventArgs e)
+    [RelayCommand]
+    private void Cleanup()
     {
-        _controller.SetDelegate(null);
-        _controller.Dispose();
-        Loaded -= Start;
-        Unloaded -= Cleanup;
+        Controller?.SetDelegate(null);
+        Controller?.Dispose();
+        Controller = null;
     }
 }

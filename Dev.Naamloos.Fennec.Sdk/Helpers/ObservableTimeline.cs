@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+using Dev.Naamloos.Fennec.Sdk.Events;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using uniffi.matrix_sdk_ffi;
 
@@ -14,7 +15,7 @@ public sealed class ObservableTimeline :
   private readonly Timeline _timeline;
   private readonly SynchronizationContext? _synchronizationContext;
 
-  private TimelineEvent? _listener;
+  private TimelineListenerCallback? _listener;
   private TaskHandle? _listenerHandle;
 
   private bool _isLoadingHistory;
@@ -112,7 +113,7 @@ public sealed class ObservableTimeline :
   {
     ThrowIfDisposed();
 
-    _listener = new TimelineEvent(UpdateEntries);
+        _listener = TimelineListenerCallback.Create(diff => UpdateEntries(diff));
 
     /*
      * In the generated Matrix FFI bindings, AddListener commonly returns
@@ -457,23 +458,5 @@ public sealed class ObservableTimeline :
   private void ThrowIfDisposed()
   {
     ObjectDisposedException.ThrowIf(_disposed, this);
-  }
-
-  private sealed class TimelineEvent : TimelineListener
-  {
-    private readonly Action<TimelineDiff[]> _callback;
-
-    public TimelineEvent(
-        Action<TimelineDiff[]> callback)
-    {
-      ArgumentNullException.ThrowIfNull(callback);
-
-      _callback = callback;
-    }
-
-    public void OnUpdate(TimelineDiff[] diff)
-    {
-      _callback(diff);
-    }
   }
 }
