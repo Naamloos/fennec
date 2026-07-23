@@ -2,6 +2,8 @@
   "editor.detectIndentation": false,
   "editor.insertSpaces": true,
   "editor.tabSize": 4,
+  "maui.configuration.androidSdkPreferredPath": "C:\\Users\\Ryand\\AppData\\Local\\Android\\Sdk",
+  "maui.configuration.javaSdkPreferredPath": "C:\\Program Files\\Java\\jdk-17",
   "files.insertFinalNewline": true,
   "files.trimTrailingWhitespace": true,
   "[csharp]": {
