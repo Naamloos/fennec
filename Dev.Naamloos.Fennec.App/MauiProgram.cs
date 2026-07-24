@@ -47,7 +47,6 @@ public static class MauiProgram
         builder.Services.AddTransient<Login>();
         builder.Services.AddTransient<AppShell>();
         builder.Services.AddTransient<Startup>();
-        builder.Services.AddTransient<RoomList>();
 
         return builder.Build();
     }

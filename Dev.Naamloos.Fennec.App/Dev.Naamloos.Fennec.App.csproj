@@ -1,99 +1,104 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFrameworks>net10.0-android</TargetFrameworks>
-    <TargetFrameworks Condition="!$([MSBuild]::IsOSPlatform('linux'))">$(TargetFrameworks);net10.0-maccatalyst</TargetFrameworks>
-    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
-    <OutputType>Exe</OutputType>
-    <RootNamespace>Dev.Naamloos.Fennec.App</RootNamespace>
-    <UseMaui>true</UseMaui>
-    <UseMaterial3>true</UseMaterial3>
-    <SingleProject>true</SingleProject>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <LangVersion>preview</LangVersion>
-    <MauiXamlInflator>SourceGen</MauiXamlInflator>
-    <MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
-    <ApplicationTitle>Fennec</ApplicationTitle>
-    <ApplicationId>com.companyname.dev.naamloos.fennec.app</ApplicationId>
-    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-    <ApplicationVersion>1</ApplicationVersion>
-    <WindowsPackageType>None</WindowsPackageType>
-    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
-    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
-    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
-    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
-    <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
-    <DefaultLanguage>en-US</DefaultLanguage>
-  </PropertyGroup>
-  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <PlatformTarget>x64</PlatformTarget>
-  </PropertyGroup>
-  <ItemGroup>
-    <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#17171a" />
-    <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#17171a" BaseSize="128,128" />
-    <MauiImage Include="Resources\Images\*" />
-    <MauiFont Include="Resources\Fonts\*" />
-  </ItemGroup>
-  <ItemGroup>
-    <AndroidResource Remove="Models\**" />
-    <AndroidResource Remove="Resources\NewFolder\**" />
-    <Compile Remove="Models\**" />
-    <Compile Remove="Resources\NewFolder\**" />
-    <EmbeddedResource Remove="Models\**" />
-    <EmbeddedResource Remove="Resources\NewFolder\**" />
-    <MauiCss Remove="Models\**" />
-    <MauiCss Remove="Resources\NewFolder\**" />
-    <MauiXaml Remove="Models\**" />
-    <MauiXaml Remove="Resources\NewFolder\**" />
-    <None Remove="Models\**" />
-    <None Remove="Resources\NewFolder\**" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Remove="Services\MatrixService.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Remove="Platforms\Android\Resources\values-night\colors.xml" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Maui.Markup" Version="7.0.1" />
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageReference Include="CommunityToolkit.Maui" Version="14.2.2" />
-    <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="10.0.0" />
-    <PackageReference Include="MaterialColorUtilities.Maui" Version="0.3.0" />
-    <PackageReference Include="Nalu.Maui.VirtualScroll" Version="10.7.9" />
-    <PackageReference Include="Plugin.Maui.Audio" Version="4.0.0" />
-    <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.80" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.10" />
-    <ProjectReference Include="..\Dev.Naamloos.Fennec.Sdk\Dev.Naamloos.Fennec.Sdk.csproj" />
-  </ItemGroup>
-  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
-    <AndroidNativeLibrary Include="..\Dev.Naamloos.Fennec.Sdk\native\android-arm64\libmatrix_sdk_ffi.so" Abi="arm64-v8a" />
-    <AndroidNativeLibrary Include="..\Dev.Naamloos.Fennec.Sdk\native\android-x64\libmatrix_sdk_ffi.so" Abi="x86_64" />
-  </ItemGroup>
-  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
-    <Content Include="..\Dev.Naamloos.Fennec.Sdk\native\win-x64\matrix_sdk_ffi.dll" Link="matrix_sdk_ffi.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Update="Pages\LoginPage.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-    <None Update="Pages\StartupPage.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Services\MatrixService.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <MauiXaml Update="Resources\Styles\Colors.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </MauiXaml>
-    <MauiXaml Update="Resources\Styles\Style.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </MauiXaml>
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Platforms\Android\Resources\values\" />
-  </ItemGroup>
+    <PropertyGroup>
+        <TargetFrameworks>net10.0-android</TargetFrameworks>
+        <TargetFrameworks Condition="!$([MSBuild]::IsOSPlatform('linux'))">$(TargetFrameworks);net10.0-maccatalyst</TargetFrameworks>
+        <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
+        <OutputType>Exe</OutputType>
+        <RootNamespace>Dev.Naamloos.Fennec.App</RootNamespace>
+        <UseMaui>true</UseMaui>
+        <UseMaterial3>true</UseMaterial3>
+        <SingleProject>true</SingleProject>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>preview</LangVersion>
+        <MauiXamlInflator>SourceGen</MauiXamlInflator>
+        <MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
+        <ApplicationTitle>Fennec</ApplicationTitle>
+        <ApplicationId>com.companyname.dev.naamloos.fennec.app</ApplicationId>
+        <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+        <ApplicationVersion>1</ApplicationVersion>
+        <WindowsPackageType>None</WindowsPackageType>
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+        <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+        <DefaultLanguage>en-US</DefaultLanguage>
+    </PropertyGroup>
+    <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+        <PlatformTarget>x64</PlatformTarget>
+    </PropertyGroup>
+    <PropertyGroup>
+        <LangVersion>preview</LangVersion>
+        <NoWarn>$(NoWarn);MCTEXP001</NoWarn>
+    </PropertyGroup>
+    <ItemGroup>
+        <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#17171a" />
+        <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#17171a" BaseSize="128,128" />
+        <MauiImage Include="Resources\Images\*" />
+        <MauiFont Include="Resources\Fonts\*" />
+    </ItemGroup>
+    <ItemGroup>
+        <AndroidResource Remove="Models\**" />
+        <AndroidResource Remove="Resources\NewFolder\**" />
+        <Compile Remove="Models\**" />
+        <Compile Remove="Resources\NewFolder\**" />
+        <EmbeddedResource Remove="Models\**" />
+        <EmbeddedResource Remove="Resources\NewFolder\**" />
+        <MauiCss Remove="Models\**" />
+        <MauiCss Remove="Resources\NewFolder\**" />
+        <MauiXaml Remove="Models\**" />
+        <MauiXaml Remove="Resources\NewFolder\**" />
+        <None Remove="Models\**" />
+        <None Remove="Resources\NewFolder\**" />
+    </ItemGroup>
+    <ItemGroup>
+        <Compile Remove="Services\MatrixService.cs" />
+    </ItemGroup>
+    <ItemGroup>
+        <None Remove="Platforms\Android\Resources\values-night\colors.xml" />
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="CommunityToolkit.Maui.Markup" Version="7.0.1" />
+        <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+        <PackageReference Include="CommunityToolkit.Maui" Version="14.2.2" />
+        <PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="10.0.0" />
+        <PackageReference Include="MaterialColorUtilities.Maui" Version="0.3.0" />
+        <PackageReference Include="MPowerKit.VirtualizeListView" Version="2.8.0" />
+        <PackageReference Include="Nalu.Maui.VirtualScroll" Version="10.7.9" />
+        <PackageReference Include="Plugin.Maui.Audio" Version="4.0.0" />
+        <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.80" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.10" />
+        <ProjectReference Include="..\Dev.Naamloos.Fennec.Sdk\Dev.Naamloos.Fennec.Sdk.csproj" />
+    </ItemGroup>
+    <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+        <AndroidNativeLibrary Include="..\Dev.Naamloos.Fennec.Sdk\native\android-arm64\libmatrix_sdk_ffi.so" Abi="arm64-v8a" />
+        <AndroidNativeLibrary Include="..\Dev.Naamloos.Fennec.Sdk\native\android-x64\libmatrix_sdk_ffi.so" Abi="x86_64" />
+    </ItemGroup>
+    <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+        <Content Include="..\Dev.Naamloos.Fennec.Sdk\native\win-x64\matrix_sdk_ffi.dll" Link="matrix_sdk_ffi.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+    <ItemGroup>
+        <None Update="Pages\LoginPage.xaml">
+            <Generator>MSBuild:Compile</Generator>
+        </None>
+        <None Update="Pages\StartupPage.xaml">
+            <Generator>MSBuild:Compile</Generator>
+        </None>
+    </ItemGroup>
+    <ItemGroup>
+        <None Include="Services\MatrixService.cs" />
+    </ItemGroup>
+    <ItemGroup>
+        <MauiXaml Update="Resources\Styles\Colors.xaml">
+            <Generator>MSBuild:Compile</Generator>
+        </MauiXaml>
+        <MauiXaml Update="Resources\Styles\Style.xaml">
+            <Generator>MSBuild:Compile</Generator>
+        </MauiXaml>
+    </ItemGroup>
+    <ItemGroup>
+        <Folder Include="Platforms\Android\Resources\values\" />
+    </ItemGroup>
 </Project>

@@ -1,31 +1,45 @@
+using CommunityToolkit.Maui;
+using CommunityToolkit.Maui.Behaviors;
+using CommunityToolkit.Maui.Markup;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.Sdk;
 
 namespace Dev.Naamloos.Fennec.App.Pages;
 
-public sealed class Startup : ContentPage
+public sealed partial class Startup : ContentPage
 {
-    private readonly ManagedMatrixClient _matrixClient;
-    private readonly AppNavigationService _navigation;
-    private readonly ToastService _toastService;
-
     private bool _started;
+    private readonly ManagedMatrixClient _matrixClient;
+    private readonly AppNavigationService _appNavigation;
 
-    public Startup(
-        ManagedMatrixClient matrixClient,
-        AppNavigationService navigation,
-        ToastService toastService)
+    public Startup(ManagedMatrixClient matrixClient, AppNavigationService appNavigation)
     {
         _matrixClient = matrixClient;
-        _navigation = navigation;
-        _toastService = toastService;
+        _appNavigation = appNavigation;
 
+        BindingContext = this;
         Shell.SetNavBarIsVisible(this, false);
+        build();
+    }
 
+    private void build()
+    {
         Content = new VerticalStackLayout
         {
             HorizontalOptions = LayoutOptions.Center,
             VerticalOptions = LayoutOptions.Center,
             Spacing = 16,
+            Behaviors =
+            {
+                new EventToCommandBehavior
+                {
+                    BindingContext = this,
+                    EventName = nameof(Loaded),
+                }.Bind(
+                    EventToCommandBehavior.CommandProperty,
+                    nameof(StartCommand)),
+            },
             Children =
             {
                 new ActivityIndicator
@@ -43,11 +57,12 @@ public sealed class Startup : ContentPage
         };
     }
 
-    protected override async void OnAppearing()
+    [RelayCommand]
+    private async Task StartAsync()
     {
-        base.OnAppearing();
-
-        if (_started)
+        if (_started ||
+            _matrixClient is null ||
+            _appNavigation is null)
         {
             return;
         }
@@ -58,19 +73,18 @@ public sealed class Startup : ContentPage
         {
             if (await _matrixClient.RecoverSessionAsync())
             {
-                _navigation.ShowShell();
+                _appNavigation.ShowShell();
             }
             else
             {
-                _navigation.ShowLogin();
+                _appNavigation.ShowLogin();
             }
         }
         catch (Exception exception)
         {
             System.Diagnostics.Debug.WriteLine(exception);
-
             await _matrixClient.LogoutAsync();
-            _navigation.ShowLogin();
+            _appNavigation.ShowLogin();
         }
     }
 }

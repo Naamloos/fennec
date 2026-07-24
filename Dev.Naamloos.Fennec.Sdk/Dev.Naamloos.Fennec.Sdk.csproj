@@ -23,4 +23,10 @@
     <Folder Include="native\linux-arm64\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Dev.Naamloos.Fennec.Sdk.Generators\Dev.Naamloos.Fennec.Sdk.Generators.csproj"
+        OutputItemType="Analyzer"
+        ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
 </Project>

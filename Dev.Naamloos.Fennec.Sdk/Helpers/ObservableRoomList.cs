@@ -1,4 +1,4 @@
-﻿using Dev.Naamloos.Fennec.Sdk.NativeEventHandler;
+using Dev.Naamloos.Fennec.Sdk.Events;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -192,10 +192,9 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
 
     public sealed class ObservableRoomList : ObservableCollection<RoomEntry>, IDisposable
     {
-        private readonly SynchronizationContext? _synchronizationContext;
         private readonly SpaceService _spaceService;
 
-        private RoomListEntriesEvent? _listener;
+        private RoomListEntriesListenerCallback? _listener;
         private RoomListEntriesWithDynamicAdaptersResult? _adapterResult;
 
         private bool _disposed;
@@ -204,31 +203,11 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
             RoomList roomList,
             SpaceService spaceService)
         {
-            _synchronizationContext = SynchronizationContext.Current;
             _spaceService = spaceService;
-            _listener = new RoomListEntriesEvent(this.updateEntries);
+            _listener = RoomListEntriesListenerCallback.Create(entries => this.applyUpdates(entries));
 
             _adapterResult = roomList.EntriesWithDynamicAdapters(5000, _listener);
             _adapterResult.Controller().SetFilter(new RoomListEntriesDynamicFilterKind.All(new RoomListEntriesDynamicFilterKind[0]));
-        }
-
-        private void RunOnCapturedContext(System.Action action)
-        {
-            if (_synchronizationContext is null ||
-                SynchronizationContext.Current == _synchronizationContext)
-            {
-                action();
-                return;
-            }
-
-            _synchronizationContext.Post(
-                static state => ((System.Action)state!).Invoke(),
-                action);
-        }
-
-        private void updateEntries(RoomListEntriesUpdate[] updates)
-        {
-            RunOnCapturedContext(() => applyUpdates(updates));
         }
 
         private void applyUpdates(RoomListEntriesUpdate[] updates)
