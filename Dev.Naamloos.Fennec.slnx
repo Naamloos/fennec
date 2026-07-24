@@ -7,5 +7,6 @@
   <Project Path="Dev.Naamloos.Fennec.App/Dev.Naamloos.Fennec.App.csproj" Id="a3e4996b-1b2c-45bd-abd3-3e852323686f">
     <Deploy Solution="Debug|*" />
   </Project>
+  <Project Path="Dev.Naamloos.Fennec.Sdk.Generators/Dev.Naamloos.Fennec.Sdk.Generators.csproj" Id="a408daba-d09a-4bc7-9674-2d2e58eb9f63" />
   <Project Path="Dev.Naamloos.Fennec.Sdk/Dev.Naamloos.Fennec.Sdk.csproj" Id="11c9859c-f295-4151-b361-2b8f3b99d8d7" />
 </Solution>

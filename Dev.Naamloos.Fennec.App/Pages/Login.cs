@@ -1,3 +1,4 @@
+using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Converters;
 using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -116,15 +117,15 @@ public partial class Login : ContentPage
     private bool _isLoading = false;
     private string _errorMessage = string.Empty;
 
-    // Services
-    private ManagedMatrixClient _client;
-    private AppNavigationService _navigation;
+    private readonly ManagedMatrixClient _matrixClient;
+    private readonly AppNavigationService _appNavigation;
 
-    public Login(ManagedMatrixClient client, AppNavigationService navigation)
+    public Login(ManagedMatrixClient matrixClient, AppNavigationService appNavigation)
 	{
+        _matrixClient = matrixClient;
+        _appNavigation = appNavigation;
+
         BindingContext = this;
-        _client = client;
-        _navigation = navigation;
         build();
 	}
 
@@ -140,11 +141,17 @@ public partial class Login : ContentPage
                              normalizedHomeserver == NormalizeHomeserver(_selectedServer.Url)
                 ? _selectedServer.ServerName
                 : new Uri(normalizedHomeserver).Authority;
-            await _client.LoginAsync(
+            await (_matrixClient ??
+                throw new InvalidOperationException(
+                    "Matrix client is required."))
+                .LoginAsync(
                 normalizedHomeserver,
                 NormalizeUsername(_username, serverName),
                 _password);
-            _navigation.ShowShell();
+            (_appNavigation ??
+                throw new InvalidOperationException(
+                    "Navigation is required."))
+                .ShowShell();
         }
         catch (Exception exception)
         {
