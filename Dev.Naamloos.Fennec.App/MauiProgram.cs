@@ -21,6 +21,7 @@ public static class MauiProgram
             .UseMauiCommunityToolkitMediaElement(true)
             .UseMauiCommunityToolkit(opt =>
             {
+                opt.SetShouldEnableSnackbarOnWindows(true);
             })
             .AddAudio()
             .ConfigureFonts(fonts =>
