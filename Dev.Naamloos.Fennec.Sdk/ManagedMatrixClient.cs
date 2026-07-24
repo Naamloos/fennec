@@ -211,7 +211,7 @@ namespace Dev.Naamloos.Fennec.Sdk
             return _syncService;
         }
 
-        public async Task<ObservableRoomList> GetObservableRoomListAsync()
+        public async Task<ObservableRoomList> GetObservableRoomListAsync(RoomListEntriesDynamicFilterKind initialFilter)
         {
             if (_syncService is null)
             {
@@ -219,7 +219,7 @@ namespace Dev.Naamloos.Fennec.Sdk
             }
 
             var roomList = await _syncService.RoomListService().AllRooms();
-            return new ObservableRoomList(roomList);
+            return new ObservableRoomList(roomList, initialFilter);
         }
 
         public async Task<ObservableTimeline> GetObservableTimelineAsync(

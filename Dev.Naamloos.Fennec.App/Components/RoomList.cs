@@ -7,6 +7,7 @@ using Dev.Naamloos.Fennec.Sdk.Entities;
 using Dev.Naamloos.Fennec.Sdk.Helpers;
 using Microsoft.Maui.Controls.Shapes;
 using System.Collections.Specialized;
+using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
@@ -34,7 +35,8 @@ public sealed partial class RoomList : ContentView, IDisposable
 
     private async void OnLoaded(object sender, EventArgs e)
     {
-        this.ObservableRoomList = await MatrixClient.GetObservableRoomListAsync();
+        // For the first version of the app, we just list all rooms that are not spaces.
+        this.ObservableRoomList = await MatrixClient.GetObservableRoomListAsync(new RoomListEntriesDynamicFilterKind.NonSpace());
         this.ObservableRoomList?.CaptureCurrentContext();
     }
 

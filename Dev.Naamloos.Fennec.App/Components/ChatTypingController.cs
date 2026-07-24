@@ -12,6 +12,7 @@ public sealed class ChatTypingController : IDisposable
     private TypingListener? _listener;
     private TaskHandle? _handle;
     private int _updateVersion;
+    private bool _lastTypingState;
 
     public ChatTypingController(
         IDispatcher dispatcher,
@@ -37,6 +38,8 @@ public sealed class ChatTypingController : IDisposable
                 userIds));
         _handle = room.SubscribeToTypingNotifications(_listener);
 
+        _lastTypingState = isTyping;
+
         if (isTyping)
         {
             _ = SendNoticeAsync(room, true);
@@ -45,6 +48,13 @@ public sealed class ChatTypingController : IDisposable
 
     public void SetTyping(bool isTyping)
     {
+        if (_lastTypingState == isTyping)
+        {
+            return;
+        }
+
+        _lastTypingState = isTyping;
+
         if (_getCurrentRoom() is { } room)
         {
             _ = SendNoticeAsync(room, isTyping);
@@ -54,6 +64,7 @@ public sealed class ChatTypingController : IDisposable
     public void Stop()
     {
         Interlocked.Increment(ref _updateVersion);
+        _lastTypingState = false;
         if (_getCurrentRoom() is { } room)
         {
             _ = SendNoticeAsync(room, false);

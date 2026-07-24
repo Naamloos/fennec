@@ -26,7 +26,7 @@ public sealed partial class Chat : ContentView, IDisposable
     private bool _isLoading;
     private bool _isSending;
     private bool _isLoadingMoreHistory;
-    private bool _reconcileQueued;
+    private int _reconcileVersion;
     private bool _disposed;
 
     private string _messageText = string.Empty;
@@ -293,26 +293,27 @@ public sealed partial class Chat : ContentView, IDisposable
 
     private void QueueMessageReconciliation()
     {
-        if (_reconcileQueued)
-        {
-            return;
-        }
-
-        _reconcileQueued = true;
+        var version =
+            Interlocked.Increment(
+                ref _reconcileVersion);
 
         /*
          * Reset currently arrives as Clear followed by many Add events.
-         * Coalesce the complete burst into one stable-ID reconciliation.
+         * A short generation-based debounce combines the complete burst
+         * without creating cancellation exceptions under the debugger.
          */
-        Dispatcher.Dispatch(() =>
-        {
-            _reconcileQueued = false;
-
-            if (!_disposed)
+        Dispatcher.DispatchDelayed(
+            TimeSpan.FromMilliseconds(16),
+            () =>
             {
+                if (_disposed ||
+                    version != _reconcileVersion)
+                {
+                    return;
+                }
+
                 ReconcileMessages();
-            }
-        });
+            });
     }
 
     private void ReconcileMessages()
@@ -1281,6 +1282,9 @@ public sealed partial class Chat : ContentView, IDisposable
 
     private void DisposeTimeline()
     {
+        Interlocked.Increment(
+            ref _reconcileVersion);
+
         _typingController.Stop();
 
         if (_observableTimeline is null)

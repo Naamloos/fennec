@@ -20,6 +20,7 @@ public sealed partial class ChatTimeline : ContentView, IDisposable
     private bool _ignoreScrollEvents;
     private bool _initialPositionApplied;
     private bool _scrollQueued;
+    private int _resizeScrollVersion;
     private bool _historyRequestRaised;
     private bool _disposed;
 
@@ -117,7 +118,7 @@ public sealed partial class ChatTimeline : ContentView, IDisposable
              * CollectionView still virtualizes the rows natively.
              */
             ItemSizingStrategy =
-                ItemSizingStrategy.MeasureAllItems,
+                ItemSizingStrategy.MeasureFirstItem,
 
             ItemsUpdatingScrollMode =
                 ItemsUpdatingScrollMode.KeepLastItemInView,
@@ -171,10 +172,17 @@ public sealed partial class ChatTimeline : ContentView, IDisposable
             1 -
             BottomFollowThreshold;
 
-        _collectionView.ItemsUpdatingScrollMode =
+        var desiredScrollMode =
             IsNearBottom
                 ? ItemsUpdatingScrollMode.KeepLastItemInView
                 : ItemsUpdatingScrollMode.KeepScrollOffset;
+
+        if (_collectionView.ItemsUpdatingScrollMode !=
+            desiredScrollMode)
+        {
+            _collectionView.ItemsUpdatingScrollMode =
+                desiredScrollMode;
+        }
 
         if (eventArgs.FirstVisibleItemIndex >
             HistoryLoadThreshold)
@@ -211,12 +219,15 @@ public sealed partial class ChatTimeline : ContentView, IDisposable
 
         if (IsNearBottom)
         {
-            QueueScrollToBottom();
+            QueueResizeScrollToBottom();
         }
     }
 
     private void Reset()
     {
+        Interlocked.Increment(
+            ref _resizeScrollVersion);
+
         _initialPositionApplied = false;
         _historyRequestRaised = false;
         IsNearBottom = true;
@@ -266,6 +277,28 @@ public sealed partial class ChatTimeline : ContentView, IDisposable
         });
 
         return completion.Task;
+    }
+
+
+    private void QueueResizeScrollToBottom()
+    {
+        var version =
+            Interlocked.Increment(
+                ref _resizeScrollVersion);
+
+        Dispatcher.DispatchDelayed(
+            TimeSpan.FromMilliseconds(100),
+            () =>
+            {
+                if (_disposed ||
+                    version != _resizeScrollVersion ||
+                    !IsNearBottom)
+                {
+                    return;
+                }
+
+                ScrollToBottomCore();
+            });
     }
 
     private void QueueScrollToBottom()
@@ -347,6 +380,9 @@ public sealed partial class ChatTimeline : ContentView, IDisposable
         }
 
         _disposed = true;
+
+        Interlocked.Increment(
+            ref _resizeScrollVersion);
 
         _collectionView.Scrolled -=
             OnCollectionViewScrolled;

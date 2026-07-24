@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.App.Pages;
 using Dev.Naamloos.Fennec.Sdk;
 using Microsoft.Maui.Controls.Shapes;
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows.Input;
@@ -19,7 +20,19 @@ public sealed partial class ChatMessageView : ContentView
     private static readonly SemaphoreSlim MediaLoadLimiter =
         new(4, 4);
 
-    private CancellationTokenSource? _loadCancellation;
+    private static readonly ConcurrentDictionary<
+        string,
+        Lazy<Task<byte[]>>> ThumbnailCache = new();
+
+    private static readonly ConcurrentDictionary<
+        string,
+        Lazy<Task<string?>>> MemberAvatarCache = new();
+
+    private static readonly ConcurrentDictionary<
+        string,
+        Lazy<Task<string>>> VideoFileCache = new();
+
+    private int _loadVersion;
     private Grid? _videoHost;
 
     [BindableProperty(
@@ -403,29 +416,19 @@ public sealed partial class ChatMessageView : ContentView
 
     private void StartLoadingMessage()
     {
-        _loadCancellation?.Cancel();
-        _loadCancellation?.Dispose();
+        var version =
+            Interlocked.Increment(
+                ref _loadVersion);
 
-        var cancellation =
-            new CancellationTokenSource();
-
-        _loadCancellation = cancellation;
-
-        _ = LoadMessageSafelyAsync(
-            cancellation.Token);
+        _ = LoadMessageSafelyAsync(version);
     }
 
     private async Task LoadMessageSafelyAsync(
-        CancellationToken cancellationToken)
+        int version)
     {
         try
         {
-            await LoadMessageAsync(
-                cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            // The CollectionView recycled this row.
+            await LoadMessageAsync(version);
         }
         catch (Exception exception)
         {
@@ -435,19 +438,17 @@ public sealed partial class ChatMessageView : ContentView
     }
 
     private async Task LoadMessageAsync(
-        CancellationToken cancellationToken)
+        int version)
     {
         var message = Message;
 
         ResetVisualState();
 
-        if (message is null)
+        if (message is null ||
+            !IsCurrent(message, version))
         {
             return;
         }
-
-        cancellationToken
-            .ThrowIfCancellationRequested();
 
         var mediaSize =
             FitMediaSize(
@@ -461,12 +462,17 @@ public sealed partial class ChatMessageView : ContentView
         MediaHeightRequest =
             mediaSize.Height;
 
-        var loads = new List<Task>
+        var loads = new List<Task>();
+
+        if (message.IsOwn &&
+            !string.IsNullOrWhiteSpace(
+                message.ReadByUserIds))
         {
-            LoadReadAvatarsAsync(
-                message,
-                cancellationToken),
-        };
+            loads.Add(
+                LoadReadAvatarsAsync(
+                    message,
+                    version));
+        }
 
         if (!string.IsNullOrWhiteSpace(
                 message.AvatarUrl))
@@ -474,7 +480,7 @@ public sealed partial class ChatMessageView : ContentView
             loads.Add(
                 LoadAvatarAsync(
                     message,
-                    cancellationToken));
+                    version));
         }
 
         if (!string.IsNullOrWhiteSpace(
@@ -483,10 +489,18 @@ public sealed partial class ChatMessageView : ContentView
             loads.Add(
                 LoadMediaAsync(
                     message,
-                    cancellationToken));
+                    version));
         }
 
         await Task.WhenAll(loads);
+    }
+
+    private bool IsCurrent(
+        ChatMessage message,
+        int version)
+    {
+        return version == _loadVersion &&
+               ReferenceEquals(Message, message);
     }
 
     private void ResetVisualState()
@@ -512,34 +526,41 @@ public sealed partial class ChatMessageView : ContentView
 
     private async Task LoadAvatarAsync(
         ChatMessage message,
-        CancellationToken cancellationToken)
+        int version)
     {
-        if (MatrixClient is null)
+        var matrixClient = MatrixClient;
+
+        if (matrixClient is null ||
+            !IsCurrent(message, version))
         {
             return;
         }
 
-        await MediaLoadLimiter.WaitAsync(
-            cancellationToken);
+        await MediaLoadLimiter.WaitAsync();
 
         try
         {
+            if (!IsCurrent(message, version))
+            {
+                return;
+            }
+
             var bytes =
-                await MatrixClient.GetThumbnailAsync(
+                await GetCachedThumbnailAsync(
+                    matrixClient,
                     message.AvatarUrl!,
                     72,
                     72,
                     isJson: false);
 
-            cancellationToken
-                .ThrowIfCancellationRequested();
-
-            if (Message?.Id == message.Id)
+            if (!IsCurrent(message, version))
             {
-                AvatarSource =
-                    ImageSource.FromStream(
-                        () => new MemoryStream(bytes));
+                return;
             }
+
+            AvatarSource =
+                ImageSource.FromStream(
+                    () => new MemoryStream(bytes));
         }
         finally
         {
@@ -549,69 +570,71 @@ public sealed partial class ChatMessageView : ContentView
 
     private async Task LoadMediaAsync(
         ChatMessage message,
-        CancellationToken cancellationToken)
+        int version)
     {
-        if (MatrixClient is null)
+        var matrixClient = MatrixClient;
+
+        if (matrixClient is null ||
+            !IsCurrent(message, version))
         {
             return;
         }
 
-        await MediaLoadLimiter.WaitAsync(
-            cancellationToken);
+        await MediaLoadLimiter.WaitAsync();
 
         try
         {
+            if (!IsCurrent(message, version))
+            {
+                return;
+            }
+
             if (message.MediaKind ==
                 ChatMediaKind.Image)
             {
                 var bytes =
-                    await MatrixClient.GetThumbnailAsync(
+                    await GetCachedThumbnailAsync(
+                        matrixClient,
                         message.MediaSourceJson!,
                         560,
                         440);
 
-                cancellationToken
-                    .ThrowIfCancellationRequested();
-
-                if (Message?.Id == message.Id)
+                if (!IsCurrent(message, version))
                 {
-                    MediaImageSource =
-                        ImageSource.FromStream(
-                            () =>
-                                new MemoryStream(bytes));
-
-                    IsImageVisible = true;
+                    return;
                 }
+
+                MediaImageSource =
+                    ImageSource.FromStream(
+                        () => new MemoryStream(bytes));
+
+                IsImageVisible = true;
             }
             else if (message.MediaKind ==
                      ChatMediaKind.Video)
             {
                 var path =
-                    await MatrixClient.GetVideoFileAsync(
-                        message.MediaSourceJson!,
-                        message.Filename ?? "video",
-                        message.MimeType ??
-                        "video/mp4");
+                    await GetCachedVideoFileAsync(
+                        matrixClient,
+                        message);
 
-                cancellationToken
-                    .ThrowIfCancellationRequested();
-
-                if (Message?.Id == message.Id)
+                if (!IsCurrent(message, version))
                 {
-                    VideoSource =
-                        PlaybackMediaSource.FromFile(
-                            path);
-
-                    EnsureVideoElement();
-                    IsVideoVisible = true;
+                    return;
                 }
+
+                VideoSource =
+                    PlaybackMediaSource.FromFile(path);
+
+                EnsureVideoElement();
+                IsVideoVisible = true;
             }
         }
         finally
         {
             MediaLoadLimiter.Release();
 
-            if (Message?.Id == message.Id)
+            if (IsCurrent(message, version))
             {
                 IsMediaLoading = false;
             }
@@ -620,7 +643,7 @@ public sealed partial class ChatMessageView : ContentView
 
     private async Task LoadReadAvatarsAsync(
         ChatMessage message,
-        CancellationToken cancellationToken)
+        int version)
     {
         const int maximumAvatars = 5;
 
@@ -634,8 +657,10 @@ public sealed partial class ChatMessageView : ContentView
         foreach (var userId in
                  userIds.Take(maximumAvatars))
         {
-            cancellationToken
-                .ThrowIfCancellationRequested();
+            if (!IsCurrent(message, version))
+            {
+                return;
+            }
 
             var avatar =
                 new ReadAvatar(
@@ -644,8 +669,11 @@ public sealed partial class ChatMessageView : ContentView
 
             ReadAvatars.Add(avatar);
 
-            if (Room is null ||
-                MatrixClient is null)
+            var room = Room;
+            var matrixClient = MatrixClient;
+
+            if (room is null ||
+                matrixClient is null)
             {
                 continue;
             }
@@ -653,48 +681,45 @@ public sealed partial class ChatMessageView : ContentView
             try
             {
                 var avatarUrl =
-                    await Room.MemberAvatarUrl(
+                    await GetCachedMemberAvatarUrlAsync(
+                        room,
                         userId);
 
-                if (string.IsNullOrWhiteSpace(
-                        avatarUrl))
+                if (string.IsNullOrWhiteSpace(avatarUrl) ||
+                    !IsCurrent(message, version))
                 {
                     continue;
                 }
 
-                await MediaLoadLimiter.WaitAsync(
-                    cancellationToken);
+                await MediaLoadLimiter.WaitAsync();
 
                 try
                 {
+                    if (!IsCurrent(message, version))
+                    {
+                        return;
+                    }
+
                     var bytes =
-                        await MatrixClient
-                            .GetThumbnailAsync(
-                                avatarUrl,
-                                36,
-                                36,
-                                isJson: false);
+                        await GetCachedThumbnailAsync(
+                            matrixClient,
+                            avatarUrl,
+                            36,
+                            36,
+                            isJson: false);
 
-                    cancellationToken
-                        .ThrowIfCancellationRequested();
-
-                    if (Message?.Id == message.Id)
+                    if (IsCurrent(message, version))
                     {
                         avatar.Source =
                             ImageSource.FromStream(
                                 () =>
-                                    new MemoryStream(
-                                        bytes));
+                                    new MemoryStream(bytes));
                     }
                 }
                 finally
                 {
                     MediaLoadLimiter.Release();
                 }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
             }
             catch (Exception exception)
             {
@@ -704,7 +729,7 @@ public sealed partial class ChatMessageView : ContentView
             }
         }
 
-        if (Message?.Id != message.Id)
+        if (!IsCurrent(message, version))
         {
             return;
         }
@@ -717,6 +742,105 @@ public sealed partial class ChatMessageView : ContentView
 
         HasReadAvatars =
             userIds.Length > 0;
+    }
+
+    private static async Task<byte[]>
+        GetCachedThumbnailAsync(
+            ManagedMatrixClient matrixClient,
+            string source,
+            int width,
+            int height,
+            bool isJson = true)
+    {
+        var key =
+            $"{source}|{width}|{height}|{isJson}";
+
+        var lazy =
+            ThumbnailCache.GetOrAdd(
+                key,
+                _ => new Lazy<Task<byte[]>>(
+                    () => matrixClient
+                        .GetThumbnailAsync(
+                            source,
+                            (uint)width,
+                            (uint)height,
+                            isJson)));
+
+        try
+        {
+            return await lazy.Value;
+        }
+        catch
+        {
+            ThumbnailCache.TryRemove(
+                key,
+                out _);
+
+            throw;
+        }
+    }
+
+    private static async Task<string?>
+        GetCachedMemberAvatarUrlAsync(
+            Room room,
+            string userId)
+    {
+        var key =
+            $"{room.Id()}|{userId}";
+
+        var lazy =
+            MemberAvatarCache.GetOrAdd(
+                key,
+                _ => new Lazy<Task<string?>>(
+                    () => room.MemberAvatarUrl(userId)));
+
+        try
+        {
+            return await lazy.Value;
+        }
+        catch
+        {
+            MemberAvatarCache.TryRemove(
+                key,
+                out _);
+
+            throw;
+        }
+    }
+
+    private static async Task<string>
+        GetCachedVideoFileAsync(
+            ManagedMatrixClient matrixClient,
+            ChatMessage message)
+    {
+        var key =
+            $"{message.MediaSourceJson}|" +
+            $"{message.Filename}|" +
+            $"{message.MimeType}";
+
+        var lazy =
+            VideoFileCache.GetOrAdd(
+                key,
+                _ => new Lazy<Task<string>>(
+                    () => matrixClient
+                        .GetVideoFileAsync(
+                            message.MediaSourceJson!,
+                            message.Filename ?? "video",
+                            message.MimeType ??
+                            "video/mp4")));
+
+        try
+        {
+            return await lazy.Value;
+        }
+        catch
+        {
+            VideoFileCache.TryRemove(
+                key,
+                out _);
+
+            throw;
+        }
     }
 
     private void EnsureVideoElement()

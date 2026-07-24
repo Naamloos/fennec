@@ -13,9 +13,9 @@ public sealed partial class ChatTimeline
 
     partial void InitializePlatformCollectionView()
     {
-        #if !WINDOWS
+#if !WINDOWS
         return;
-        #endif
+#endif
         _collectionView.HandlerChanged +=
             OnCollectionViewHandlerChanged;
 
@@ -24,9 +24,9 @@ public sealed partial class ChatTimeline
 
     partial void DisposePlatformCollectionView()
     {
-        #if !WINDOWS
+#if !WINDOWS
         return;
-        #endif
+#endif
         _collectionView.HandlerChanged -=
             OnCollectionViewHandlerChanged;
 
