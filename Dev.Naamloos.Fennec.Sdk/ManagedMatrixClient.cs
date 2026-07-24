@@ -1,4 +1,4 @@
-﻿using Dev.Naamloos.Fennec.Sdk.Helpers;
+using Dev.Naamloos.Fennec.Sdk.Helpers;
 using Dev.Naamloos.Fennec.Sdk.Interfaces;
 using System.Collections.Concurrent;
 using System.Net.Http.Headers;
@@ -219,9 +219,7 @@ namespace Dev.Naamloos.Fennec.Sdk
             }
 
             var roomList = await _syncService.RoomListService().AllRooms();
-            var spaceService = await (_client ?? throw new InvalidOperationException(
-                "The client is not logged in.")).SpaceService();
-            return new ObservableRoomList(roomList, spaceService);
+            return new ObservableRoomList(roomList);
         }
 
         public async Task<ObservableTimeline> GetObservableTimelineAsync(

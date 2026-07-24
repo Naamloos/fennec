@@ -1,225 +1,63 @@
+using Dev.Naamloos.Fennec.Sdk.Entities;
 using Dev.Naamloos.Fennec.Sdk.Events;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
+using System.Text;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.Sdk.Helpers
 {
-    public sealed record RoomSpace(
-        string Id,
-        string Name,
-        string? AvatarUrl);
-
-    public sealed class RoomEntry : INotifyPropertyChanged
+    public class ObservableRoomList : ObservableCollection<ManagedRoom>, IDisposable
     {
-        private Room _room;
-        private string _name;
-        private string? _avatarUrl;
-        private bool _isSpace;
-        private bool _isDirectMessage;
-        private bool _hasUnread;
-        private IReadOnlyList<RoomSpace> _spaces = [];
-        private int _refreshVersion;
-
-        internal RoomEntry(
-            Room room,
-            SpaceService spaceService)
-        {
-            _room = room;
-            _name = GetName(room);
-            _avatarUrl = room.AvatarUrl();
-            _isSpace = room.IsSpace();
-            _ = RefreshInfoAsync(room);
-
-            if (!_isSpace)
-            {
-                _ = LoadSpacesAsync(room, spaceService);
-            }
-        }
-
-        public Room Room => _room;
-
-        public string Id => _room.Id();
-
-        public string Name
-        {
-            get => _name;
-            private set
-            {
-                if (_name == value)
-                {
-                    return;
-                }
-
-                _name = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public string? AvatarUrl
-        {
-            get => _avatarUrl;
-            private set => SetField(ref _avatarUrl, value);
-        }
-
-        public bool IsSpace
-        {
-            get => _isSpace;
-            private set => SetField(ref _isSpace, value);
-        }
-
-        public bool HasUnread
-        {
-            get => _hasUnread;
-            private set => SetField(ref _hasUnread, value);
-        }
-
-        public bool IsDirectMessage
-        {
-            get => _isDirectMessage;
-            private set => SetField(ref _isDirectMessage, value);
-        }
-
-        public IReadOnlyList<RoomSpace> Spaces
-        {
-            get => _spaces;
-            private set => SetField(ref _spaces, value);
-        }
-
-        internal void Update(Room room)
-        {
-            _room = room;
-
-            OnPropertyChanged(nameof(Room));
-            Name = GetName(room);
-            AvatarUrl = room.AvatarUrl();
-            IsSpace = room.IsSpace();
-            _ = RefreshInfoAsync(room);
-        }
-
-        private static string GetName(Room room)
-        {
-            return room.DisplayName() ?? room.Id();
-        }
-
-        private async Task RefreshInfoAsync(Room room)
-        {
-            var version = Interlocked.Increment(ref _refreshVersion);
-
-            try
-            {
-                using var info = await room.RoomInfo();
-
-                if (version != _refreshVersion)
-                {
-                    return;
-                }
-
-                Name = info.DisplayName ?? room.Id();
-                AvatarUrl = info.AvatarUrl;
-                IsSpace = info.IsSpace;
-                IsDirectMessage = info.IsDm || info.IsDirect;
-                HasUnread =
-                    info.IsMarkedUnread ||
-                    info.NumUnreadMessages > 0 ||
-                    info.NumUnreadNotifications > 0;
-            }
-            catch (Exception exception)
-            {
-                Debug.WriteLine(
-                    $"Could not refresh room {room.Id()}: {exception}");
-            }
-        }
-
-        public async Task MarkAsReadAsync()
-        {
-            Interlocked.Increment(ref _refreshVersion);
-            HasUnread = false;
-
-            await Task.WhenAll(
-                _room.MarkAsRead(ReceiptType.Read),
-                _room.SetUnreadFlag(false));
-        }
-
-        private async Task LoadSpacesAsync(
-            Room room,
-            SpaceService spaceService)
-        {
-            try
-            {
-                Spaces = (await spaceService.JoinedParentsOfChild(room.Id()))
-                    .Select(space => new RoomSpace(
-                        space.RoomId,
-                        space.DisplayName,
-                        space.AvatarUrl))
-                    .ToArray();
-            }
-            catch (Exception exception)
-            {
-                Debug.WriteLine(
-                    $"Could not load spaces for {room.Id()}: {exception}");
-            }
-        }
-
-        private void SetField<T>(
-            ref T field,
-            T value,
-            [CallerMemberName] string? propertyName = null)
-        {
-            if (EqualityComparer<T>.Default.Equals(field, value))
-            {
-                return;
-            }
-
-            field = value;
-            OnPropertyChanged(propertyName);
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        private void OnPropertyChanged(
-            [CallerMemberName] string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(
-                this,
-                new PropertyChangedEventArgs(propertyName));
-        }
-    }
-
-    public sealed class ObservableRoomList : ObservableCollection<RoomEntry>, IDisposable
-    {
-        private readonly SpaceService _spaceService;
-
-        private RoomListEntriesListenerCallback? _listener;
-        private RoomListEntriesWithDynamicAdaptersResult? _adapterResult;
-
+        private RoomList _roomList;
+        private RoomListEntriesListenerCallback? _listenerCallback;
+        private RoomListEntriesWithDynamicAdaptersResult? _emitter;
+        private SynchronizationContext? _synchronizationContext;
         private bool _disposed;
 
-        internal ObservableRoomList(
-            RoomList roomList,
-            SpaceService spaceService)
+        internal ObservableRoomList(RoomList roomList, RoomListEntriesDynamicFilterKind? initialFilter = null)
         {
-            _spaceService = spaceService;
-            _listener = RoomListEntriesListenerCallback.Create(entries => this.applyUpdates(entries));
+            _roomList = roomList;
 
-            _adapterResult = roomList.EntriesWithDynamicAdapters(5000, _listener);
-            _adapterResult.Controller().SetFilter(new RoomListEntriesDynamicFilterKind.All(new RoomListEntriesDynamicFilterKind[0]));
+            _listenerCallback = RoomListEntriesListenerCallback.Create(entries => this.applyUpdates(entries));
+
+            _emitter = roomList.EntriesWithDynamicAdapters(5000, _listenerCallback);
+            _emitter.Controller().SetFilter(initialFilter ?? new RoomListEntriesDynamicFilterKind.All([]));
         }
 
-        private void applyUpdates(RoomListEntriesUpdate[] updates)
+        public void SetFilter(RoomListEntriesDynamicFilterKind filter)
         {
             if (_disposed)
             {
                 return;
             }
 
-            foreach (var update in updates)
+            _emitter?.Controller().SetFilter(filter);
+        }
+
+        public void CaptureCurrentContext()
+        {
+            _synchronizationContext = SynchronizationContext.Current;
+        }
+
+        private void applyUpdates(RoomListEntriesUpdate[] entries, bool skipContext = false)
+        {
+            if(_disposed)
             {
-                switch (update)
+                return;
+            }
+
+            // This piece ensures that updates are applied on the same thread that created the ObservableCollection, which is important for UI updates in many frameworks.
+            if (_synchronizationContext != null && !skipContext)
+            {
+                _synchronizationContext.Post(_ => this.applyUpdates(entries, true), null);
+                return;
+            }
+
+            foreach (var entry in entries)
+            {
+                switch (entry)
                 {
                     case RoomListEntriesUpdate.Append appendUpdate:
                         append(appendUpdate);
@@ -260,70 +98,68 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
             }
         }
 
-        // multiple elements appended
+        // append to the end
         private void append(RoomListEntriesUpdate.Append append)
         {
-            foreach (var room in append.Values)
+            var values = append.Values.Select(x => new ManagedRoom(x));
+            foreach (var value in values)
             {
-                Add(new RoomEntry(room, _spaceService));
+                this.Add(value);
             }
         }
 
-        // vector was cleared
+        // clear the list
         private void clear(RoomListEntriesUpdate.Clear clear)
         {
-            Clear();
+            this.Clear();
         }
 
-        // an element was added at the front
+        // push to the front
         private void pushFront(RoomListEntriesUpdate.PushFront pushFront)
         {
-            Insert(0, new RoomEntry(pushFront.Value, _spaceService));
+            this.Insert(0, new ManagedRoom(pushFront.Value));
         }
 
-        // an element was added at the back
+        // push to the back
         private void pushBack(RoomListEntriesUpdate.PushBack pushBack)
         {
-            Add(new RoomEntry(pushBack.Value, _spaceService));
+            this.Add(new ManagedRoom(pushBack.Value));
         }
 
-        // the element at the front was removed
+        // pop the first element
         private void popFront(RoomListEntriesUpdate.PopFront popFront)
         {
-            RemoveAt(0);
+            if (this.Count > 0)
+            {
+                this.RemoveAt(0);
+            }
         }
 
-        // the element at the back was removed
+        // pop the last element
         private void popBack(RoomListEntriesUpdate.PopBack popBack)
         {
-            RemoveAt(Count - 1);
+            if (this.Count > 0)
+            {
+                this.RemoveAt(Count - 1);
+            }
         }
 
-        // an element was inserted at a specific index
+        // insert at index
         private void insert(RoomListEntriesUpdate.Insert insert)
         {
-            Insert((int)insert.Index, new RoomEntry(insert.Value, _spaceService));
+            this.Insert((int)insert.Index, new ManagedRoom(insert.Value));
         }
 
-        // an element was set at a specific index
+        // set at specific index (update)
         private void set(RoomListEntriesUpdate.Set set)
         {
-            var index = checked((int)set.Index);
-            var existing = this[index];
-
-            if (existing.Id == set.Value.Id())
-            {
-                existing.Update(set.Value);
-                return;
-            }
-
-            this[index] = new RoomEntry(set.Value, _spaceService);
+            this[(int)set.Index].Update(set.Value);
         }
 
-        // an element was removed at a specific index
+        // remove at a specific index
         private void remove(RoomListEntriesUpdate.Remove remove)
         {
-            RemoveAt((int)remove.Index);
+            this.RemoveAt((int)remove.Index);
         }
 
         // the list was truncated to a specific length
@@ -335,25 +171,14 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
             }
         }
 
-        // the list was reset with new values
+        // reset the list with new values
         private void reset(RoomListEntriesUpdate.Reset reset)
         {
-            var existingEntries = this
-                .ToDictionary(entry => entry.Id);
-
-            Clear();
-
-            foreach (var room in reset.Values) 
+            this.Clear();
+            var values = reset.Values.Select(x => new ManagedRoom(x));
+            foreach (var value in values)
             {
-                if (existingEntries.TryGetValue(room.Id(), out var existing))
-                {
-                    existing.Update(room);
-                    Add(existing);
-                }
-                else
-                {
-                    Add(new RoomEntry(room, _spaceService));
-                }
+                this.Add(value);
             }
         }
 
@@ -366,12 +191,10 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
 
             _disposed = true;
 
-            _adapterResult?.EntriesStream().Cancel();
-            _adapterResult?.Dispose();
-            _spaceService.Dispose();
+            _emitter?.Dispose();
 
-            _adapterResult = null;
-            _listener = null;
+            _listenerCallback = null;
+            _emitter = null;
 
             GC.SuppressFinalize(this);
         }

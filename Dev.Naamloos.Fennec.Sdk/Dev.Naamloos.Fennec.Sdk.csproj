@@ -16,17 +16,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Entities\" />
     <Folder Include="native\android-arm64\" />
     <Folder Include="native\android-x64\" />
     <Folder Include="native\linux-x64\" />
     <Folder Include="native\linux-arm64\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Dev.Naamloos.Fennec.Sdk.Generators\Dev.Naamloos.Fennec.Sdk.Generators.csproj"
-        OutputItemType="Analyzer"
-        ReferenceOutputAssembly="false" />
+    <Folder Include="Util\" />
   </ItemGroup>
 
 </Project>

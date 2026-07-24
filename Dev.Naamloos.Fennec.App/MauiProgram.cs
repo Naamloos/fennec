@@ -3,6 +3,7 @@ using CommunityToolkit.Maui;
 using Plugin.Maui.Audio;
 using Dev.Naamloos.Fennec.Sdk;
 using MaterialColorUtilities.Maui;
+using Dev.Naamloos.Fennec.Sdk.Helpers;
 
 
 #if ANDROID || IOS || MACCATALYST

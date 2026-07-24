@@ -1,13 +1,48 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
-using Dev.Naamloos.Fennec.Sdk.Generation;
+using System.Threading;
 using uniffi.matrix_sdk_ffi;
 
-namespace Dev.Naamloos.Fennec.Sdk.Events
+namespace Dev.Naamloos.Fennec.Sdk.Events;
+
+public sealed class RoomListEntriesListenerCallback
+    : RoomListEntriesListener
 {
-    [GenerateMatrixListener<RoomListEntriesListener>]
-    public partial class RoomListEntriesListenerCallback
+    private readonly Action<RoomListEntriesUpdate[]> _callback;
+    private readonly SynchronizationContext? _context;
+
+    private RoomListEntriesListenerCallback(
+        Action<RoomListEntriesUpdate[]> callback)
     {
+        _callback = callback
+            ?? throw new ArgumentNullException(nameof(callback));
+
+        _context = SynchronizationContext.Current;
     }
+
+    public static RoomListEntriesListenerCallback Create(
+        Action<RoomListEntriesUpdate[]> callback)
+    {
+        return new RoomListEntriesListenerCallback(callback);
+    }
+
+    public void OnUpdate(RoomListEntriesUpdate[] updates)
+    {
+        if (_context is null ||
+            ReferenceEquals(SynchronizationContext.Current, _context))
+        {
+            _callback(updates);
+            return;
+        }
+
+        _context.Post(
+            static state =>
+            {
+                var callbackState = (CallbackState)state!;
+                callbackState.Callback(callbackState.Updates);
+            },
+            new CallbackState(_callback, updates));
+    }
+
+    private sealed record CallbackState(
+        Action<RoomListEntriesUpdate[]> Callback,
+        RoomListEntriesUpdate[] Updates);
 }

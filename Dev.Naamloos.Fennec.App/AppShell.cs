@@ -8,9 +8,9 @@ using CommunityToolkit.Maui.Views;
 using Microsoft.Maui.Controls.Shapes;
 using System.Diagnostics;
 using uniffi.matrix_sdk_ffi;
-using RoomListComponent = Dev.Naamloos.Fennec.App.Components.RoomList;
 using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Mvvm.Input;
+using Dev.Naamloos.Fennec.Sdk.Entities;
 
 namespace Dev.Naamloos.Fennec.App;
 
@@ -45,6 +45,22 @@ public sealed partial class AppShell : Shell
             }
         }
     }
+
+    public ManagedRoom? ManagedSelectedRoom
+    {
+        get => _managedSelectedRoom;
+        set
+        {
+            _managedSelectedRoom = value;
+            OnPropertyChanged();
+            // Ensures we do not emit an update if the selected room is already the same as the new value.
+            if (SelectedRoom?.Id() != value?.NativeRoom.Id())
+            {
+                SelectedRoom = value?.NativeRoom;
+            }
+        }
+    }
+    private ManagedRoom? _managedSelectedRoom = null;
 
     public ImageSource? AccountAvatarSource => _accountAvatarSource;
     public string AccountDisplayName => _accountDisplayName;
@@ -211,13 +227,12 @@ public sealed partial class AppShell : Shell
 #endif
                     },
                 }.Row(0),
-                new RoomListComponent()
-                    .BindService<ManagedMatrixClient, RoomListComponent>(RoomListComponent.MatrixClientProperty)
+                new Components.RoomList()
                     .Bind(
-                        RoomListComponent.SelectedRoomProperty,
-                        nameof(SelectedRoom),
+                        Components.RoomList.SelectedRoomProperty,
+                        nameof(ManagedSelectedRoom),
                         BindingMode.TwoWay,
-                        source: BindingContext)
+                        source: this)
                     .Row(1),
                 new VerticalStackLayout
                 {
