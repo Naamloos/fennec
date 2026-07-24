@@ -2,6 +2,7 @@ using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Behaviors;
 using CommunityToolkit.Maui.Converters;
 using CommunityToolkit.Maui.Markup;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.App.Components;
 using Dev.Naamloos.Fennec.Sdk;
@@ -344,8 +345,8 @@ public sealed partial class Chat : ContentView, IDisposable
                 if (Messages[desiredIndex] !=
                     desiredMessage)
                 {
-                    Messages[desiredIndex] =
-                        desiredMessage;
+
+                    Messages[desiredIndex].UpdateFrom(desiredMessage);
                 }
 
                 continue;
@@ -365,8 +366,7 @@ public sealed partial class Chat : ContentView, IDisposable
                 if (Messages[desiredIndex] !=
                     desiredMessage)
                 {
-                    Messages[desiredIndex] =
-                        desiredMessage;
+                    Messages[desiredIndex].UpdateFrom(desiredMessage);
                 }
 
                 continue;
@@ -1229,11 +1229,11 @@ public sealed partial class Chat : ContentView, IDisposable
                     file.Content.Source.ToJson(),
                     file.Content.Filename,
                     file.Content.Info?.Mimetype,
-                    ReadByUserIds:
+                    readByUserIds:
                         readByUserIds,
-                    EventId:
+                    eventId:
                         eventId,
-                    ReplyTo:
+                    replyTo:
                         replyTo),
 
             _ =>
@@ -1243,12 +1243,9 @@ public sealed partial class Chat : ContentView, IDisposable
                     message.Content.Body,
                     isOwn,
                     avatarUrl,
-                    ReadByUserIds:
-                        readByUserIds,
-                    EventId:
-                        eventId,
-                    ReplyTo:
-                        replyTo),
+                    readByUserIds: readByUserIds,
+                    eventId: eventId,
+                    replyTo: replyTo),
         };
     }
 
@@ -1331,21 +1328,106 @@ public sealed partial class Chat : ContentView, IDisposable
     }
 }
 
-public sealed record ChatMessage(
-    string Id,
-    string Username,
-    string Body,
-    bool IsOwn,
-    string? AvatarUrl = null,
-    ChatMediaKind MediaKind = ChatMediaKind.None,
-    string? MediaSourceJson = null,
-    string? Filename = null,
-    string? MimeType = null,
-    ulong? MediaWidth = null,
-    ulong? MediaHeight = null,
-    string? ReadByUserIds = null,
-    string? EventId = null,
-    string? ReplyTo = null);
+public sealed partial class ChatMessage : ObservableObject
+{
+    public ChatMessage(
+        string id,
+        string username,
+        string body,
+        bool isOwn,
+        string? avatarUrl = null,
+        ChatMediaKind mediaKind = ChatMediaKind.None,
+        string? mediaSourceJson = null,
+        string? filename = null,
+        string? mimeType = null,
+        ulong? mediaWidth = null,
+        ulong? mediaHeight = null,
+        string? readByUserIds = null,
+        string? eventId = null,
+        string? replyTo = null)
+    {
+        Id = id;
+        Username = username;
+        Body = body;
+        IsOwn = isOwn;
+        AvatarUrl = avatarUrl;
+        MediaKind = mediaKind;
+        MediaSourceJson = mediaSourceJson;
+        Filename = filename;
+        MimeType = mimeType;
+        MediaWidth = mediaWidth;
+        MediaHeight = mediaHeight;
+        ReadByUserIds = readByUserIds;
+        EventId = eventId;
+        ReplyTo = replyTo;
+    }
+
+    public string Id { get; }
+
+    [ObservableProperty]
+    public partial string Username { get; set; }
+
+    [ObservableProperty]
+    public partial string Body { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsOwn { get; set; }
+
+    [ObservableProperty]
+    public partial string? AvatarUrl { get; set; }
+
+    [ObservableProperty]
+    public partial ChatMediaKind MediaKind { get; set; }
+
+    [ObservableProperty]
+    public partial string? MediaSourceJson { get; set; }
+
+    [ObservableProperty]
+    public partial string? Filename { get; set; }
+
+    [ObservableProperty]
+    public partial string? MimeType { get; set; }
+
+    [ObservableProperty]
+    public partial ulong? MediaWidth { get; set; }
+
+    [ObservableProperty]
+    public partial ulong? MediaHeight { get; set; }
+
+    [ObservableProperty]
+    public partial string? ReadByUserIds { get; set; }
+
+    [ObservableProperty]
+    public partial string? EventId { get; set; }
+
+    [ObservableProperty]
+    public partial string? ReplyTo { get; set; }
+
+    public void UpdateFrom(ChatMessage source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        if (source.Id != Id)
+        {
+            throw new InvalidOperationException(
+                "Cannot update a message from a different timeline item.");
+        }
+
+        Username = source.Username;
+        Body = source.Body;
+        IsOwn = source.IsOwn;
+        AvatarUrl = source.AvatarUrl;
+        MediaKind = source.MediaKind;
+        MediaSourceJson = source.MediaSourceJson;
+        Filename = source.Filename;
+        MimeType = source.MimeType;
+        MediaWidth = source.MediaWidth;
+        MediaHeight = source.MediaHeight;
+        ReadByUserIds = source.ReadByUserIds;
+        EventId = source.EventId;
+        ReplyTo = source.ReplyTo;
+    }
+}
 
 public enum ChatMediaKind
 {

@@ -1,4 +1,5 @@
 using CommunityToolkit.Maui;
+using CommunityToolkit.Maui.Behaviors;
 using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Dev.Naamloos.Fennec.App.Pages;
@@ -70,7 +71,13 @@ public sealed partial class ChatTimeline : ContentView, IDisposable
             OnCollectionViewSizeChanged;
 
         Content = _collectionView;
+
+        InitializePlatformCollectionView();
     }
+
+    partial void InitializePlatformCollectionView();
+
+    partial void DisposePlatformCollectionView();
 
     private CollectionView CreateCollectionView()
     {
@@ -346,6 +353,8 @@ public sealed partial class ChatTimeline : ContentView, IDisposable
 
         _collectionView.SizeChanged -=
             OnCollectionViewSizeChanged;
+
+        DisposePlatformCollectionView();
 
         GC.SuppressFinalize(this);
     }

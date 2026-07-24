@@ -57,7 +57,7 @@ public partial class UserSettingsPopup : ContentView
         {
             Padding = 20,
             Spacing = 12,
-            WidthRequest = 500,
+            MaximumWidthRequest = 500,
             Children =
             {
                 // User avatar with fallback label
