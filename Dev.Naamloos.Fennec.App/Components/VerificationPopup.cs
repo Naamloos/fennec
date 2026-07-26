@@ -14,12 +14,6 @@ public sealed partial class VerificationPopup :
     ContentView,
     SessionVerificationControllerDelegate
 {
-#if DEBUG
-    static VerificationPopup() =>
-        Debug.Assert(
-            FormatDecimals([1, 2, 3]) == "1   2   3");
-#endif
-
     private bool _started;
 
     [BindableProperty(PropertyChangedMethodName = nameof(OnControllerChanged))]

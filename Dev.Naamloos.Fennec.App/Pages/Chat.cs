@@ -948,10 +948,6 @@ public sealed partial class Chat : ContentView, IDisposable
     private async Task SaveMediaAsync(
         ChatMessage message)
     {
-#if MACCATALYST
-        await Task.CompletedTask;
-        return;
-#endif
 
 #if WINDOWS || ANDROID
         if (string.IsNullOrWhiteSpace(

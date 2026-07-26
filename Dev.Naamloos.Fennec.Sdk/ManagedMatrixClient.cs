@@ -519,9 +519,11 @@ namespace Dev.Naamloos.Fennec.Sdk
                 }
 
                 _syncService.Dispose();
+                _syncService.Destroy();
                 _syncService = null;
             }
             _client?.Dispose();
+            _client?.Destroy();
             _client = null;
             _httpClient?.Dispose();
             _httpClient = null;

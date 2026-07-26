@@ -193,6 +193,8 @@ public sealed partial class AppShell : Shell
             },
             Children =
             {
+                new VerificationPopupV2(), // This is a hidden component that will show the verification popup when needed.
+
                 new VerticalStackLayout
                 {
                     Spacing = 2,
@@ -239,12 +241,6 @@ public sealed partial class AppShell : Shell
                     Spacing = 8,
                     Children =
                     {
-                        new Button
-                        {
-                            Text = "Verify this session",
-                            HorizontalOptions = LayoutOptions.Fill,
-                        }.BindCommand(
-                            nameof(OpenVerificationCommand)),
                         new Button
                         {
                             Text = "Settings",
@@ -493,31 +489,6 @@ public sealed partial class AppShell : Shell
     private void OnSessionInvalidated(object? sender, EventArgs e) =>
         MainThread.BeginInvokeOnMainThread(
             () => _appNavigation?.ShowLogin());
-
-    [RelayCommand]
-    private async Task OpenVerificationAsync()
-    {
-        try
-        {
-            var controller = await (_matrixClient ??
-                throw new InvalidOperationException(
-                    "Matrix client is required."))
-                .GetSessionVerificationControllerAsync();
-            await CurrentPage.ShowPopupAsync(
-                new Popup
-                {
-                    CanBeDismissedByTappingOutsideOfPopup = false,
-                    Content = new VerificationPopup
-                    {
-                        Controller = controller,
-                    },
-                });
-        }
-        catch (Exception exception)
-        {
-            Debug.WriteLine($"Could not start verification: {exception}");
-        }
-    }
 
     private void ShowRoom(Room room)
     {

@@ -33,14 +33,14 @@ public sealed partial class RoomList : ContentView, IDisposable
         this.build();
     }
 
-    private async void OnLoaded(object sender, EventArgs e)
+    private async void OnLoaded(object? sender, EventArgs e)
     {
         // For the first version of the app, we just list all rooms that are not spaces.
         this.ObservableRoomList = await MatrixClient.GetObservableRoomListAsync(new RoomListEntriesDynamicFilterKind.NonSpace());
         this.ObservableRoomList?.CaptureCurrentContext();
     }
 
-    private void OnUnloaded(object sender, EventArgs e)
+    private void OnUnloaded(object? sender, EventArgs e)
     {
         Dispose();
     }
@@ -130,7 +130,7 @@ public sealed partial class RoomList : ContentView, IDisposable
                                 Label.TextProperty,
                                 new Binding(nameof(ManagedRoom.DisplayName)),
                                 new Binding(nameof(ManagedRoom.Id)),
-                                convert: static values => values.Item1 ?? values.Item2)
+                                convert: static values => values.Item1 ?? values.Item2 ?? "#")
                         }
                     }
                 }

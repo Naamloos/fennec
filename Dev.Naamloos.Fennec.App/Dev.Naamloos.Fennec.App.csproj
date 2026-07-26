@@ -47,6 +47,7 @@
     <PropertyGroup>
         <LangVersion>preview</LangVersion>
         <NoWarn>$(NoWarn);MCTEXP001</NoWarn>
+        <NoWarn>$(NoWarn);CA1416</NoWarn>
     </PropertyGroup>
     <ItemGroup>
         <MauiIcon Include="Resources\AppIcon\appicon.svg"
