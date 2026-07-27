@@ -71,7 +71,7 @@ public sealed partial class Startup : ContentPage
 
         try
         {
-            if (await _matrixClient.RecoverSessionAsync())
+            if (await Task.Run(_matrixClient.RecoverSessionAsync))
             {
                 _appNavigation.ShowShell();
             }
@@ -83,7 +83,6 @@ public sealed partial class Startup : ContentPage
         catch (Exception exception)
         {
             System.Diagnostics.Debug.WriteLine(exception);
-            await _matrixClient.LogoutAsync();
             _appNavigation.ShowLogin();
         }
     }

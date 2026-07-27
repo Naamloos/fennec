@@ -15,13 +15,19 @@ public partial class MatrixImage : Image
     public partial bool IsJson { get; set; }
 
     private int _loadId;
+    private CancellationTokenSource? _loadCancellation;
 
     public MatrixImage()
     {
         this.BindService<ManagedMatrixClient, MatrixImage>(ClientProperty);
 
         Loaded += (_, _) => Load();
-        Unloaded += (_, _) => _loadId++;
+        Unloaded += (_, _) =>
+        {
+            _loadId++;
+            _loadCancellation?.Cancel();
+            Source = null;
+        };
 
         PropertyChanged += (_, e) =>
         {
@@ -34,9 +40,15 @@ public partial class MatrixImage : Image
         };
     }
 
-    private void Load() => _ = LoadAsync(++_loadId);
+    private void Load()
+    {
+        _loadCancellation?.Cancel();
+        _loadCancellation?.Dispose();
+        _loadCancellation = new CancellationTokenSource();
+        _ = LoadAsync(++_loadId, _loadCancellation.Token);
+    }
 
-    private async Task LoadAsync(int loadId)
+    private async Task LoadAsync(int loadId, CancellationToken cancellationToken)
     {
         var client = Client;
         var source = MatrixSource;
@@ -53,7 +65,8 @@ public partial class MatrixImage : Image
                 source,
                 200,
                 200,
-                IsJson);
+                IsJson,
+                cancellationToken);
 
             if (loadId != _loadId)
             {
@@ -65,6 +78,9 @@ public partial class MatrixImage : Image
                 Source = ImageSource.FromStream(
                     () => new MemoryStream(data));
             });
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
         catch (Exception exception)
         {

@@ -42,8 +42,10 @@ public static class MauiProgram
             var secureStore = sp.GetRequiredService<AsyncSecureStorage>();
             return new ManagedMatrixClient(DeviceInfo.Current.Platform.ToString(), Path.Combine(FileSystem.AppDataDirectory, "fennec"), secureStore);
         });
+        builder.Services.AddSingleton<SessionVerificationService>();
         builder.Services.AddSingleton<AppNavigationService>();
         builder.Services.AddSingleton<ToastService>();
+        builder.Services.AddSingleton<MatrixRecoveryService>();
 
         // Pages
         builder.Services.AddTransient<Login>();

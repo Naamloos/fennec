@@ -11,6 +11,7 @@ using uniffi.matrix_sdk_ffi;
 using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.Sdk.Entities;
+using Dev.Naamloos.Fennec.Sdk.Helpers;
 
 namespace Dev.Naamloos.Fennec.App;
 
@@ -51,6 +52,11 @@ public sealed partial class AppShell : Shell
         get => _managedSelectedRoom;
         set
         {
+            if (value is null && SelectedRoom is not null)
+            {
+                return;
+            }
+
             _managedSelectedRoom = value;
             OnPropertyChanged();
             // Ensures we do not emit an update if the selected room is already the same as the new value.
@@ -89,11 +95,20 @@ public sealed partial class AppShell : Shell
 
     private readonly ManagedMatrixClient _matrixClient;
     private readonly AppNavigationService _appNavigation;
+    private readonly SessionVerificationService _sessionVerificationService;
 
-    public AppShell(ManagedMatrixClient matrixClient, AppNavigationService appNavigation)
+    public AppShell(
+        ManagedMatrixClient matrixClient,
+        AppNavigationService appNavigation,
+        SessionVerificationService sessionVerificationService)
     {
         _matrixClient = matrixClient;
         _appNavigation = appNavigation;
+        _sessionVerificationService = sessionVerificationService;
+
+        _matrixClient.SessionInvalidated += OnSessionInvalidated;
+
+        _ = InitializeVerificationServiceAsync(sessionVerificationService);
 
         BindingContext = this;
 
@@ -118,23 +133,17 @@ public sealed partial class AppShell : Shell
                 nameof(UnloadCommand)));
     }
 
-    private static void OnMatrixClientChanged(
-        BindableObject bindable,
-        object oldValue,
-        object newValue)
+    private static async Task InitializeVerificationServiceAsync(
+        SessionVerificationService sessionVerificationService)
     {
-        var shell = (AppShell)bindable;
-
-        if (oldValue is ManagedMatrixClient oldClient)
+        try
         {
-            oldClient.SessionInvalidated -=
-                shell.OnSessionInvalidated;
+            await sessionVerificationService.InitializeAsync();
         }
-
-        if (newValue is ManagedMatrixClient newClient)
+        catch (Exception exception)
         {
-            newClient.SessionInvalidated +=
-                shell.OnSessionInvalidated;
+            Debug.WriteLine(
+                $"Unable to initialize session verification: {exception}");
         }
     }
 
@@ -176,25 +185,22 @@ public sealed partial class AppShell : Shell
                 "OnSurfaceVariant");
 
         FlyoutBehavior = FlyoutBehavior.Flyout;
-        FlyoutWidth = 320;
+        FlyoutWidth = 360;
     }
 
     private void Build()
     {
         FlyoutContent = new Grid
         {
-            Padding = 16,
+            Padding = new Thickness(0, 16, 16, 16),
             RowSpacing = 16,
             RowDefinitions =
             {
                 new RowDefinition(GridLength.Auto),
                 new RowDefinition(GridLength.Star),
-                new RowDefinition(GridLength.Auto),
             },
             Children =
             {
-                new VerificationPopupV2(), // This is a hidden component that will show the verification popup when needed.
-
                 new VerticalStackLayout
                 {
                     Spacing = 2,
@@ -229,26 +235,13 @@ public sealed partial class AppShell : Shell
 #endif
                     },
                 }.Row(0),
-                new Components.RoomList()
+                new TieredSidebar()
                     .Bind(
-                        Components.RoomList.SelectedRoomProperty,
+                        TieredSidebar.SelectedRoomProperty,
                         nameof(ManagedSelectedRoom),
                         BindingMode.TwoWay,
                         source: this)
                     .Row(1),
-                new VerticalStackLayout
-                {
-                    Spacing = 8,
-                    Children =
-                    {
-                        new Button
-                        {
-                            Text = "Settings",
-                            HorizontalOptions = LayoutOptions.Fill,
-                        }.BindCommand(
-                            nameof(OpenSettingsCommand)),
-                    },
-                }.Row(2),
             },
         }.DynamicResource(
             VisualElement.BackgroundColorProperty,
@@ -272,6 +265,7 @@ public sealed partial class AppShell : Shell
                         {
                             Children =
                             {
+                                new VerificationPopupV2(),
                                 new Chat()
                                     .BindService<ManagedMatrixClient, Chat>(Chat.MatrixClientProperty)
                                     .Bind(
@@ -450,29 +444,14 @@ public sealed partial class AppShell : Shell
     [RelayCommand]
     private async Task ShowUserSettingsAsync()
     {
-        await CurrentPage.ShowPopupAsync(
-            new Popup
-            {
-                Padding = 0,
-                Margin = 0,
-                Content = new UserSettingsPopup()
-                    .Bind(
-                        UserSettingsPopup.AvatarSourceProperty,
-                        nameof(AccountAvatarSource),
-                        source: BindingContext)
-                    .Bind(
-                        UserSettingsPopup.DisplayNameProperty,
-                        nameof(AccountDisplayName),
-                        source: BindingContext)
-                    .Bind(
-                        UserSettingsPopup.UserIdProperty,
-                        nameof(AccountUserId),
-                        source: BindingContext)
-                    .Bind(
-                        UserSettingsPopup.LogoutCommandProperty,
-                        nameof(LogoutCommand),
-                        source: BindingContext),
-            });
+        await Navigation.PushAsync(new Settings(this));
+    }
+
+    [RelayCommand]
+    private async Task StartVerificationAsync()
+    {
+        await _sessionVerificationService.InitializeAsync();
+        await _sessionVerificationService.RequestVerificationAsync();
     }
 
     [RelayCommand]
@@ -501,12 +480,6 @@ public sealed partial class AppShell : Shell
         var roomName = room.DisplayName() ?? room.Id();
         CurrentPage.Title = roomName;
         RoomErrorMessage = string.Empty;
-    }
-
-    [RelayCommand]
-    private void OpenSettings()
-    {
-        Debug.WriteLine("Settings clicked.");
     }
 
     [RelayCommand]

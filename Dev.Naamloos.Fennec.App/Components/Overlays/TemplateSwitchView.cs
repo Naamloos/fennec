@@ -39,11 +39,18 @@ public class TemplateSwitchView<TValue, TInput> : ContentView
 
     private void build()
     {
-        this.BindingContext = Value;
+        if (Value is not TValue value)
+        {
+            BindingContext = null;
+            Content = FallbackTemplate;
+            return;
+        }
+
+        this.BindingContext = value;
 
         View? outputView = null;
 
-        TInput inputValue = _inputSelector((TValue)Value!);
+        TInput inputValue = _inputSelector(value);
 
         foreach (var selector in _templateSelectors)
         {

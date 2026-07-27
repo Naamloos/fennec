@@ -27,10 +27,28 @@ public sealed class App : Microsoft.Maui.Controls.Application
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        return new Window(_startupPage)
+        var window = new Window(_startupPage)
         {
             Title = "Fennec",
         };
+
+        window.Stopped += async (sender, e) =>
+        {
+            if (Services?.GetService<MatrixRecoveryService>() is { } recoveryService)
+            {
+                await recoveryService.OnAppStoppedAsync();
+            }
+        };
+
+        window.Resumed += async (sender, e) =>
+        {
+            if (Services?.GetService<MatrixRecoveryService>() is { } recoveryService)
+            {
+                await recoveryService.OnAppResumedAsync();
+            }
+        };
+
+        return window;
     }
 
     public static void SetRootPage(Page page)

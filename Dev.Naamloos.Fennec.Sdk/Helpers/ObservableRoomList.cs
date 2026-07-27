@@ -3,6 +3,7 @@ using Dev.Naamloos.Fennec.Sdk.Events;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Text;
 using uniffi.matrix_sdk_ffi;
 
@@ -10,20 +11,33 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
 {
     public class ObservableRoomList : ObservableCollection<ManagedRoom>, IDisposable
     {
+        private readonly ManagedMatrixClient _client;
+        private RoomListEntriesDynamicFilterKind _filter;
         private RoomList _roomList;
         private RoomListEntriesListenerCallback? _listenerCallback;
         private RoomListEntriesWithDynamicAdaptersResult? _emitter;
         private SynchronizationContext? _synchronizationContext;
+        private int _isRestarting;
         private bool _disposed;
 
-        internal ObservableRoomList(RoomList roomList, RoomListEntriesDynamicFilterKind? initialFilter = null)
+        internal ObservableRoomList(
+            ManagedMatrixClient client,
+            RoomList roomList,
+            RoomListEntriesDynamicFilterKind? initialFilter = null)
         {
+            _client = client;
             _roomList = roomList;
+            _filter = initialFilter ??
+                new RoomListEntriesDynamicFilterKind.All([]);
+            _synchronizationContext = SynchronizationContext.Current;
 
             _listenerCallback = RoomListEntriesListenerCallback.Create(entries => this.applyUpdates(entries));
 
             _emitter = roomList.EntriesWithDynamicAdapters(5000, _listenerCallback);
-            _emitter.Controller().SetFilter(initialFilter ?? new RoomListEntriesDynamicFilterKind.All([]));
+            _emitter.Controller().SetFilter(_filter);
+
+            _client.ConnectionRecovered += OnConnectionRecovered;
+            _client.NativeResourcesDisposing += StopAsync;
         }
 
         public void SetFilter(RoomListEntriesDynamicFilterKind filter)
@@ -33,12 +47,63 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
                 return;
             }
 
+            _filter = filter;
             _emitter?.Controller().SetFilter(filter);
         }
 
         public void CaptureCurrentContext()
         {
             _synchronizationContext = SynchronizationContext.Current;
+        }
+
+        private void OnConnectionRecovered(
+            object? sender,
+            EventArgs e)
+        {
+            _ = RestartAsync();
+        }
+
+        private async Task RestartAsync()
+        {
+            if (_disposed || Interlocked.Exchange(ref _isRestarting, 1) != 0)
+            {
+                return;
+            }
+
+            try
+            {
+                _emitter?.Dispose();
+                _roomList.Dispose();
+
+                _roomList = await _client.GetSyncService()
+                    .RoomListService()
+                    .AllRooms();
+
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _emitter = _roomList.EntriesWithDynamicAdapters(
+                    5000,
+                    _listenerCallback!);
+                _emitter.Controller().SetFilter(_filter);
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine(
+                    $"Failed to restart room-list listener: {exception}");
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _isRestarting, 0);
+            }
+        }
+
+        private Task StopAsync()
+        {
+            Dispose();
+            return Task.CompletedTask;
         }
 
         private void applyUpdates(RoomListEntriesUpdate[] entries, bool skipContext = false)
@@ -55,46 +120,51 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
                 return;
             }
 
-            foreach (var entry in entries)
+            try
             {
-                switch (entry)
+                foreach (var entry in entries)
                 {
-                    case RoomListEntriesUpdate.Append appendUpdate:
-                        append(appendUpdate);
-                        break;
-                    case RoomListEntriesUpdate.Clear clearUpdate:
-                        clear(clearUpdate);
-                        break;
-                    case RoomListEntriesUpdate.PushFront pushFrontUpdate:
-                        pushFront(pushFrontUpdate);
-                        break;
-                    case RoomListEntriesUpdate.PushBack pushBackUpdate:
-                        pushBack(pushBackUpdate);
-                        break;
-                    case RoomListEntriesUpdate.PopFront popFrontUpdate:
-                        popFront(popFrontUpdate);
-                        break;
-                    case RoomListEntriesUpdate.PopBack popBackUpdate:
-                        popBack(popBackUpdate);
-                        break;
-                    case RoomListEntriesUpdate.Insert insertUpdate:
-                        insert(insertUpdate);
-                        break;
-                    case RoomListEntriesUpdate.Set setUpdate:
-                        set(setUpdate);
-                        break;
-                    case RoomListEntriesUpdate.Remove removeUpdate:
-                        remove(removeUpdate);
-                        break;
-                    case RoomListEntriesUpdate.Truncate truncateUpdate:
-                        truncate(truncateUpdate);
-                        break;
-                    case RoomListEntriesUpdate.Reset resetUpdate:
-                        reset(resetUpdate);
-                        break;
-                    default:
-                        break;
+                    switch (entry)
+                    {
+                        case RoomListEntriesUpdate.Append appendUpdate:
+                            append(appendUpdate);
+                            break;
+                        case RoomListEntriesUpdate.Clear clearUpdate:
+                            clear(clearUpdate);
+                            break;
+                        case RoomListEntriesUpdate.PushFront pushFrontUpdate:
+                            pushFront(pushFrontUpdate);
+                            break;
+                        case RoomListEntriesUpdate.PushBack pushBackUpdate:
+                            pushBack(pushBackUpdate);
+                            break;
+                        case RoomListEntriesUpdate.PopFront popFrontUpdate:
+                            popFront(popFrontUpdate);
+                            break;
+                        case RoomListEntriesUpdate.PopBack popBackUpdate:
+                            popBack(popBackUpdate);
+                            break;
+                        case RoomListEntriesUpdate.Insert insertUpdate:
+                            insert(insertUpdate);
+                            break;
+                        case RoomListEntriesUpdate.Set setUpdate:
+                            set(setUpdate);
+                            break;
+                        case RoomListEntriesUpdate.Remove removeUpdate:
+                            remove(removeUpdate);
+                            break;
+                        case RoomListEntriesUpdate.Truncate truncateUpdate:
+                            truncate(truncateUpdate);
+                            break;
+                        case RoomListEntriesUpdate.Reset resetUpdate:
+                            reset(resetUpdate);
+                            break;
+                    }
                 }
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine($"Failed to apply room-list update: {exception}");
             }
         }
 
@@ -191,7 +261,11 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
 
             _disposed = true;
 
+            _client.ConnectionRecovered -= OnConnectionRecovered;
+            _client.NativeResourcesDisposing -= StopAsync;
+
             _emitter?.Dispose();
+            _roomList.Dispose();
 
             _listenerCallback = null;
             _emitter = null;

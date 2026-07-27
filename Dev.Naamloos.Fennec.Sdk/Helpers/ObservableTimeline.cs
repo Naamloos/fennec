@@ -12,6 +12,7 @@ public sealed class ObservableTimeline :
   private const ushort DefaultPageSize = 50;
   private const int DefaultInitialItemTarget = 50;
 
+  private readonly ManagedMatrixClient _client;
   private readonly Timeline _timeline;
   private readonly SynchronizationContext? _synchronizationContext;
 
@@ -20,12 +21,19 @@ public sealed class ObservableTimeline :
 
   private bool _isLoadingHistory;
   private bool _hasReachedStart;
+  private int _isRestarting;
   private bool _disposed;
 
-  private ObservableTimeline(Timeline timeline)
+  private ObservableTimeline(
+      ManagedMatrixClient client,
+      Timeline timeline)
   {
+    _client = client;
     _timeline = timeline;
     _synchronizationContext = SynchronizationContext.Current;
+
+    _client.ConnectionRecovered += OnConnectionRecovered;
+    _client.NativeResourcesDisposing += StopAsync;
   }
 
   public Timeline Timeline
@@ -74,6 +82,7 @@ public sealed class ObservableTimeline :
   }
 
   internal static async Task<ObservableTimeline> CreateAsync(
+      ManagedMatrixClient client,
       Timeline timeline,
       ushort initialPageSize = DefaultPageSize,
       int initialItemTarget = DefaultInitialItemTarget,
@@ -97,7 +106,7 @@ public sealed class ObservableTimeline :
     cancellationToken.ThrowIfCancellationRequested();
 
     var observableTimeline =
-        new ObservableTimeline(timeline);
+        new ObservableTimeline(client, timeline);
 
     await observableTimeline.InitializeListener();
 
@@ -122,6 +131,46 @@ public sealed class ObservableTimeline :
      */
     _listenerHandle =
         await _timeline.AddListener(_listener);
+  }
+
+  private void OnConnectionRecovered(
+      object? sender,
+      EventArgs e)
+  {
+    _ = RestartListenerAsync();
+  }
+
+  private async Task RestartListenerAsync()
+  {
+    if (_disposed || Interlocked.Exchange(ref _isRestarting, 1) != 0)
+    {
+      return;
+    }
+
+    try
+    {
+      _listenerHandle?.Cancel();
+      _listenerHandle?.Dispose();
+      _listenerHandle = null;
+      _listener = null;
+
+      await InitializeListener();
+    }
+    catch (Exception exception)
+    {
+      Debug.WriteLine(
+          $"Failed to restart timeline listener: {exception}");
+    }
+    finally
+    {
+      Interlocked.Exchange(ref _isRestarting, 0);
+    }
+  }
+
+  private Task StopAsync()
+  {
+    Dispose();
+    return Task.CompletedTask;
   }
 
   private async Task LoadInitialHistoryAsync(
@@ -437,6 +486,9 @@ public sealed class ObservableTimeline :
 
     _disposed = true;
 
+    _client.ConnectionRecovered -= OnConnectionRecovered;
+    _client.NativeResourcesDisposing -= StopAsync;
+
     try
     {
       _listenerHandle?.Cancel();
@@ -451,6 +503,9 @@ public sealed class ObservableTimeline :
 
     _listenerHandle = null;
     _listener = null;
+
+    _timeline.Dispose();
+    _timeline.Destroy();
 
     GC.SuppressFinalize(this);
   }
