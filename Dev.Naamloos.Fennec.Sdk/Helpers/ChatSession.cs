@@ -39,7 +39,8 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         _synchronizationContext = SynchronizationContext.Current;
         _typing = new RoomTypingController(room);
         _typing.PropertyChanged += OnTypingChanged;
-        _timeline.PropertyChanged += OnTimelinePropertyChanged;
+        ((INotifyPropertyChanged)_timeline).PropertyChanged +=
+            OnTimelinePropertyChanged;
         _timeline.CollectionChanged += OnTimelineChanged;
         _typing.Start();
         ResetItems();
@@ -989,7 +990,8 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
         _disposed = true;
         _timeline.CollectionChanged -= OnTimelineChanged;
-        _timeline.PropertyChanged -= OnTimelinePropertyChanged;
+        ((INotifyPropertyChanged)_timeline).PropertyChanged -=
+            OnTimelinePropertyChanged;
         _typing.PropertyChanged -= OnTypingChanged;
         _typing.Dispose();
         _timeline.Dispose();
