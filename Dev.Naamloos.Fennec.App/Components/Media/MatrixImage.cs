@@ -17,18 +17,28 @@ public partial class MatrixImage : Image
     [BindableProperty]
     public partial bool UseFullSize { get; set; }
 
+    [BindableProperty]
+    public partial bool UseAvatarCache { get; set; }
+
     private int _loadId;
     private CancellationTokenSource? _loadCancellation;
+    private ManagedMatrixClient? _avatarChangeClient;
+    private string? _sourceOverride;
 
     public MatrixImage()
     {
         this.BindService<ManagedMatrixClient, MatrixImage>(ClientProperty);
 
-        Loaded += (_, _) => Load();
+        Loaded += (_, _) =>
+        {
+            SubscribeToAvatarChanges();
+            Load();
+        };
         Unloaded += (_, _) =>
         {
             _loadId++;
             _loadCancellation?.Cancel();
+            UnsubscribeFromAvatarChanges();
             Source = null;
         };
 
@@ -37,8 +47,20 @@ public partial class MatrixImage : Image
             if (e.PropertyName is nameof(MatrixSource)
                 or nameof(Client)
                 or nameof(IsJson)
-                or nameof(UseFullSize))
+                or nameof(UseFullSize)
+                or nameof(UseAvatarCache))
             {
+                if (e.PropertyName == nameof(MatrixSource))
+                {
+                    _sourceOverride = null;
+                }
+                if (e.PropertyName == nameof(Client))
+                {
+                    if (IsLoaded)
+                    {
+                        SubscribeToAvatarChanges();
+                    }
+                }
                 Load();
             }
         };
@@ -55,7 +77,7 @@ public partial class MatrixImage : Image
     private async Task LoadAsync(int loadId, CancellationToken cancellationToken)
     {
         var client = Client;
-        var source = MatrixSource;
+        var source = _sourceOverride ?? MatrixSource;
 
         if (client is null || string.IsNullOrWhiteSpace(source))
         {
@@ -66,23 +88,30 @@ public partial class MatrixImage : Image
         try
         {
             var data = UseFullSize
-                ? await client.GetMediaContentAsync(source, IsJson)
+                ? await client.GetMediaContentAsync(source, IsJson).ConfigureAwait(false)
+                : UseAvatarCache
+                    ? await client.GetAvatarThumbnailAsync(
+                        source,
+                        200,
+                        200,
+                        IsJson,
+                        cancellationToken).ConfigureAwait(false)
                 : await client.GetThumbnailAsync(
                     source,
                     200,
                     200,
                     IsJson,
-                    cancellationToken);
+                    cancellationToken).ConfigureAwait(false);
 
             if (loadId != _loadId)
             {
                 return;
             }
 
+            var imageSource = ImageSource.FromStream(() => new MemoryStream(data));
             await Dispatcher.DispatchAsync(() =>
             {
-                Source = ImageSource.FromStream(
-                    () => new MemoryStream(data));
+                Source = imageSource;
             });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -93,5 +122,38 @@ public partial class MatrixImage : Image
             System.Diagnostics.Debug.WriteLine(
                 $"Failed to load Matrix image: {exception}");
         }
+    }
+
+    private void SubscribeToAvatarChanges()
+    {
+        if (_avatarChangeClient == Client) return;
+
+        UnsubscribeFromAvatarChanges();
+        _avatarChangeClient = Client;
+        if (_avatarChangeClient is not null)
+        {
+            _avatarChangeClient.AvatarChanged += OnAvatarChanged;
+        }
+    }
+
+    private void UnsubscribeFromAvatarChanges()
+    {
+        if (_avatarChangeClient is not null)
+        {
+            _avatarChangeClient.AvatarChanged -= OnAvatarChanged;
+            _avatarChangeClient = null;
+        }
+    }
+
+    private void OnAvatarChanged(string? previous, string? current)
+    {
+        if (!string.Equals(_sourceOverride ?? MatrixSource, previous, StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(current))
+        {
+            return;
+        }
+
+        _sourceOverride = current;
+        Load();
     }
 }

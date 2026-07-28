@@ -9,7 +9,7 @@ namespace Dev.Naamloos.Fennec.App.Components;
 
 public sealed partial class TextMessageView : ContentView
 {
-    [BindableProperty]
+    [BindableProperty(PropertyChangedMethodName = nameof(OnItemChanged))]
     public partial ChatTimelineItem? Item { get; set; }
 
     [BindableProperty]
@@ -54,4 +54,7 @@ public sealed partial class TextMessageView : ContentView
             },
         };
     }
+
+    private static void OnItemChanged(BindableObject bindable, object oldValue, object newValue) =>
+        ((TextMessageView)bindable).IsVisible = (newValue as ChatTimelineItem)?.Poll is null;
 }

@@ -41,6 +41,7 @@ public sealed partial class MatrixAvatar : ContentView
                     new MatrixImage
                     {
                         Aspect = Aspect.AspectFill,
+                        UseAvatarCache = true,
                     }.Bind(MatrixImage.MatrixSourceProperty, nameof(MatrixSource), source: this),
                 },
             },

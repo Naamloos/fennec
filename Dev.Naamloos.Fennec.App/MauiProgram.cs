@@ -29,6 +29,10 @@ public static class MauiProgram
             .UseMauiCommunityToolkit(opt =>
             {
                 opt.SetShouldEnableSnackbarOnWindows(true);
+                opt.SetPopupOptionsDefaults(new DefaultPopupOptionsSettings
+                {
+                    PageOverlayColor = Color.FromArgb("#66000000"),
+                });
             })
             .AddAudio()
             .ConfigureFonts(fonts =>
@@ -53,6 +57,17 @@ public static class MauiProgram
         builder.Services.AddSingleton<ToastService>();
         builder.Services.AddSingleton<MatrixRecoveryService>();
         builder.Services.AddSingleton<UserSettingsService>();
+
+        builder.ConfigureMauiHandlers(handlers =>
+        {
+#if ANDROID
+            handlers.AddHandler<Components.AttachmentEntry,
+                Platforms.Android.AttachmentEntryHandler>();
+#elif WINDOWS
+            handlers.AddHandler<Components.AttachmentEntry,
+                Platforms.Windows.AttachmentEntryHandler>();
+#endif
+        });
 
         // Pages
         builder.Services.AddTransient<Login>();

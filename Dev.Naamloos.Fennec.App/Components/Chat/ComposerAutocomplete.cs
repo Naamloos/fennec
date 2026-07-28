@@ -13,22 +13,29 @@ public enum ComposerAutocompleteMode
     None,
     Mentions,
     Emotes,
+    Rooms,
 }
 
 public sealed partial class ComposerAutocomplete : ContentView
 {
     private INotifyCollectionChanged? _membersSource;
     private INotifyCollectionChanged? _emotesSource;
+    private INotifyCollectionChanged? _roomsSource;
 
     public ObservableCollection<RoomMember> VisibleMembers { get; } = [];
 
     public ObservableCollection<MatrixEmote> VisibleEmotes { get; } = [];
+
+    public ObservableCollection<ManagedRoom> VisibleRooms { get; } = [];
 
     [BindableProperty]
     public partial IEnumerable<RoomMember>? Members { get; set; }
 
     [BindableProperty]
     public partial IEnumerable<MatrixEmote>? Emotes { get; set; }
+
+    [BindableProperty]
+    public partial IEnumerable<ManagedRoom>? Rooms { get; set; }
 
     [BindableProperty]
     public partial string Query { get; set; } = string.Empty;
@@ -42,6 +49,9 @@ public sealed partial class ComposerAutocomplete : ContentView
     [BindableProperty]
     public partial ICommand? PickEmoteCommand { get; set; }
 
+    [BindableProperty]
+    public partial ICommand? PickRoomCommand { get; set; }
+
     public ComposerAutocomplete()
     {
         PropertyChanged += (_, args) =>
@@ -54,8 +64,12 @@ public sealed partial class ComposerAutocomplete : ContentView
             {
                 Subscribe(ref _emotesSource, Emotes as INotifyCollectionChanged);
             }
+            else if (args.PropertyName == nameof(Rooms))
+            {
+                Subscribe(ref _roomsSource, Rooms as INotifyCollectionChanged);
+            }
 
-            if (args.PropertyName is nameof(Members) or nameof(Emotes) or nameof(Query) or nameof(Mode))
+            if (args.PropertyName is nameof(Members) or nameof(Emotes) or nameof(Rooms) or nameof(Query) or nameof(Mode))
             {
                 Refresh();
             }
@@ -86,7 +100,8 @@ public sealed partial class ComposerAutocomplete : ContentView
     private void OnSourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs args)
     {
         if ((ReferenceEquals(sender, _membersSource) && Mode == ComposerAutocompleteMode.Mentions) ||
-            (ReferenceEquals(sender, _emotesSource) && Mode == ComposerAutocompleteMode.Emotes))
+            (ReferenceEquals(sender, _emotesSource) && Mode == ComposerAutocompleteMode.Emotes) ||
+            (ReferenceEquals(sender, _roomsSource) && Mode == ComposerAutocompleteMode.Rooms))
         {
             Refresh();
         }
@@ -97,6 +112,7 @@ public sealed partial class ComposerAutocomplete : ContentView
         var query = Query.Trim();
         VisibleMembers.Clear();
         VisibleEmotes.Clear();
+        VisibleRooms.Clear();
 
         if (Mode == ComposerAutocompleteMode.Mentions)
         {
@@ -118,6 +134,17 @@ public sealed partial class ComposerAutocomplete : ContentView
                 VisibleEmotes.Add(emote);
             }
         }
+        else if (Mode == ComposerAutocompleteMode.Rooms)
+        {
+            foreach (var room in Rooms?.Where(room =>
+                         !room.IsSpace &&
+                         ((room.DisplayName?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                          (room.Id?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)))
+                     .Take(8) ?? [])
+            {
+                VisibleRooms.Add(room);
+            }
+        }
 
         Content = CreateContent();
     }
@@ -128,25 +155,19 @@ public sealed partial class ComposerAutocomplete : ContentView
         {
             SelectionMode = SelectionMode.None,
             MaximumHeightRequest = 260,
-            ItemTemplate = Mode == ComposerAutocompleteMode.Emotes
-                ? new DataTemplate(() => new Button
-                {
-                    HorizontalOptions = LayoutOptions.Fill,
-                    Padding = new Thickness(8, 5),
-                }
-                .Bind(Button.TextProperty, nameof(MatrixEmote.Name), stringFormat: ":{0}:")
-                .BindCommand(nameof(PickEmoteCommand), source: this)
-                .Bind(Button.CommandParameterProperty, "."))
-                : new DataTemplate(() => new Button
-                {
-                    HorizontalOptions = LayoutOptions.Fill,
-                    Padding = new Thickness(8, 5),
-                }
-                .Bind(Button.TextProperty, nameof(RoomMember.DisplayName))
-                .BindCommand(nameof(PickMemberCommand), source: this)
-                .Bind(Button.CommandParameterProperty, ".")),
+            ItemTemplate = Mode switch
+            {
+                ComposerAutocompleteMode.Emotes => CreateEmoteTemplate(),
+                ComposerAutocompleteMode.Rooms => CreateRoomTemplate(),
+                _ => CreateMemberTemplate(),
+            },
         };
-        list.ItemsSource = Mode == ComposerAutocompleteMode.Emotes ? VisibleEmotes : VisibleMembers;
+        list.ItemsSource = Mode switch
+        {
+            ComposerAutocompleteMode.Emotes => VisibleEmotes,
+            ComposerAutocompleteMode.Rooms => VisibleRooms,
+            _ => VisibleMembers,
+        };
 
         return new Border
         {
@@ -157,4 +178,76 @@ public sealed partial class ComposerAutocomplete : ContentView
             Content = list,
         }.DynamicResource(BackgroundColorProperty, "SurfaceContainer");
     }
+
+    private DataTemplate CreateMemberTemplate() => new(() => CreateRow(
+        new MatrixAvatar { Size = 34 }
+            .Bind(MatrixAvatar.MatrixSourceProperty, nameof(RoomMember.AvatarUrl))
+            .Bind(MatrixAvatar.DisplayNameProperty, nameof(RoomMember.DisplayName)),
+        new VerticalStackLayout
+        {
+            Spacing = 0,
+            Children =
+            {
+                new Label { FontAttributes = FontAttributes.Bold }
+                    .Bind(Label.TextProperty, nameof(RoomMember.DisplayName)),
+                new Label { FontSize = 11, Opacity = .68 }
+                    .Bind(Label.TextProperty, nameof(RoomMember.UserId)),
+            },
+        },
+        nameof(PickMemberCommand)));
+
+    private DataTemplate CreateEmoteTemplate() => new(() => CreateRow(
+        new MatrixImage { IsJson = false, WidthRequest = 34, HeightRequest = 34, Aspect = Aspect.AspectFit }
+            .Bind(MatrixImage.MatrixSourceProperty, nameof(MatrixEmote.Source)),
+        new VerticalStackLayout
+        {
+            Spacing = 0,
+            Children =
+            {
+                new Label { FontAttributes = FontAttributes.Bold }
+                    .Bind(Label.TextProperty, nameof(MatrixEmote.Name), stringFormat: ":{0}:"),
+                new Label { FontSize = 11, Opacity = .68 }
+                    .Bind(Label.TextProperty, nameof(MatrixEmote.Body)),
+            },
+        },
+        nameof(PickEmoteCommand)));
+
+    private DataTemplate CreateRoomTemplate() => new(() => CreateRow(
+        new MatrixAvatar { Size = 34 }
+            .Bind(MatrixAvatar.MatrixSourceProperty, nameof(ManagedRoom.AvatarUrl))
+            .Bind(MatrixAvatar.DisplayNameProperty, nameof(ManagedRoom.DisplayName)),
+        new VerticalStackLayout
+        {
+            Spacing = 0,
+            Children =
+            {
+                new Label { FontAttributes = FontAttributes.Bold }
+                    .Bind(Label.TextProperty, nameof(ManagedRoom.DisplayName)),
+                new Label { FontSize = 11, Opacity = .68 }
+                    .Bind(Label.TextProperty, nameof(ManagedRoom.Id)),
+            },
+        },
+        nameof(PickRoomCommand)));
+
+    private View CreateRow(View icon, View text, string commandName) => new Grid
+    {
+        Padding = new Thickness(8, 6),
+        ColumnSpacing = 10,
+        ColumnDefinitions =
+        {
+            new ColumnDefinition(GridLength.Auto),
+            new ColumnDefinition(GridLength.Star),
+        },
+        Children =
+        {
+            icon.Column(0),
+            text.Column(1),
+        },
+        GestureRecognizers =
+        {
+            new TapGestureRecognizer()
+                .BindCommand(commandName, source: this)
+                .Bind(TapGestureRecognizer.CommandParameterProperty, "."),
+        },
+    };
 }

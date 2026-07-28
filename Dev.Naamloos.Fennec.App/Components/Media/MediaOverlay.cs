@@ -24,7 +24,7 @@ public sealed partial class MediaOverlay : ContentView
         InputTransparent = false;
         Content = new Grid
         {
-            BackgroundColor = Colors.Black,
+            BackgroundColor = new Color(0,0,0, 200),
             Children =
             {
                 new MatrixMedia { IsFull = true }

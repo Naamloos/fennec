@@ -139,18 +139,24 @@ public partial class Login : ContentPage
         IsLoading = true;
         try
         {
-            var normalizedHomeserver = NormalizeHomeserver(_homeserver);
+            var normalizedHomeserver = await ManagedMatrixClient
+                .DiscoverHomeserverAsync(NormalizeHomeserver(_homeserver));
             var serverName = _selectedServer is not null &&
                              normalizedHomeserver == NormalizeHomeserver(_selectedServer.Url)
                 ? _selectedServer.ServerName
                 : new Uri(normalizedHomeserver).Authority;
-            await (_matrixClient ??
+            var loggedIn = await (_matrixClient ??
                 throw new InvalidOperationException(
                     "Matrix client is required."))
                 .LoginAsync(
                 normalizedHomeserver,
                 NormalizeUsername(_username, serverName),
                 _password);
+            if (!loggedIn)
+            {
+                ErrorMessage = "Could not sign in. Check your username and password.";
+                return;
+            }
             (_appNavigation ??
                 throw new InvalidOperationException(
                     "Navigation is required."))

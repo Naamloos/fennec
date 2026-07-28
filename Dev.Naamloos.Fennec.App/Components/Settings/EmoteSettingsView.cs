@@ -65,7 +65,7 @@ public sealed partial class EmoteSettingsView : ContentView
     {
         if (MatrixClient is null) return;
 
-        var name = await Shell.Current.DisplayPromptAsync("Emoji name", "Use the name people type between colons.");
+        var name = await InAppDialogs.PromptAsync(Shell.Current, "Emoji name", "Use the name people type between colons.", "Continue");
         if (string.IsNullOrWhiteSpace(name) || Emotes.Any(emote => emote.Name == name.Trim())) return;
 
         var attachment = await AttachmentPicker.PickConfirmedAsync(new PickOptions

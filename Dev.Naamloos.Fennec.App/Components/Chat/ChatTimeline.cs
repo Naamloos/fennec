@@ -15,8 +15,9 @@ public sealed partial class ChatTimeline : ContentView
     private INotifyCollectionChanged? _itemsSource;
     private bool _initialScrollPending = true;
     private bool _followingLatest = true;
-    private bool _loadMoreArmed = true;
     private bool _scrollQueued;
+    private int _firstVisibleItemIndex;
+    private ChatTimelineItem? _historyAnchor;
 
     [BindableProperty(PropertyChangedMethodName = nameof(OnItemsChanged))]
     public partial ObservableCollection<ChatTimelineItem>? Items { get; set; }
@@ -51,11 +52,14 @@ public sealed partial class ChatTimeline : ContentView
     [BindableProperty]
     public partial ICommand? OpenProfileCommand { get; set; }
 
+    [BindableProperty]
+    public partial ICommand? PollVoteCommand { get; set; }
+
     [BindableProperty(DefaultBindingMode = BindingMode.TwoWay,
         PropertyChangedMethodName = nameof(OnIsNearBottomChanged))]
     public partial bool IsNearBottom { get; set; } = true;
 
-    [BindableProperty]
+    [BindableProperty(PropertyChangedMethodName = nameof(OnIsLoadingHistoryChanged))]
     public partial bool IsLoadingHistory { get; set; }
 
     [BindableProperty]
@@ -73,6 +77,19 @@ public sealed partial class ChatTimeline : ContentView
             ItemSizingStrategy = ItemSizingStrategy.MeasureAllItems,
             ItemsLayout = new LinearItemsLayout(ItemsLayoutOrientation.Vertical),
             ItemTemplate = new ChatTimelineTemplateSelector(this),
+            Header = new TemplateSwitchView<bool, bool>(value => value)
+            {
+                Padding = new Thickness(12, 8),
+                FallbackTemplate = new Label
+                {
+                    Text = "Beginning of chat",
+                    Opacity = .6,
+                    HorizontalOptions = LayoutOptions.Center,
+                },
+            }
+            .Add(value => value, CreateLoadMoreButton())
+            .Bind(TemplateSwitchView<bool, bool>.ValueProperty,
+                nameof(HasMoreHistory), source: this),
             EmptyView = new Grid
             {
                 Children =
@@ -137,8 +154,7 @@ public sealed partial class ChatTimeline : ContentView
         }
 
         IsNearBottom = eventArgs.LastVisibleItemIndex >= Items.Count - 1;
-        var isNearTop = eventArgs.FirstVisibleItemIndex <= 3;
-
+        _firstVisibleItemIndex = Math.Max(0, eventArgs.FirstVisibleItemIndex);
         if (_initialScrollPending && IsNearBottom)
         {
             _initialScrollPending = false;
@@ -150,18 +166,6 @@ public sealed partial class ChatTimeline : ContentView
             _followingLatest = false;
         }
 
-        if (!_initialScrollPending && !_followingLatest && _loadMoreArmed &&
-            isNearTop && eventArgs.VerticalDelta < 0 && HasMoreHistory &&
-            !IsLoadingHistory && HistoryCommand?.CanExecute(null) == true)
-        {
-            _loadMoreArmed = false;
-            HistoryCommand.Execute(null);
-        }
-
-        if (!isNearTop && eventArgs.VerticalDelta > 0 && !IsLoadingHistory)
-        {
-            _loadMoreArmed = true;
-        }
     }
 
     private static void OnItemsChanged(
@@ -174,6 +178,96 @@ public sealed partial class ChatTimeline : ContentView
         object oldValue,
         object newValue) => ((ChatTimeline)bindable).OnPropertyChanged(
             nameof(IsScrollToBottomVisible));
+
+    private static void OnIsLoadingHistoryChanged(
+        BindableObject bindable,
+        object oldValue,
+        object newValue)
+    {
+        if (newValue is false)
+        {
+            ((ChatTimeline)bindable).RestoreHistoryAnchor();
+        }
+    }
+
+    private View CreateLoadMoreButton()
+    {
+        var button = new Button
+        {
+            Text = string.Empty,
+            MinimumWidthRequest = 120,
+        }
+        .Bind(IsEnabledProperty, nameof(IsLoadingHistory),
+            converter: new CommunityToolkit.Maui.Converters.InvertedBoolConverter(),
+            source: this)
+        .Invoke(view => view.Clicked += (_, _) =>
+        {
+            if (IsLoadingHistory || HistoryCommand?.CanExecute(null) != true)
+            {
+                return;
+            }
+
+            _followingLatest = false;
+            _historyAnchor = Items is { Count: > 0 }
+                ? Items[Math.Min(_firstVisibleItemIndex, Items.Count - 1)]
+                : null;
+            HistoryCommand.Execute(null);
+        })
+        .Invoke(view => SemanticProperties.SetDescription(
+            view, "Load older messages"));
+
+        return new Grid
+        {
+            HorizontalOptions = LayoutOptions.Center,
+            Children =
+            {
+                button,
+                new Label
+                {
+                    Text = "Load more",
+                    InputTransparent = true,
+                    HorizontalOptions = LayoutOptions.Center,
+                    VerticalOptions = LayoutOptions.Center,
+                }
+                .Bind(IsVisibleProperty, nameof(IsLoadingHistory),
+                    converter: new CommunityToolkit.Maui.Converters.InvertedBoolConverter(),
+                    source: this),
+                new ActivityIndicator
+                {
+                    InputTransparent = true,
+                    HorizontalOptions = LayoutOptions.Center,
+                    VerticalOptions = LayoutOptions.Center,
+                }
+                .Bind(ActivityIndicator.IsRunningProperty,
+                    nameof(IsLoadingHistory), source: this)
+                .Bind(IsVisibleProperty, nameof(IsLoadingHistory), source: this),
+            },
+        };
+    }
+
+    private void RestoreHistoryAnchor()
+    {
+        var anchor = _historyAnchor;
+        _historyAnchor = null;
+        if (anchor is null)
+        {
+            if (_followingLatest)
+            {
+                _scrollQueued = false;
+                QueueScrollToLatest();
+            }
+
+            return;
+        }
+
+        if (Items?.Contains(anchor) != true)
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(() =>
+            _collectionView.ScrollTo(anchor, ScrollToPosition.Start, animate: false));
+    }
 
     private void SetItemsSource()
     {
@@ -190,7 +284,6 @@ public sealed partial class ChatTimeline : ContentView
 
         _initialScrollPending = true;
         _followingLatest = true;
-        _loadMoreArmed = true;
         OnPropertyChanged(nameof(IsScrollToBottomVisible));
         QueueScrollToLatest();
     }
@@ -224,6 +317,7 @@ public sealed partial class ChatTimeline : ContentView
             if (Items.LastOrDefault() is { } latest)
             {
                 _collectionView.ScrollTo(latest, ScrollToPosition.End, animate: false);
+                _initialScrollPending = false;
             }
         });
     }
@@ -252,7 +346,9 @@ public sealed partial class ChatTimeline : ContentView
                 .Bind(ChatMessageView.OpenMediaCommandProperty,
                     nameof(OpenMediaCommand), source: owner)
                 .Bind(ChatMessageView.OpenProfileCommandProperty,
-                    nameof(OpenProfileCommand), source: owner));
+                    nameof(OpenProfileCommand), source: owner)
+                .Bind(ChatMessageView.PollVoteCommandProperty,
+                    nameof(PollVoteCommand), source: owner));
         }
 
         protected override DataTemplate OnSelectTemplate(

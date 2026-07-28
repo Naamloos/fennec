@@ -36,6 +36,12 @@ public sealed partial class AppShell : Shell
         get => _selectedRoom;
         set
         {
+            if (value?.Membership() == Membership.Invited)
+            {
+                _ = HandleInviteAsync(value);
+                return;
+            }
+
             if (_selectedRoom?.Id() == value?.Id())
             {
                 return;
@@ -116,6 +122,7 @@ public sealed partial class AppShell : Shell
         _sessionVerificationService = sessionVerificationService;
 
         _matrixClient.SessionInvalidated += OnSessionInvalidated;
+        _matrixClient.AvatarChanged += OnAvatarChanged;
 
         _ = InitializeVerificationServiceAsync(sessionVerificationService);
 
@@ -161,10 +168,16 @@ public sealed partial class AppShell : Shell
         this
             .DynamicResource(
                 VisualElement.BackgroundColorProperty,
-                "Surface")
-            .DynamicResource(
+                "Surface");
+#if ANDROID
+        FlyoutBackgroundColor = Colors.Transparent;
+        FlyoutBackdrop = new SolidColorBrush(Color.FromArgb("#66000000"));
+#else
+        this.DynamicResource(
                 FlyoutBackgroundColorProperty,
-                "Surface")
+                "Surface");
+#endif
+        this
             .DynamicResource(
                 Shell.BackgroundColorProperty,
                 "Surface")
@@ -199,9 +212,9 @@ public sealed partial class AppShell : Shell
 
     private void Build()
     {
-        FlyoutContent = new Grid
+        var sidebar = new Grid
         {
-            Padding = new Thickness(0, 16, 16, 16),
+            Padding = 0,
             RowSpacing = 16,
             RowDefinitions =
             {
@@ -215,10 +228,19 @@ public sealed partial class AppShell : Shell
                     Spacing = 2,
                     Children =
                     {
+                        new Button
+                        {
+                            Text = "New conversation",
+                            HorizontalOptions = LayoutOptions.Fill,
+                            Margin = new Thickness(8, 0, 8, 10),
+                        }
+                        .DynamicResource(VisualElement.BackgroundColorProperty, "PrimaryContainer")
+                        .DynamicResource(Button.TextColorProperty, "OnPrimaryContainer")
+                        .BindCommand(nameof(OpenConversationCommand), source: this),
 #if !WINDOWS && !MACCATALYST
                         new AccountButton
                         {
-                            Margin = new Thickness(0, 0, 0, 8),
+                            Margin = new Thickness(8, 0, 8, 4),
                             ShowUserId = true,
                         }
                         .Bind(
@@ -255,6 +277,7 @@ public sealed partial class AppShell : Shell
         }.DynamicResource(
             VisualElement.BackgroundColorProperty,
             "Surface");
+        FlyoutContent = sidebar;
 
         Items.Add(new FlyoutItem
         {
@@ -270,6 +293,7 @@ public sealed partial class AppShell : Shell
                     Content = new ContentPage
                     {
                         Title = "Fennec",
+                        SafeAreaEdges = SafeAreaEdges.All,
                         Content = new Grid
                         {
                             Children =
@@ -441,6 +465,8 @@ public sealed partial class AppShell : Shell
             HeightRequest = 42,
             TrailingContent = new HorizontalStackLayout { Children =
             {
+                new MauiIcon { Icon = MaterialIcons.Search, IconSize = 22, WidthRequest = 40, HeightRequest = 40,
+                    GestureRecognizers = { new TapGestureRecognizer().BindCommand(nameof(SearchMessagesCommand), source: this) } },
                 new AccountButton
             {
                 Margin = new Thickness(0, 0, 8, 0),
@@ -515,6 +541,98 @@ public sealed partial class AppShell : Shell
     private void ToggleRoomInfo() => IsRoomInfoOpen = !IsRoomInfoOpen;
 
     [RelayCommand]
+    private async Task SearchMessagesAsync()
+    {
+        var page = CurrentPage;
+        var query = await InAppDialogs.PromptAsync(page, "Search messages", "Search joined conversations", "Search");
+        if (string.IsNullOrWhiteSpace(query)) return;
+
+        try
+        {
+            var results = await _matrixClient.SearchMessagesAsync(query.Trim());
+            if (results.Count == 0)
+            {
+                await page.DisplayAlertAsync("Search messages", "No matching messages.", "OK");
+                return;
+            }
+
+            var labels = results.Take(20)
+                .Select(result => $"{result.SenderId}: {result.Body}")
+                .ToArray();
+            var selected = await InAppDialogs.ChooseAsync(
+                page, $"{results.Count} result(s)", labels);
+            var result = results.FirstOrDefault(candidate =>
+                $"{candidate.SenderId}: {candidate.Body}" == selected);
+            if (result is not null)
+            {
+                ManagedSelectedRoom = new ManagedRoom(
+                    _matrixClient.GetSyncService().RoomListService().Room(result.RoomId));
+            }
+        }
+        catch (Exception exception)
+        {
+            await page.DisplayAlertAsync("Search failed", exception.Message, "OK");
+        }
+    }
+
+    private async Task HandleInviteAsync(Room room)
+    {
+        var page = CurrentPage;
+        var name = room.DisplayName() ?? room.Id();
+        var accept = await page.DisplayAlertAsync(
+            "Room invitation", $"Join {name}?", "Join", "Decline");
+        try
+        {
+            if (accept)
+            {
+                await _matrixClient.AcceptInviteAsync(room.Id());
+                SelectedRoom = room;
+            }
+            else
+            {
+                await _matrixClient.DeclineInviteAsync(room.Id());
+            }
+        }
+        catch (Exception exception)
+        {
+            await page.DisplayAlertAsync("Could not update invitation", exception.Message, "OK");
+        }
+    }
+
+    [RelayCommand]
+    private async Task OpenConversationAsync()
+    {
+        var page = CurrentPage;
+        var action = await InAppDialogs.ChooseAsync(
+            page, "New conversation", ["Start direct message", "Join room"]);
+        var prompt = action switch
+        {
+            "Start direct message" => await InAppDialogs.PromptAsync(
+                page, "Start direct message", "Matrix ID", "Start", "@alice:example.org"),
+            "Join room" => await InAppDialogs.PromptAsync(
+                page, "Join room", "Room alias, ID, or link", "Join", "#community:example.org"),
+            _ => null,
+        };
+
+        if (string.IsNullOrWhiteSpace(prompt))
+        {
+            return;
+        }
+
+        try
+        {
+            var room = action == "Start direct message"
+                ? await _matrixClient.CreateDirectMessageAsync(prompt.Trim())
+                : await _matrixClient.JoinRoomAsync(prompt.Trim());
+            ManagedSelectedRoom = room;
+        }
+        catch (Exception exception)
+        {
+            await page.DisplayAlertAsync("Could not open conversation", exception.Message, "OK");
+        }
+    }
+
+    [RelayCommand]
     private async Task ShowUserSettingsAsync()
     {
         FlyoutIsPresented = false;
@@ -542,6 +660,9 @@ public sealed partial class AppShell : Shell
     private void OnSessionInvalidated(object? sender, EventArgs e) =>
         MainThread.BeginInvokeOnMainThread(
             () => _appNavigation?.ShowLogin());
+
+    private void OnAvatarChanged(string? previous, string? current) =>
+        MainThread.BeginInvokeOnMainThread(() => _ = LoadOwnAvatarAsync());
 
     private void ShowRoom(Room room)
     {
@@ -583,6 +704,7 @@ public sealed partial class AppShell : Shell
         {
             _matrixClient.SessionInvalidated -=
                 OnSessionInvalidated;
+            _matrixClient.AvatarChanged -= OnAvatarChanged;
         }
 
         _selectedRoom = null;

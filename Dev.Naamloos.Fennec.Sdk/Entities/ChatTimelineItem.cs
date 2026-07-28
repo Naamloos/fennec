@@ -20,6 +20,7 @@ public sealed class ChatTimelineItem : ObservableModel
     private string? _eventId;
     private string? _replyPreview;
     private ChatMedia? _media;
+    private ChatPoll? _poll;
 
     public ChatTimelineItem(string id)
     {
@@ -95,6 +96,8 @@ public sealed class ChatTimelineItem : ObservableModel
 
     public ChatMedia? Media { get => _media; set => Set(ref _media, value); }
 
+    public ChatPoll? Poll { get => _poll; set => Set(ref _poll, value); }
+
     public ObservableCollection<ChatReaction> Reactions { get; } = [];
 
     public ObservableCollection<ChatReadReceipt> ReadReceipts { get; } = [];
@@ -121,6 +124,7 @@ public sealed class ChatTimelineItem : ObservableModel
         EventId = source.EventId;
         ReplyPreview = source.ReplyPreview;
         Media = source.Media;
+        Poll = source.Poll;
         EventOrTransactionId = source.EventOrTransactionId;
         IsRemoteEvent = source.IsRemoteEvent;
 

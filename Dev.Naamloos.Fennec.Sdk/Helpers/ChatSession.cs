@@ -17,6 +17,9 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
     private readonly Room _room;
     private readonly ObservableTimeline _timeline;
     private readonly RoomTypingController _typing;
+    private readonly RoomInfoListener _roomInfoListener;
+    private readonly TaskHandle _roomInfoSubscription;
+    private readonly SemaphoreSlim _membersLoadGate = new(1, 1);
     private readonly SynchronizationContext? _synchronizationContext;
     private string? _lastReadEventId;
     private bool _disposed;
@@ -27,6 +30,9 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
     private string _draftText = string.Empty;
     private ChatTimelineItem? _replyTarget;
     private ChatTimelineItem? _editTarget;
+    private ChatTimelineItem? _threadTarget;
+    private string? _roomAvatarUrl;
+    private bool _canInvalidateAvatars;
 
     private ChatSession(
         ManagedMatrixClient client,
@@ -38,6 +44,9 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         _timeline = timeline;
         _synchronizationContext = SynchronizationContext.Current;
         _typing = new RoomTypingController(room);
+        _roomInfoListener = new MemberListUpdateListener(this);
+        _roomInfoSubscription = room.SubscribeToRoomInfoUpdates(_roomInfoListener);
+        _roomAvatarUrl = room.AvatarUrl();
         _typing.PropertyChanged += OnTypingChanged;
         ((INotifyPropertyChanged)_timeline).PropertyChanged +=
             OnTimelinePropertyChanged;
@@ -45,6 +54,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         _typing.Start();
         ResetItems();
         UpdateMessageGroups();
+        _canInvalidateAvatars = true;
     }
 
     public ObservableCollection<ChatTimelineItem> Items { get; } = [];
@@ -52,6 +62,8 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
     public ObservableCollection<MatrixEmote> Emotes { get; } = [];
 
     public ObservableCollection<RoomMember> Members { get; } = [];
+
+    public ObservableCollection<ManagedRoom> Rooms { get; } = [];
 
     public Room Room => _room;
 
@@ -124,6 +136,12 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         private set => Set(ref _editTarget, value);
     }
 
+    public ChatTimelineItem? ThreadTarget
+    {
+        get => _threadTarget;
+        private set => Set(ref _threadTarget, value);
+    }
+
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public bool CanLoadMoreHistory => !_timeline.HasReachedStart;
@@ -145,6 +163,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
             cancellationToken);
 
         var session = new ChatSession(client, room, timeline);
+        _ = session.LoadRoomsAsync();
         _ = session.LoadMembersAsync();
         _ = session.LoadUserEmotesAsync();
         return session;
@@ -170,6 +189,26 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
             {
                 await _room.Edit(editEventId, content);
             }
+            else if (ThreadTarget?.EventId is { } threadRoot)
+            {
+                var threadRelation = new Dictionary<string, object?>
+                {
+                    ["rel_type"] = "m.thread",
+                    ["event_id"] = threadRoot,
+                    ["is_falling_back"] = true,
+                    ["m.in_reply_to"] = new Dictionary<string, string>
+                    {
+                        ["event_id"] = threadRoot,
+                    },
+                };
+                await _room.SendRaw("m.room.message", JsonSerializer.Serialize(
+                    new Dictionary<string, object?>
+                    {
+                        ["body"] = text,
+                        ["msgtype"] = "m.text",
+                        ["m.relates_to"] = threadRelation,
+                    }));
+            }
             else if (ReplyTarget?.EventId is { } eventId)
             {
                 await _timeline.Timeline.SendReply(content, eventId);
@@ -182,6 +221,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
             DraftText = string.Empty;
             ReplyTarget = null;
             EditTarget = null;
+            ThreadTarget = null;
         }
         catch (Exception exception)
         {
@@ -228,7 +268,9 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         }
     }
 
-    public async Task LoadMoreHistoryAsync()
+    public async Task LoadMoreHistoryAsync(
+        ushort eventCount = 50,
+        CancellationToken cancellationToken = default)
     {
         if (_timeline.IsLoadingHistory || _timeline.HasReachedStart)
         {
@@ -237,7 +279,12 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
         try
         {
-            await _timeline.LoadMoreHistoryAsync();
+            await _timeline.LoadMoreHistoryAsync(
+                eventCount,
+                cancellationToken: cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
         catch (Exception exception)
         {
@@ -284,6 +331,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
     public void ReplyTo(ChatTimelineItem? item)
     {
         EditTarget = null;
+        ThreadTarget = null;
         ReplyTarget = item;
     }
 
@@ -295,16 +343,110 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         }
 
         ReplyTarget = null;
+        ThreadTarget = null;
         EditTarget = item;
         DraftText = MarkdownFromHtml(item.FormattedBody, item.Body);
     }
 
-    public void CancelReply() => ReplyTarget = null;
+    public void CancelReply()
+    {
+        ReplyTarget = null;
+        ThreadTarget = null;
+    }
+
+    public void ReplyInThread(ChatTimelineItem? item)
+    {
+        if (item is not { IsMessage: true, EventId: not null }) return;
+        ReplyTarget = null;
+        EditTarget = null;
+        ThreadTarget = item;
+        ReplyTarget = item;
+    }
+
+    public void CancelThreadReply() => ThreadTarget = null;
 
     public void CancelEdit()
     {
         EditTarget = null;
         DraftText = string.Empty;
+    }
+
+    public async Task CreatePollAsync(
+        string question,
+        IEnumerable<string> answers,
+        byte maxSelections = 1)
+    {
+        var choices = answers.Select(answer => answer.Trim())
+            .Where(answer => !string.IsNullOrWhiteSpace(answer))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (string.IsNullOrWhiteSpace(question) || choices.Length < 2)
+        {
+            throw new ArgumentException("A poll needs a question and at least two distinct answers.");
+        }
+
+        await _timeline.Timeline.CreatePoll(
+            question.Trim(), choices,
+            Math.Clamp(maxSelections, (byte)1, (byte)choices.Length),
+            PollKind.Disclosed);
+    }
+
+    public async Task VoteInPollAsync(ChatTimelineItem item, string answerId)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentException.ThrowIfNullOrWhiteSpace(answerId);
+        if (item.EventId is null || item.Poll is not { IsClosed: false } poll)
+        {
+            return;
+        }
+
+        var snapshot = poll.Snapshot();
+        var answers = poll.Select(answerId);
+        if (answers.Length == 0) return;
+
+        IsSending = true;
+        ErrorMessage = string.Empty;
+        try
+        {
+            await _timeline.Timeline.SendPollResponse(item.EventId, answers);
+        }
+        catch (Exception exception)
+        {
+            poll.Restore(snapshot);
+            ErrorMessage = exception.Message;
+            Debug.WriteLine($"Could not vote in poll: {exception}");
+        }
+        finally
+        {
+            IsSending = false;
+        }
+    }
+
+    public Task SendLocationAsync(string geoUri, string? description = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(geoUri);
+        if (!geoUri.StartsWith("geo:", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Use a geo: URI, for example geo:52.3676,4.9041.", nameof(geoUri));
+        }
+
+        return _room.SendRaw("m.room.message", JsonSerializer.Serialize(new
+        {
+            body = description ?? geoUri,
+            msgtype = "m.location",
+            geo_uri = geoUri,
+        }));
+    }
+
+    public Task SendStickerAsync(MatrixEmote emote)
+    {
+        ArgumentNullException.ThrowIfNull(emote);
+        return _room.SendRaw("m.sticker", JsonSerializer.Serialize(new
+        {
+            body = emote.Body,
+            url = emote.Source,
+            info = new { },
+        }));
     }
 
     public async Task<bool> CanDeleteAsync(ChatTimelineItem item)
@@ -664,7 +806,27 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         }
     }
 
-    private static void PopulateContent(
+    private async Task LoadRoomsAsync()
+    {
+        await Task.Yield();
+        if (_disposed) return;
+
+        try
+        {
+            foreach (var room in _client.GetRooms().Where(room =>
+                         !room.IsSpace() && room.Id() != _room.Id()))
+            {
+                if (_disposed) return;
+                Rooms.Add(new ManagedRoom(room));
+            }
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Could not load composer rooms: {exception}");
+        }
+    }
+
+    private void PopulateContent(
         ChatTimelineItem result,
         EventTimelineItem eventItem)
     {
@@ -689,12 +851,33 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                     sticker.Info.ThumbnailSource?.ToJson());
                 return;
 
+            case TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Poll poll }:
+                result.IsMessage = true;
+                result.Body = poll.Question;
+                result.Poll = new ChatPoll(
+                    poll.Question,
+                    poll.Answers.Select(answer => new ChatPollAnswer(
+                        answer.Id,
+                        answer.Text,
+                        poll.Votes.TryGetValue(answer.Id, out var voters) ? voters.Length : 0,
+                        poll.Votes.TryGetValue(answer.Id, out voters) && voters.Contains(_room.OwnUserId()))),
+                    poll.MaxSelections,
+                    poll.EndTime is not null);
+                return;
+
             case TimelineItemContent.RoomMembership membership:
                 result.Body = $"{membership.UserDisplayName ?? membership.UserId} {MembershipText(membership.Change)}";
                 return;
 
             case TimelineItemContent.ProfileChange profile:
+                RefreshAvatar(profile.PrevAvatarUrl, profile.AvatarUrl);
                 result.Body = ProfileText(profile);
+                return;
+
+            case TimelineItemContent.State { Content: OtherState.RoomAvatar avatar }:
+                RefreshAvatar(_roomAvatarUrl, avatar.Url);
+                _roomAvatarUrl = avatar.Url;
+                result.Body = StateText(avatar);
                 return;
 
             case TimelineItemContent.State state:
@@ -749,6 +932,11 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
             video.Content.Filename,
             video.Content.Info?.Mimetype,
             video.Content.Info?.ThumbnailSource?.ToJson()),
+        MessageType.Audio audio => new ChatMedia(
+            ChatMediaKind.Audio,
+            audio.Content.Source.ToJson(),
+            audio.Content.Filename,
+            audio.Content.Info?.Mimetype),
         MessageType.File file => new ChatMedia(
             ChatMediaKind.File,
             file.Content.Source.ToJson(),
@@ -759,8 +947,10 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
     private async Task LoadMembersAsync()
     {
+        await _membersLoadGate.WaitAsync();
         try
         {
+            if (_disposed) return;
             using var iterator = await _room.Members();
 
             // ponytail: one page feeds typeahead; add query-backed search for very large rooms.
@@ -769,8 +959,10 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                 var joined = members.Where(member => member.Membership is MembershipState.Join).ToArray();
                 RunOnCapturedContext(() =>
                 {
-                    foreach (var member in joined.Where(member =>
-                                 Members.All(existing => existing.UserId != member.UserId)))
+                    if (_disposed) return;
+
+                    Members.Clear();
+                    foreach (var member in joined)
                     {
                         Members.Add(member);
                     }
@@ -787,13 +979,26 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         }
         catch (Exception exception)
         {
-            Debug.WriteLine($"Could not load room members: {exception}");
+            if (!_disposed)
+            {
+                Debug.WriteLine($"Could not load room members: {exception}");
+            }
         }
+        finally
+        {
+            _membersLoadGate.Release();
+        }
+    }
+
+    private sealed class MemberListUpdateListener(ChatSession session) : RoomInfoListener
+    {
+        public void Call(RoomInfo roomInfo) => _ = session.LoadMembersAsync();
     }
 
     private RoomMessageEventContentWithoutRelation CreateMarkdownContent(string markdown)
     {
         var userIds = new HashSet<string>(StringComparer.Ordinal);
+        var roomMention = markdown.Contains("@room", StringComparison.Ordinal);
         var content = MentionPattern.Replace(markdown, match =>
         {
             var value = match.Groups["value"].Value;
@@ -823,12 +1028,12 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         });
 
         var result = MatrixSdkFfiMethods.MessageEventContentFromMarkdown(content);
-        if (userIds.Count == 0)
+        if (userIds.Count == 0 && !roomMention)
         {
             return result;
         }
 
-        var mentioned = result.WithMentions(new Mentions(userIds.ToArray(), false));
+        var mentioned = result.WithMentions(new Mentions(userIds.ToArray(), roomMention));
         result.Dispose();
         return mentioned;
     }
@@ -915,6 +1120,10 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
             new MessageType.Video(new VideoMessageContent(
                 filename, null, null, source,
                 new VideoInfo(null, null, null, mimeType, size, null, null, null))),
+        _ when mimeType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) =>
+            new MessageType.Audio(new AudioMessageContent(
+                filename, null, null, source,
+                new AudioInfo(null, size, mimeType), null, null)),
         _ => new MessageType.File(new FileMessageContent(
             filename, null, null, source,
             new uniffi.matrix_sdk_ffi.FileInfo(mimeType, size, null, null))),
@@ -930,6 +1139,14 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         item.SenderProfile is ProfileDetails.Ready ready
             ? ready.AvatarUrl
             : null;
+
+    private void RefreshAvatar(string? previous, string? current)
+    {
+        if (_canInvalidateAvatars && !_timeline.IsLoadingHistory)
+        {
+            _client.RefreshAvatar(previous, current);
+        }
+    }
 
     private static string EventOrTransactionIdValue(EventOrTransactionId id) => id switch
     {
@@ -985,21 +1202,15 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
     private static string FormatSource(string? source, object fallback)
     {
-        try
+        if (!string.IsNullOrWhiteSpace(source))
         {
-            using var document = JsonDocument.Parse(source ?? string.Empty);
-            return JsonSerializer.Serialize(document.RootElement, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-            });
+            return source;
         }
-        catch (JsonException)
+
+        return JsonSerializer.Serialize(fallback, new JsonSerializerOptions
         {
-            return JsonSerializer.Serialize(fallback, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-            });
-        }
+            WriteIndented = true,
+        });
     }
 
     private void RunOnCapturedContext(System.Action action)
@@ -1028,6 +1239,8 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         ((INotifyPropertyChanged)_timeline).PropertyChanged -=
             OnTimelinePropertyChanged;
         _typing.PropertyChanged -= OnTypingChanged;
+        _roomInfoSubscription.Cancel();
+        _roomInfoSubscription.Dispose();
         _typing.Dispose();
         _timeline.Dispose();
         await Task.CompletedTask;

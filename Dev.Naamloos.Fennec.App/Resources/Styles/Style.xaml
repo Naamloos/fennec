@@ -19,7 +19,7 @@
   </Style>
 
   <Style TargetType="BoxView">
-    <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource OnSurfaceVariantLight}, Dark={StaticResource OnSurfaceVariantDark}}" />
+    <Setter Property="Color" Value="{AppThemeBinding Light={StaticResource OnSurfaceVariantLight}, Dark={StaticResource OnSurfaceVariantDark}}" />
   </Style>
 
   <Style TargetType="Button">

@@ -100,7 +100,6 @@ public sealed class ObservableTimeline :
     {
       await observableTimeline.InitializeListener();
       await observableTimeline._initialItemsLoaded.Task.WaitAsync(cancellationToken);
-      await observableTimeline.LoadMoreHistoryAsync(cancellationToken: cancellationToken);
       return observableTimeline;
     }
     catch

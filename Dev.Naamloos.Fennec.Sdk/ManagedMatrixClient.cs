@@ -24,6 +24,8 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
     private const int StoreKeyLength = 32;
     private const int DirectoryDeleteRetryCount = 5;
+    private const int AvatarCacheLimit = 256;
+    private const int RoomImageCacheLimit = 96;
 
     private readonly string _platformName;
     private readonly string _accountPath;
@@ -36,6 +38,14 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
     private readonly ConcurrentDictionary<string, Lazy<Task<string>>>
         _videoCache = [];
+    private readonly ConcurrentDictionary<AvatarCacheKey, Lazy<Task<byte[]>>>
+        _avatarCache = [];
+    private readonly ConcurrentQueue<KeyValuePair<AvatarCacheKey, Lazy<Task<byte[]>>>>
+        _avatarCacheOrder = [];
+    private readonly ConcurrentDictionary<ThumbnailCacheKey, Lazy<Task<byte[]>>>
+        _roomImageCache = [];
+    private readonly ConcurrentQueue<KeyValuePair<ThumbnailCacheKey, Lazy<Task<byte[]>>>>
+        _roomImageCacheOrder = [];
 
     private HttpClient? _httpClient;
 
@@ -81,10 +91,66 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// </summary>
     public bool IsLoggedIn => _client?.UserId() is not null;
 
+    /// <summary>Resolves a Matrix server name through its client well-known record.</summary>
+    public static async Task<string> DiscoverHomeserverAsync(string homeserver)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(homeserver);
+        var value = homeserver.Trim();
+        if (!value.Contains("://", StringComparison.Ordinal))
+        {
+            value = $"https://{value}";
+        }
+
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
+            uri.Scheme is not ("http" or "https") ||
+            string.IsNullOrWhiteSpace(uri.Host))
+        {
+            throw new ArgumentException("Enter a valid homeserver.", nameof(homeserver));
+        }
+
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+        try
+        {
+            using var response = await client.GetAsync(
+                $"https://{uri.Host}/.well-known/matrix/client");
+            if (!response.IsSuccessStatusCode)
+            {
+                return uri.GetLeftPart(UriPartial.Authority);
+            }
+
+            using var document = JsonDocument.Parse(
+                await response.Content.ReadAsStringAsync());
+            var baseUrl = document.RootElement
+                .GetProperty("m.homeserver")
+                .GetProperty("base_url")
+                .GetString();
+
+            return Uri.TryCreate(baseUrl, UriKind.Absolute, out var discovered) &&
+                   discovered.Scheme is "http" or "https"
+                ? discovered.GetLeftPart(UriPartial.Authority)
+                : uri.GetLeftPart(UriPartial.Authority);
+        }
+        catch (HttpRequestException)
+        {
+            return uri.GetLeftPart(UriPartial.Authority);
+        }
+        catch (TaskCanceledException)
+        {
+            return uri.GetLeftPart(UriPartial.Authority);
+        }
+        catch (KeyNotFoundException)
+        {
+            return uri.GetLeftPart(UriPartial.Authority);
+        }
+    }
+
     /// <summary>
     /// Occurs when the current Matrix session is no longer valid.
     /// </summary>
     public event EventHandler? SessionInvalidated;
+
+    /// <summary>Occurs when an avatar URL has changed.</summary>
+    public event Action<string?, string?>? AvatarChanged;
 
     /// <summary>
     /// Occurs after the Matrix sync infrastructure has been recovered.
@@ -142,6 +208,8 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
             var client = await new ClientBuilder()
                 .Username(username)
                 .SqliteStore(storeBuilder)
+                .AutoEnableBackups(true)
+                .AutoEnableCrossSigning(true)
                 .SlidingSyncVersionBuilder(
                     SlidingSyncVersionBuilder.DiscoverNative)
                 .HomeserverUrl(homeserver)
@@ -290,6 +358,8 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
                             dataPath,
                             cachePath)
                         .Key(await GetOrGenerateStoreKeyAsync()))
+                .AutoEnableBackups(true)
+                .AutoEnableCrossSigning(true)
                 .SlidingSyncVersionBuilder(
                     SlidingSyncVersionBuilder.DiscoverNative)
                 .HomeserverUrl(session.HomeserverUrl)
@@ -584,6 +654,164 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         return new ManagedRoom(nativeRoom);
     }
 
+    /// <summary>Creates an encrypted direct-message room and records it as a DM.</summary>
+    public async Task<ManagedRoom> CreateDirectMessageAsync(string userId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+
+        var ownUserId = GetRequiredClient().UserId();
+        if (string.Equals(userId, ownUserId, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("You cannot start a direct message with yourself.", nameof(userId));
+        }
+
+        using var body = JsonContent.Create(new
+        {
+            invite = new[] { userId },
+            is_direct = true,
+            preset = "trusted_private_chat",
+            initial_state = new[]
+            {
+                new
+                {
+                    type = "m.room.encryption",
+                    state_key = string.Empty,
+                    content = new { algorithm = "m.megolm.v1.aes-sha2" },
+                },
+            },
+        });
+        using var response = await SendHttpRequestAsync(
+            HttpMethod.Post,
+            "/_matrix/client/v3/createRoom",
+            body);
+        using var document = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync());
+        var roomId = document.RootElement.GetProperty("room_id").GetString()
+            ?? throw new InvalidOperationException("The homeserver did not return a room ID.");
+
+        await AddDirectRoomAsync(userId, roomId);
+        return await GetManagedRoomAsync(roomId);
+    }
+
+    /// <summary>Joins a Matrix room ID, alias, matrix.to link, or matrix URI.</summary>
+    public async Task<ManagedRoom> JoinRoomAsync(string roomReference)
+    {
+        var (roomIdOrAlias, via) = ParseRoomReference(roomReference);
+        var room = await GetRequiredClient().JoinRoomByIdOrAlias(roomIdOrAlias, via);
+        return new ManagedRoom(room);
+    }
+
+    /// <summary>Accepts a pending invitation.</summary>
+    public async Task AcceptInviteAsync(string roomId) =>
+        await GetRoomAsync(roomId).Join();
+
+    /// <summary>Declines a pending invitation without joining.</summary>
+    public async Task DeclineInviteAsync(string roomId) =>
+        await GetRoomAsync(roomId).Leave();
+
+    /// <summary>Leaves a room and optionally removes it from the local list.</summary>
+    public async Task LeaveRoomAsync(string roomId, bool forget = false)
+    {
+        var room = GetRoomAsync(roomId);
+        await room.Leave();
+        if (forget)
+        {
+            await room.Forget();
+        }
+    }
+
+    public async Task SetRoomFavouriteAsync(string roomId, bool favourite) =>
+        await GetRoomAsync(roomId).SetIsFavourite(favourite, null);
+
+    public async Task InviteUserAsync(string roomId, string userId) =>
+        await GetRoomAsync(roomId).InviteUserById(userId);
+
+    public async Task KickUserAsync(string roomId, string userId, string? reason = null) =>
+        await GetRoomAsync(roomId).KickUser(userId, reason);
+
+    public async Task BanUserAsync(string roomId, string userId, string? reason = null) =>
+        await GetRoomAsync(roomId).BanUser(userId, reason);
+
+    public async Task UnbanUserAsync(string roomId, string userId, string? reason = null) =>
+        await GetRoomAsync(roomId).UnbanUser(userId, reason);
+
+    public async Task SetRoomNameAsync(string roomId, string name) =>
+        await GetRoomAsync(roomId).SetName(name);
+
+    public async Task SetRoomTopicAsync(string roomId, string topic) =>
+        await GetRoomAsync(roomId).SetTopic(topic);
+
+    public async Task SetRoomHistoryVisibilityAsync(
+        string roomId,
+        RoomHistoryVisibility visibility) =>
+        await GetRoomAsync(roomId).UpdateHistoryVisibility(visibility);
+
+    public async Task SetRoomMutedAsync(string roomId, bool muted)
+    {
+        var settings = await GetRequiredClient().GetNotificationSettings();
+        if (muted)
+        {
+            await settings.SetRoomNotificationMode(
+                roomId,
+                RoomNotificationMode.Mute);
+        }
+        else
+        {
+            await settings.RestoreDefaultRoomNotificationMode(roomId);
+        }
+    }
+
+    public Task IgnoreUserAsync(string userId) =>
+        GetRequiredClient().IgnoreUser(userId);
+
+    public Task UnignoreUserAsync(string userId) =>
+        GetRequiredClient().UnignoreUser(userId);
+
+    public Task<string[]> GetIgnoredUsersAsync() =>
+        GetRequiredClient().IgnoredUsers();
+
+    public async Task<IReadOnlyList<MatrixSearchResult>> SearchMessagesAsync(
+        string query,
+        SearchRoomFilter filter = SearchRoomFilter.Rooms,
+        uint limit = 50)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        var iterator = await GetRequiredClient().SearchMessages(query, filter, limit);
+        using (iterator)
+        {
+            var results = await iterator.NextEvents() ?? [];
+            return results.Select(result => new MatrixSearchResult(
+                result.RoomId,
+                result.Result.EventId,
+                result.Result.Sender,
+                SearchResultBody(result.Result.Content),
+                result.Result.Timestamp.ToString())).ToArray();
+        }
+    }
+
+    /// <summary>Creates server-side encrypted-key backup and returns the recovery key once.</summary>
+    public async Task<string> EnableRecoveryAsync(string? passphrase = null)
+    {
+        using var encryption = GetRequiredClient().Encryption();
+        return await encryption.EnableRecovery(
+            waitForBackupsToUpload: true,
+            passphrase,
+            new RecoveryProgressListener());
+    }
+
+    public async Task RecoverEncryptionAsync(string recoveryKey)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(recoveryKey);
+        using var encryption = GetRequiredClient().Encryption();
+        await encryption.RecoverAndFixBackup(recoveryKey.Trim());
+    }
+
+    public async Task<bool> HasRecoveryBackupAsync()
+    {
+        using var encryption = GetRequiredClient().Encryption();
+        return await encryption.BackupExistsOnServer();
+    }
+
     /// <summary>
     /// Creates an observable timeline for a room.
     /// </summary>
@@ -658,6 +886,29 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
     public Task<MatrixProfile> GetOwnMatrixProfileAsync() =>
         GetMatrixProfileAsync(GetRequiredClient().UserId());
+
+    public async Task<IReadOnlyList<MatrixSharedRoom>> GetMutualRoomsAsync(string userId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+        var shared = new List<MatrixSharedRoom>();
+        foreach (var room in GetRequiredClient().Rooms().Where(room =>
+                     room.Membership() == Membership.Joined && !room.IsSpace()))
+        {
+            try
+            {
+                if ((await room.Member(userId)).Membership is MembershipState.Join)
+                {
+                    shared.Add(new MatrixSharedRoom(room.Id(), room.DisplayName() ?? room.Id(), room.AvatarUrl()));
+                }
+            }
+            catch
+            {
+                // A missing member state simply means this room is not mutual.
+            }
+        }
+
+        return shared;
+    }
 
     public async Task<MatrixProfile> GetMatrixProfileAsync(string userId)
     {
@@ -750,8 +1001,20 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// <summary>Uploads and sets the authenticated user's avatar.</summary>
     public async Task SetOwnAvatarAsync(string mimeType, byte[] data)
     {
-        var url = await UploadMediaAsync(mimeType, data);
-        await GetRequiredClient().SetAvatarUrl(url);
+        ArgumentException.ThrowIfNullOrWhiteSpace(mimeType);
+        ArgumentNullException.ThrowIfNull(data);
+
+        var client = GetRequiredClient();
+        string? previous = null;
+        try { previous = (await client.GetProfile(client.UserId())).AvatarUrl; }
+        catch { }
+
+        await client.UploadAvatar(mimeType, data);
+
+        string? current = null;
+        try { current = (await client.GetProfile(client.UserId())).AvatarUrl; }
+        catch { }
+        RefreshAvatar(previous, current);
     }
 
     /// <summary>Gets the user's active Matrix sessions.</summary>
@@ -1080,6 +1343,103 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     }
 
     /// <summary>
+    /// Returns an avatar thumbnail from a bounded managed hot cache. The Rust
+    /// SDK remains responsible for its persistent media cache.
+    /// </summary>
+    public async Task<byte[]> GetAvatarThumbnailAsync(
+        string source,
+        ulong width,
+        ulong height,
+        bool isJson = false,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(source);
+
+        var key = new AvatarCacheKey(source, width, height, isJson);
+        var created = new Lazy<Task<byte[]>>(
+            () => GetThumbnailAsync(source, width, height, isJson),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+        var cached = _avatarCache.GetOrAdd(key, created);
+
+        if (ReferenceEquals(cached, created))
+        {
+            _avatarCacheOrder.Enqueue(new(key, cached));
+            TrimAvatarCache();
+        }
+
+        try
+        {
+            return await cached.Value.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            _avatarCache.TryRemove(new(key, cached));
+            throw;
+        }
+    }
+
+    internal void RefreshAvatar(string? previous, string? current)
+    {
+        InvalidateAvatarThumbnail(previous);
+        InvalidateAvatarThumbnail(current);
+        AvatarChanged?.Invoke(previous, current);
+    }
+
+    /// <summary>Returns a room-image thumbnail from a bounded managed hot cache.</summary>
+    public async Task<byte[]> GetRoomImageThumbnailAsync(
+        string source,
+        ulong width,
+        ulong height,
+        bool isJson = true,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(source);
+
+        var key = new ThumbnailCacheKey(source, width, height, isJson);
+        var created = new Lazy<Task<byte[]>>(
+            () => GetThumbnailAsync(source, width, height, isJson),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+        var cached = _roomImageCache.GetOrAdd(key, created);
+
+        if (ReferenceEquals(cached, created))
+        {
+            _roomImageCacheOrder.Enqueue(new(key, cached));
+            TrimRoomImageCache();
+        }
+
+        try
+        {
+            return await cached.Value.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            _roomImageCache.TryRemove(new(key, cached));
+            throw;
+        }
+    }
+
+    private void InvalidateAvatarThumbnail(string? source)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return;
+        }
+
+        foreach (var key in _avatarCache.Keys.Where(key => key.Source == source))
+        {
+            _avatarCache.TryRemove(key, out _);
+        }
+    }
+
+    /// <summary>
     /// Downloads the complete content of a Matrix media source.
     /// </summary>
     /// <param name="sourceJson">
@@ -1138,6 +1498,129 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         return _client ??
             throw new InvalidOperationException(
                 "The client is not logged in.");
+    }
+
+    private Room GetRoomAsync(string roomId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(roomId);
+
+        return GetRequiredClient().Rooms()
+            .FirstOrDefault(room => room.Id() == roomId)
+            ?? GetSyncService().RoomListService().Room(roomId);
+    }
+
+    private async Task<ManagedRoom> GetManagedRoomAsync(string roomId)
+    {
+        // Let Sliding Sync materialize a just-created room before resolving it.
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            var room = GetRequiredClient().Rooms()
+                .FirstOrDefault(candidate => candidate.Id() == roomId);
+            if (room is not null)
+            {
+                return new ManagedRoom(room);
+            }
+
+            await Task.Delay(200);
+        }
+
+        return new ManagedRoom(GetSyncService().RoomListService().Room(roomId));
+    }
+
+    private async Task AddDirectRoomAsync(string userId, string roomId)
+    {
+        var directRooms = new Dictionary<string, HashSet<string>>(
+            StringComparer.Ordinal);
+        var existing = await GetAccountDataAsync("m.direct");
+
+        if (!string.IsNullOrWhiteSpace(existing))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(existing);
+                foreach (var entry in document.RootElement.EnumerateObject())
+                {
+                    directRooms[entry.Name] = entry.Value.ValueKind == JsonValueKind.Array
+                        ? entry.Value.EnumerateArray()
+                            .Select(value => value.GetString())
+                            .OfType<string>()
+                            .ToHashSet(StringComparer.Ordinal)
+                        : [];
+                }
+            }
+            catch (JsonException)
+            {
+                // Preserve the ability to create a DM even when old account data is malformed.
+            }
+        }
+
+        if (!directRooms.TryGetValue(userId, out var rooms))
+        {
+            rooms = [];
+            directRooms[userId] = rooms;
+        }
+
+        rooms.Add(roomId);
+        await SetAccountDataAsync("m.direct", JsonSerializer.Serialize(directRooms));
+    }
+
+    private static (string RoomIdOrAlias, string[] Via) ParseRoomReference(
+        string roomReference)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(roomReference);
+        var value = roomReference.Trim();
+        var via = Array.Empty<string>();
+
+        if (Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+            (uri.Host.Equals("matrix.to", StringComparison.OrdinalIgnoreCase) ||
+             uri.Scheme.Equals("matrix", StringComparison.OrdinalIgnoreCase)))
+        {
+            var fragment = Uri.UnescapeDataString(uri.Fragment.TrimStart('#'));
+            var target = string.IsNullOrWhiteSpace(fragment)
+                ? Uri.UnescapeDataString(uri.AbsolutePath.Trim('/'))
+                : fragment.TrimStart('/');
+            var queryIndex = target.IndexOf('?');
+            var query = queryIndex >= 0
+                ? target[(queryIndex + 1)..]
+                : uri.Query.TrimStart('?');
+            value = queryIndex >= 0 ? target[..queryIndex] : target;
+
+            via = query
+                .Split('&', StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => part.Split('=', 2))
+                .Where(part => part.Length == 2 && part[0] == "via")
+                .Select(part => Uri.UnescapeDataString(part[1]))
+                .Where(server => !string.IsNullOrWhiteSpace(server))
+                .ToArray();
+        }
+
+        if (!value.StartsWith('!') && !value.StartsWith('#'))
+        {
+            throw new ArgumentException(
+                "Enter a Matrix room ID, room alias, matrix.to link, or matrix URI.",
+                nameof(roomReference));
+        }
+
+        return (value, via);
+    }
+
+    private static string SearchResultBody(TimelineItemContent content) => content switch
+    {
+        TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Message message } =>
+            message.Content.Body,
+        TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Sticker sticker } =>
+            sticker.Body,
+        TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Poll poll } =>
+            poll.Question,
+        _ => content.GetType().Name,
+    };
+
+    private sealed class RecoveryProgressListener : EnableRecoveryProgressListener
+    {
+        public void OnUpdate(EnableRecoveryProgress status)
+        {
+            Debug.WriteLine($"Matrix recovery: {status.GetType().Name}");
+        }
     }
 
     private async Task StartSyncingAsync()
@@ -1587,6 +2070,10 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     private async Task NativeCleanupAsync()
     {
         _videoCache.Clear();
+        _avatarCache.Clear();
+        while (_avatarCacheOrder.TryDequeue(out _)) { }
+        _roomImageCache.Clear();
+        while (_roomImageCacheOrder.TryDequeue(out _)) { }
 
         await StopNativeDependentsAsync();
 
@@ -1735,6 +2222,36 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
             throw;
         }
     }
+
+    private void TrimAvatarCache()
+    {
+        while (_avatarCache.Count > AvatarCacheLimit &&
+               _avatarCacheOrder.TryDequeue(out var oldest))
+        {
+            _avatarCache.TryRemove(oldest);
+        }
+    }
+
+    private void TrimRoomImageCache()
+    {
+        while (_roomImageCache.Count > RoomImageCacheLimit &&
+               _roomImageCacheOrder.TryDequeue(out var oldest))
+        {
+            _roomImageCache.TryRemove(oldest);
+        }
+    }
+
+    private readonly record struct AvatarCacheKey(
+        string Source,
+        ulong Width,
+        ulong Height,
+        bool IsJson);
+
+    private readonly record struct ThumbnailCacheKey(
+        string Source,
+        ulong Width,
+        ulong Height,
+        bool IsJson);
 
     private static void DestroyClient(
         Client client)

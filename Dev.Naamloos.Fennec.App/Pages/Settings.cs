@@ -41,6 +41,7 @@ public sealed partial class Settings : ContentPage
 
         var profile = new ProfileSettingsView();
         var sessions = new SessionsSettingsView();
+        var security = new RecoverySettingsView();
         var emotes = new EmoteSettingsView();
         var client = new VerticalStackLayout
         {
@@ -53,6 +54,7 @@ public sealed partial class Settings : ContentPage
         var content = new TemplateSwitchView<string, string>(value => value)
             .Add(value => value == "Profile", CreateTabContent(profile))
             .Add(value => value == "Sessions", CreateTabContent(sessions))
+            .Add(value => value == "Security", CreateTabContent(security))
             .Add(value => value == "Stickers", CreateTabContent(emotes))
             .Add(value => value == "Client", CreateTabContent(client))
             .Add(value => value == "About", CreateTabContent(about));
@@ -119,6 +121,7 @@ public sealed partial class Settings : ContentPage
                                 {
                                     CreateTabButton("Profile"),
                                     CreateTabButton("Sessions"),
+                                    CreateTabButton("Security"),
                                     CreateTabButton("Stickers"),
                                     CreateTabButton("Client"),
                                     CreateTabButton("About"),

@@ -10,6 +10,7 @@ public sealed class PasswordConfirmationPopup : Popup<string?>
     public PasswordConfirmationPopup(string title, string message, string accept)
     {
         CanBeDismissedByTappingOutsideOfPopup = true;
+        BackgroundColor = Colors.Transparent;
         Content = new Border
         {
             Padding = 20,
@@ -30,8 +31,11 @@ public sealed class PasswordConfirmationPopup : Popup<string?>
                         ColumnSpacing = 8,
                         Children =
                         {
-                            new Button { Text = "Cancel", BackgroundColor = Colors.Transparent, Command = new Command(async () => await CloseAsync(null)) },
-                            new Button { Text = accept, TextColor = Colors.Red, Command = new Command(async () => await CloseAsync(_password.Text)) }.Column(1),
+                            new Button { Text = "Cancel", BackgroundColor = Colors.Transparent, Command = new Command(async () => await CloseAsync(null)) }
+                                .DynamicResource(Button.TextColorProperty, "Primary"),
+                            new Button { Text = accept, Command = new Command(async () => await CloseAsync(_password.Text)) }
+                                .DynamicResource(VisualElement.BackgroundColorProperty, "Error")
+                                .DynamicResource(Button.TextColorProperty, "OnError").Column(1),
                         },
                     },
                 },

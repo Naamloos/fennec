@@ -40,6 +40,9 @@ public sealed partial class ChatComposer : ContentView
     public partial ICommand? AttachCommand { get; set; }
 
     [BindableProperty]
+    public partial ICommand? MoreCommand { get; set; }
+
+    [BindableProperty]
     public partial ICommand? InlineAttachmentCommand { get; set; }
 
     [BindableProperty]
@@ -53,6 +56,9 @@ public sealed partial class ChatComposer : ContentView
 
     [BindableProperty]
     public partial IEnumerable<MatrixEmote>? Emotes { get; set; }
+
+    [BindableProperty]
+    public partial IEnumerable<ManagedRoom>? Rooms { get; set; }
 
     [BindableProperty]
     public partial string PreviewHtml { get; set; } = string.Empty;
@@ -205,9 +211,10 @@ public sealed partial class ChatComposer : ContentView
                             ColumnSpacing = 8,
                             ColumnDefinitions =
                             {
-                                new ColumnDefinition(GridLength.Auto),
-                                new ColumnDefinition(GridLength.Star),
-                                new ColumnDefinition(GridLength.Auto)
+                                    new ColumnDefinition(GridLength.Auto),
+                                    new ColumnDefinition(GridLength.Star),
+                                    new ColumnDefinition(GridLength.Auto),
+                                    new ColumnDefinition(GridLength.Auto)
                             },
                             Children =
                             {
@@ -228,6 +235,20 @@ public sealed partial class ChatComposer : ContentView
                                 CreateEntry().Column(1),
                                 new MauiIcon
                                 {
+                                    Icon = MaterialIcons.Add,
+                                    IconSize = 24,
+                                    WidthRequest = 40,
+                                    HeightRequest = 40,
+                                    VerticalOptions = LayoutOptions.Center,
+                                    GestureRecognizers =
+                                    {
+                                        new TapGestureRecognizer()
+                                            .BindCommand(nameof(MoreCommand), source: this),
+                                    },
+                                }
+                                .Column(2),
+                                new MauiIcon
+                                {
                                     Icon = MaterialIcons.Send,
                                     IconSize = 24,
                                     WidthRequest = 40,
@@ -239,7 +260,7 @@ public sealed partial class ChatComposer : ContentView
                                             .BindCommand(nameof(SendCommand), source: this),
                                     },
                                 }
-                                .Column(2)
+                                .Column(3)
                             }
                         },
                         new ComposerAutocomplete
@@ -250,9 +271,11 @@ public sealed partial class ChatComposer : ContentView
                             ZIndex = 1,
                             PickMemberCommand = new Command<RoomMember>(PickMember),
                             PickEmoteCommand = new Command<MatrixEmote>(PickEmote),
+                            PickRoomCommand = new Command<ManagedRoom>(PickRoom),
                         }
                         .Bind(ComposerAutocomplete.MembersProperty, nameof(Members), source: this)
                         .Bind(ComposerAutocomplete.EmotesProperty, nameof(Emotes), source: this)
+                        .Bind(ComposerAutocomplete.RoomsProperty, nameof(Rooms), source: this)
                         .Bind(ComposerAutocomplete.QueryProperty, nameof(AutocompleteQuery), source: this)
                         .Bind(ComposerAutocomplete.ModeProperty, nameof(AutocompleteMode), source: this)
                         .Bind(IsVisibleProperty, nameof(IsAutocompleteOpen), source: this),
@@ -264,56 +287,27 @@ public sealed partial class ChatComposer : ContentView
 
     private Entry CreateEntry()
     {
-        _entry = new Entry
+        _entry = new AttachmentEntry
         {
             Placeholder = "Message",
             ReturnType = ReturnType.Send,
             VerticalOptions = LayoutOptions.Center,
         };
         _entry.TextChanged += OnTextChanged;
-#if ANDROID
-        _entry.HandlerChanged += OnEntryHandlerChanged;
-#endif
 
-        return _entry
+        return ((AttachmentEntry)_entry)
             .Bind(Entry.TextProperty, nameof(Text), BindingMode.TwoWay, source: this)
-            .Bind(Entry.ReturnCommandProperty, nameof(SendCommand), source: this);
+            .Bind(Entry.ReturnCommandProperty, nameof(SendCommand), source: this)
+            .Bind(AttachmentEntry.AttachmentCommandProperty,
+                nameof(InlineAttachmentCommand), source: this);
     }
-
-#if ANDROID
-    private void OnEntryHandlerChanged(object? sender, EventArgs args)
-    {
-        if (_entry?.Handler?.PlatformView is Android.Views.View view)
-            AndroidX.Core.View.ViewCompat.SetOnReceiveContentListener(view, ["image/gif", "image/webp", "image/*"], new InlineContentListener(this));
-    }
-
-    private sealed class InlineContentListener(ChatComposer composer) : Java.Lang.Object, AndroidX.Core.View.IOnReceiveContentListener
-    {
-        public AndroidX.Core.View.ContentInfoCompat? OnReceiveContent(Android.Views.View? view, AndroidX.Core.View.ContentInfoCompat? payload)
-        {
-            var uri = payload?.Clip?.GetItemAt(0)?.Uri;
-            if (uri is null || view?.Context?.ContentResolver is not { } resolver) return payload;
-            _ = Task.Run(async () =>
-            {
-                await using var input = resolver.OpenInputStream(uri);
-                if (input is null) return;
-                using var data = new MemoryStream();
-                await input.CopyToAsync(data);
-                var mime = resolver.GetType(uri) ?? "application/octet-stream";
-                var attachment = new PickedAttachment("gboard" + (mime == "image/gif" ? ".gif" : ".webp"), mime, data.ToArray());
-                await MainThread.InvokeOnMainThreadAsync(() => composer.InlineAttachmentCommand?.Execute(attachment));
-            });
-            return null;
-        }
-    }
-#endif
 
     private void OnTextChanged(object? sender, TextChangedEventArgs args)
     {
         PreviewHtml = Preview(args.NewTextValue ?? string.Empty);
         var position = Math.Clamp(_entry?.CursorPosition ?? 0, 0, (args.NewTextValue ?? string.Empty).Length);
         var beforeCursor = (args.NewTextValue ?? string.Empty)[..position];
-        var trigger = beforeCursor.LastIndexOfAny(['@', ':']);
+        var trigger = beforeCursor.LastIndexOfAny(['@', ':', '#']);
 
         if (trigger < 0 || (trigger > 0 && !char.IsWhiteSpace(beforeCursor[trigger - 1])))
         {
@@ -331,7 +325,9 @@ public sealed partial class ChatComposer : ContentView
         _triggerPosition = trigger;
         AutocompleteMode = beforeCursor[trigger] == '@'
             ? ComposerAutocompleteMode.Mentions
-            : ComposerAutocompleteMode.Emotes;
+            : beforeCursor[trigger] == ':'
+                ? ComposerAutocompleteMode.Emotes
+                : ComposerAutocompleteMode.Rooms;
         AutocompleteQuery = query;
         IsAutocompleteOpen = true;
     }
@@ -339,6 +335,10 @@ public sealed partial class ChatComposer : ContentView
     private void PickMember(RoomMember? member) => Insert(member?.UserId);
 
     private void PickEmote(MatrixEmote? emote) => Insert(emote is null ? null : $":{emote.Name}:");
+
+    private void PickRoom(ManagedRoom? room) => Insert(room?.Id is { Length: > 0 } id
+        ? $"https://matrix.to/#/{id}"
+        : null);
 
     private void Insert(string? value)
     {

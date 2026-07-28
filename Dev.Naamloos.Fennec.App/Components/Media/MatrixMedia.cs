@@ -11,7 +11,9 @@ namespace Dev.Naamloos.Fennec.App.Components;
 
 public sealed partial class MatrixMedia : ContentView
 {
-    private readonly MediaElement _videoElement;
+    private readonly ContentView _videoHost;
+    private readonly Image _image;
+    private MediaElement? _videoElement;
     private int _loadVersion;
     private CancellationTokenSource? _loadCancellation;
 
@@ -44,6 +46,7 @@ public sealed partial class MatrixMedia : ContentView
 
     public MatrixMedia()
     {
+        IsVisible = false;
         Loaded += (_, _) => Load();
         Unloaded += (_, _) =>
         {
@@ -54,34 +57,29 @@ public sealed partial class MatrixMedia : ContentView
         };
 
         HeightRequest = 160;
-        _videoElement = new MediaElement
+        _videoHost = new ContentView();
+        _image = new Image
         {
-            ShouldAutoPlay = false,
-            ShouldShowPlaybackControls = true,
             Aspect = Aspect.AspectFit,
+            IsAnimationPlaying = true,
+            GestureRecognizers =
+            {
+                new TapGestureRecognizer()
+                    .BindCommand(nameof(OpenCommand), source: this)
+                    .Bind(TapGestureRecognizer.CommandParameterProperty,
+                        nameof(Media), source: this),
+            },
         }
-        .Bind(MediaElement.SourceProperty, nameof(VideoSource), source: this)
-        .Bind(IsVisibleProperty, nameof(IsVideoVisible), source: this);
+        .Bind(Image.SourceProperty, nameof(ImageSource), source: this)
+        .Bind(IsVisibleProperty, nameof(IsImageVisible), source: this);
 
         Content = new Grid
         {
             Children =
             {
-                new Image
-                {
-                    Aspect = Aspect.AspectFit,
-                    GestureRecognizers =
-                    {
-                        new TapGestureRecognizer()
-                            .BindCommand(nameof(OpenCommand), source: this)
-                            .Bind(TapGestureRecognizer.CommandParameterProperty,
-                                nameof(Media), source: this),
-                    },
-                }
-                .Bind(Image.SourceProperty, nameof(ImageSource), source: this)
-                .Bind(IsVisibleProperty, nameof(IsImageVisible), source: this),
+                _image,
 
-                _videoElement,
+                _videoHost,
 
                 new Button
                 {
@@ -125,7 +123,7 @@ public sealed partial class MatrixMedia : ContentView
     {
         IsImageVisible = false;
         IsVideoVisible = false;
-        IsFileVisible = Media?.Kind == ChatMediaKind.File ||
+        IsFileVisible = Media?.Kind is ChatMediaKind.File or ChatMediaKind.Audio ||
             (Media?.Kind == ChatMediaKind.Video && !IsFull && !Media.HasPreview);
 
         if (Client is null || Media is null || IsFileVisible)
@@ -133,17 +131,22 @@ public sealed partial class MatrixMedia : ContentView
             return;
         }
 
+        if (Media.Kind == ChatMediaKind.Video)
+        {
+            EnsureVideoElement();
+        }
+
         byte[]? imageData;
         try
         {
             if (IsFull)
             {
-                await Media.LoadFullAsync(Client);
+                await Media.LoadFullAsync(Client).ConfigureAwait(false);
                 imageData = Media.FullImageData;
             }
             else
             {
-                imageData = await Media.LoadPreviewAsync(Client, cancellationToken);
+                imageData = await Media.LoadPreviewAsync(Client, cancellationToken).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -153,7 +156,8 @@ public sealed partial class MatrixMedia : ContentView
         catch (Exception exception)
         {
             System.Diagnostics.Debug.WriteLine($"Could not load media: {exception}");
-            IsFileVisible = Media.Kind == ChatMediaKind.Video && !IsFull;
+            await Dispatcher.DispatchAsync(() =>
+                IsFileVisible = Media.Kind == ChatMediaKind.Video && !IsFull);
             return;
         }
 
@@ -162,27 +166,38 @@ public sealed partial class MatrixMedia : ContentView
             return;
         }
 
-        if (Media.Kind == ChatMediaKind.Video && IsFull)
-        {
-            VideoSource = Media.VideoPath is { } path
-                ? PlaybackMediaSource.FromFile(path)
-                : null;
-            IsVideoVisible = VideoSource is not null;
-            IsFileVisible = !IsVideoVisible;
-            return;
-        }
-
-        ImageSource = imageData is null
+        var imageSource = imageData is null
             ? null
             : Microsoft.Maui.Controls.ImageSource.FromStream(
                 () => new MemoryStream(imageData));
-        IsImageVisible = ImageSource is not null;
+        await Dispatcher.DispatchAsync(() =>
+        {
+            if (version != _loadVersion) return;
+
+            if (Media.Kind == ChatMediaKind.Video && IsFull)
+            {
+                VideoSource = Media.VideoPath is { } path
+                    ? PlaybackMediaSource.FromFile(path)
+                    : null;
+                IsVideoVisible = VideoSource is not null;
+                IsFileVisible = !IsVideoVisible;
+                return;
+            }
+
+            ImageSource = imageSource;
+            IsImageVisible = imageSource is not null;
+        });
     }
 
     private static void OnMediaChanged(
         BindableObject bindable,
         object oldValue,
-        object newValue) => ((MatrixMedia)bindable).Load();
+        object newValue)
+    {
+        var media = (MatrixMedia)bindable;
+        media.IsVisible = newValue is ChatMedia { Kind: not ChatMediaKind.Audio };
+        media.Load();
+    }
 
     private static void OnClientChanged(
         BindableObject bindable,
@@ -201,7 +216,22 @@ public sealed partial class MatrixMedia : ContentView
 
     private void StopVideo()
     {
-        _videoElement.Stop();
+        _videoElement?.Stop();
         VideoSource = null;
+    }
+
+    private void EnsureVideoElement()
+    {
+        if (_videoElement is not null) return;
+
+        _videoElement = new MediaElement
+        {
+            ShouldAutoPlay = false,
+            ShouldShowPlaybackControls = true,
+            Aspect = Aspect.AspectFit,
+        }
+        .Bind(MediaElement.SourceProperty, nameof(VideoSource), source: this)
+        .Bind(IsVisibleProperty, nameof(IsVideoVisible), source: this);
+        _videoHost.Content = _videoElement;
     }
 }

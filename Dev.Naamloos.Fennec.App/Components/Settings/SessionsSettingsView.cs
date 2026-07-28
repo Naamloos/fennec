@@ -147,8 +147,8 @@ public sealed partial class SessionsSettingsView : ContentView
     private async Task RenameSessionAsync(MatrixSession? session)
     {
         if (session is null || MatrixClient is null) return;
-        var name = await Shell.Current.DisplayPromptAsync(
-            "Device name", "Give this session a recognizable name.", initialValue: session.DisplayName);
+        var name = await InAppDialogs.PromptAsync(
+            Shell.Current, "Device name", "Give this session a recognizable name.", "Rename", initialValue: session.DisplayName);
         if (string.IsNullOrWhiteSpace(name)) return;
 
         await MatrixClient.RenameSessionAsync(session.DeviceId, name.Trim());

@@ -40,6 +40,9 @@ public sealed partial class ChatMessageView : ContentView
     [BindableProperty]
     public partial ICommand? OpenProfileCommand { get; set; }
 
+    [BindableProperty]
+    public partial ICommand? PollVoteCommand { get; set; }
+
     public ChatMessageView()
     {
         Content = new Grid
@@ -113,7 +116,9 @@ public sealed partial class ChatMessageView : ContentView
                             .Bind(MessageBubbleView.OpenMediaCommandProperty,
                                 nameof(OpenMediaCommand), source: this)
                             .Bind(MessageBubbleView.OpenProfileCommandProperty,
-                                nameof(OpenProfileCommand), source: this),
+                                nameof(OpenProfileCommand), source: this)
+                            .Bind(MessageBubbleView.PollVoteCommandProperty,
+                                nameof(PollVoteCommand), source: this),
                     },
                 }
                 .Column(1),

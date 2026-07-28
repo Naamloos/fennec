@@ -5,6 +5,7 @@ public enum ChatMediaKind
     None,
     Image,
     Video,
+    Audio,
     File,
 }
 
@@ -36,6 +37,10 @@ public sealed class ChatMedia : ObservableModel
     public string? MimeType { get; }
 
     public string? ThumbnailSourceJson { get; }
+
+    public bool IsAnimatedGif => Kind == ChatMediaKind.Image &&
+        (string.Equals(MimeType, "image/gif", StringComparison.OrdinalIgnoreCase) ||
+         Filename.EndsWith(".gif", StringComparison.OrdinalIgnoreCase));
 
     public bool HasPreview => Kind != ChatMediaKind.Video ||
         !string.IsNullOrWhiteSpace(ThumbnailSourceJson);
@@ -71,7 +76,12 @@ public sealed class ChatMedia : ObservableModel
 
         try
         {
-            return await client.GetThumbnailAsync(
+            if (IsAnimatedGif)
+            {
+                return await client.GetMediaContentAsync(SourceJson);
+            }
+
+            return await client.GetRoomImageThumbnailAsync(
                 ThumbnailSourceJson ?? SourceJson,
                 480,
                 480,

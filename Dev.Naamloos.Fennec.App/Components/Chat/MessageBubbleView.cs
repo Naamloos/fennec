@@ -43,6 +43,9 @@ public sealed partial class MessageBubbleView : ContentView
     [BindableProperty]
     public partial ICommand? OpenProfileCommand { get; set; }
 
+    [BindableProperty]
+    public partial ICommand? PollVoteCommand { get; set; }
+
     public MessageBubbleView()
     {
         var bubble = new Border
@@ -89,10 +92,16 @@ public sealed partial class MessageBubbleView : ContentView
                             $"{nameof(Item)}.{nameof(ChatTimelineItem.Media)}",
                             source: this)
                         .Bind(MatrixMedia.ClientProperty, nameof(Client), source: this)
-                        .Bind(MatrixMedia.OpenCommandProperty, nameof(OpenMediaCommand), source: this)
-                        .Bind(IsVisibleProperty,
-                            $"{nameof(Item)}.{nameof(ChatTimelineItem.Media)}",
-                            converter: new NotNullConverter(), source: this),
+                        .Bind(MatrixMedia.OpenCommandProperty, nameof(OpenMediaCommand), source: this),
+
+                    new InlineAudioPlayer()
+                        .Bind(InlineAudioPlayer.MediaProperty,
+                            $"{nameof(Item)}.{nameof(ChatTimelineItem.Media)}", source: this)
+                        .Bind(InlineAudioPlayer.ClientProperty, nameof(Client), source: this),
+
+                    new PollMessageView()
+                        .Bind(PollMessageView.ItemProperty, nameof(Item), source: this)
+                        .Bind(PollMessageView.VoteCommandProperty, nameof(PollVoteCommand), source: this),
 
                     new MessageReactionsView()
                         .Bind(MessageReactionsView.ItemProperty, nameof(Item), source: this)

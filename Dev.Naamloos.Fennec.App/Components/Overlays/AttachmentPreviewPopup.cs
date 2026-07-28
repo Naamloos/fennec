@@ -8,6 +8,7 @@ public sealed class AttachmentPreviewPopup : Popup<bool>
     public AttachmentPreviewPopup(PickedAttachment attachment)
     {
         CanBeDismissedByTappingOutsideOfPopup = true;
+        BackgroundColor = Colors.Transparent;
         var isImage = attachment.MimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
 
         Content = new Border
@@ -37,8 +38,11 @@ public sealed class AttachmentPreviewPopup : Popup<bool>
                         ColumnSpacing = 8,
                         Children =
                         {
-                            new Button { Text = "Cancel", BackgroundColor = Colors.Transparent, Command = new Command(async () => await CloseAsync(false)) },
-                            new Button { Text = "Send", Command = new Command(async () => await CloseAsync(true)) }.Column(1),
+                            new Button { Text = "Cancel", BackgroundColor = Colors.Transparent, Command = new Command(async () => await CloseAsync(false)) }
+                                .DynamicResource(Button.TextColorProperty, "Primary"),
+                            new Button { Text = "Send", Command = new Command(async () => await CloseAsync(true)) }
+                                .DynamicResource(VisualElement.BackgroundColorProperty, "Primary")
+                                .DynamicResource(Button.TextColorProperty, "OnPrimary").Column(1),
                         },
                     },
                 },

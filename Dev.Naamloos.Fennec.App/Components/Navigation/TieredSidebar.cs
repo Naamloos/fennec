@@ -29,6 +29,7 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
             new RoomListEntriesDynamicFilterKind.Category(
                 RoomListFilterCategory.People),
         ])),
+        new("Invites", MaterialIcons.Mail, new RoomListEntriesDynamicFilterKind.Invite()),
         new("Rooms", MaterialIcons.Tag, new RoomListEntriesDynamicFilterKind.All(
         [
             new RoomListEntriesDynamicFilterKind.NonSpace(),
@@ -57,9 +58,9 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
         _spacesView = CreateSpacesView();
         _roomListView = new RoomListView
         {
-            Filter = _sections[2].Filter,
+            Filter = _sections[3].Filter,
             ExcludeSpaceRooms = true,
-            SectionTitle = _sections[2].Title,
+            SectionTitle = _sections[3].Title,
         }
         .Bind(
             RoomListView.SelectedRoomProperty,
@@ -95,7 +96,7 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
                 ]));
             _spaces.CaptureCurrentContext();
             _spacesView.ItemsSource = _spaces;
-            ShowSection(_sections[2]);
+            ShowSection(_sections[3]);
         }
         catch (Exception exception)
         {

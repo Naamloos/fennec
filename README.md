@@ -70,45 +70,45 @@ I will be tracking feature support in the following table. This table is based o
 |----------------------------------|--------------------------|-------------|-------|
 | Content Repository               | Both                     | 〰️          | uploading files and images and viewing them works |
 | Direct Messaging                 | Both                     | ✅          |       |
-| Ignoring Users                   | Both                     |             |       |
+| Ignoring Users                   | Both                     | ✅          |       |
 | Instant Messaging                | Both                     | ✅          |       |
-| Presence                         | Both                     |             |       |
+| Presence                         | Both                     | ✅          |       |
 | Push Notifications               | Mobile                   |             |       |
 | Receipts                         | Both                     | ✅          |       |
-| Room History Visibility          | Both                     |             |       |
+| Room History Visibility          | Both                     | ✅          |       |
 | Room Upgrades                    | Both                     |             |       |
 | Third-party Invites              | Mobile                   |             |       |
 | Typing Notifications             | Both                     | ✅          |       |
-| User and Room Mentions           | Both                     | 〰️          | You can mention users, not rooms. |
+| User and Room Mentions           | Both                     | ✅          |       |
 | Voice over IP                    | Both                     |             |       |
-| Client Config                    | Optional                 |             |       |
-| Device Management                | Optional                 |             |       |
+| Client Config                    | Optional                 | ✅          |       |
+| Device Management                | Optional                 | ✅          |       |
 | End-to-End Encryption            | Optional                 | ✅          |       |
-| Event Annotations and reactions  | Optional                 |             |       |
+| Event Annotations and reactions  | Optional                 | 〰️           |       |
 | Event Context                    | Optional                 |             |       |
 | Event Replacements               | Optional                 | ✅          |       |
 | Read and Unread Markers          | Optional                 | ✅          |       |
 | Guest Access                     | Optional                 |             |       |
-| Image Packs                      | Optional                 |             |       |
+| Image Packs                      | Optional                 | ✅          |       |
 | Moderation Policy Lists          | Optional                 |             |       |
 | Policy Servers                   | Optional                 |             |       |
 | OpenID                           | Optional                 |             |       |
 | Recently used emoji              | Optional                 |             |       |
 | Reference Relations              | Optional                 |             |       |
-| Reporting Content                | Optional                 |             |       |
+| Reporting Content                | Optional                 | ✅          |       |
 | Rich replies                     | Optional                 | ✅          |       |
 | Room Previews                    | Optional                 |             |       |
-| Room Tagging                     | Optional                 |             |       |
+| Room Tagging                     | Optional                 | ✅          |       |
 | SSO Client Login/Authentication  | Optional                 |             |       |
 | Secrets                          | Optional                 |             |       |
 | Send-to-Device Messaging         | Optional                 |             |       |
 | Server Access Control Lists      | Optional                 |             |       |
 | Server Administration            | Optional                 |             |       |
-| Server Notices                   | Optional                 |             |       |
+| Server Notices                   | Optional                 | ✅          |       |
 | Server Side Search               | Optional                 |             |       |
 | Spaces                           | Optional                 | ✅          |       |
-| Sticker Messages                 | Optional                 |             |       |
+| Sticker Messages                 | Optional                 | ✅          |       |
 | Third-party Networks             | Optional                 |             |       |
-| Threading                        | Optional                 |             |       |
+| Threading                        | Optional                 | ✅          |       |
 | Invite permission                | Optional                 |             |       |
-| Mutual Rooms                     | Optional                 |             |       |
+| Mutual Rooms                     | Optional                 | ✅          |       |
