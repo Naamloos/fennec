@@ -68,26 +68,26 @@ I will be tracking feature support in the following table. This table is based o
 
 | Feature                          | Desktop/Mobile Required? | Implemented | Notes |
 |----------------------------------|--------------------------|-------------|-------|
-| Content Repository               | Both                     |             |       |
-| Direct Messaging                 | Both                     |             |       |
+| Content Repository               | Both                     | 〰️          | uploading files and images and viewing them works |
+| Direct Messaging                 | Both                     | ✅          |       |
 | Ignoring Users                   | Both                     |             |       |
-| Instant Messaging                | Both                     |             |       |
+| Instant Messaging                | Both                     | ✅          |       |
 | Presence                         | Both                     |             |       |
 | Push Notifications               | Mobile                   |             |       |
-| Receipts                         | Both                     |             |       |
+| Receipts                         | Both                     | ✅          |       |
 | Room History Visibility          | Both                     |             |       |
 | Room Upgrades                    | Both                     |             |       |
 | Third-party Invites              | Mobile                   |             |       |
-| Typing Notifications             | Both                     |             |       |
-| User and Room Mentions           | Both                     |             |       |
+| Typing Notifications             | Both                     | ✅          |       |
+| User and Room Mentions           | Both                     | 〰️          | You can mention users, not rooms. |
 | Voice over IP                    | Both                     |             |       |
 | Client Config                    | Optional                 |             |       |
 | Device Management                | Optional                 |             |       |
-| End-to-End Encryption            | Optional                 |             |       |
+| End-to-End Encryption            | Optional                 | ✅          |       |
 | Event Annotations and reactions  | Optional                 |             |       |
 | Event Context                    | Optional                 |             |       |
-| Event Replacements               | Optional                 |             |       |
-| Read and Unread Markers          | Optional                 |             |       |
+| Event Replacements               | Optional                 | ✅          |       |
+| Read and Unread Markers          | Optional                 | ✅          |       |
 | Guest Access                     | Optional                 |             |       |
 | Image Packs                      | Optional                 |             |       |
 | Moderation Policy Lists          | Optional                 |             |       |
@@ -96,7 +96,7 @@ I will be tracking feature support in the following table. This table is based o
 | Recently used emoji              | Optional                 |             |       |
 | Reference Relations              | Optional                 |             |       |
 | Reporting Content                | Optional                 |             |       |
-| Rich replies                     | Optional                 |             |       |
+| Rich replies                     | Optional                 | ✅          |       |
 | Room Previews                    | Optional                 |             |       |
 | Room Tagging                     | Optional                 |             |       |
 | SSO Client Login/Authentication  | Optional                 |             |       |
@@ -106,7 +106,7 @@ I will be tracking feature support in the following table. This table is based o
 | Server Administration            | Optional                 |             |       |
 | Server Notices                   | Optional                 |             |       |
 | Server Side Search               | Optional                 |             |       |
-| Spaces                           | Optional                 |             |       |
+| Spaces                           | Optional                 | ✅          |       |
 | Sticker Messages                 | Optional                 |             |       |
 | Third-party Networks             | Optional                 |             |       |
 | Threading                        | Optional                 |             |       |
