@@ -344,6 +344,7 @@ public sealed partial class MatrixHtmlView : ContentView
                     new MatrixAvatar
                     {
                         MatrixSource = member?.AvatarUrl,
+                        DisplayName = member?.DisplayName ?? userId,
                         Size = 18,
                     },
                     new Label

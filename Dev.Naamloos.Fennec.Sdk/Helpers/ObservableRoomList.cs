@@ -171,7 +171,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
         // append to the end
         private void append(RoomListEntriesUpdate.Append append)
         {
-            var values = append.Values.Select(x => new ManagedRoom(x));
+            var values = append.Values.Select(CreateManagedRoom);
             foreach (var value in values)
             {
                 this.Add(value);
@@ -187,13 +187,13 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
         // push to the front
         private void pushFront(RoomListEntriesUpdate.PushFront pushFront)
         {
-            this.Insert(0, new ManagedRoom(pushFront.Value));
+            this.Insert(0, CreateManagedRoom(pushFront.Value));
         }
 
         // push to the back
         private void pushBack(RoomListEntriesUpdate.PushBack pushBack)
         {
-            this.Add(new ManagedRoom(pushBack.Value));
+            this.Add(CreateManagedRoom(pushBack.Value));
         }
 
         // pop the first element
@@ -217,13 +217,15 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
         // insert at index
         private void insert(RoomListEntriesUpdate.Insert insert)
         {
-            this.Insert((int)insert.Index, new ManagedRoom(insert.Value));
+            this.Insert((int)insert.Index, CreateManagedRoom(insert.Value));
         }
 
         // set at specific index (update)
         private void set(RoomListEntriesUpdate.Set set)
         {
-            this[(int)set.Index].Update(set.Value);
+            var room = this[(int)set.Index];
+            room.Update(set.Value);
+            _ = room.ResolveDirectAvatarAsync();
         }
 
         // remove at a specific index
@@ -245,11 +247,18 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
         private void reset(RoomListEntriesUpdate.Reset reset)
         {
             this.Clear();
-            var values = reset.Values.Select(x => new ManagedRoom(x));
+            var values = reset.Values.Select(CreateManagedRoom);
             foreach (var value in values)
             {
                 this.Add(value);
             }
+        }
+
+        private static ManagedRoom CreateManagedRoom(Room room)
+        {
+            var managedRoom = new ManagedRoom(room);
+            _ = managedRoom.ResolveDirectAvatarAsync();
+            return managedRoom;
         }
 
         public void Dispose()

@@ -4,6 +4,8 @@ using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Dev.Naamloos.Fennec.App.Converters;
 using Dev.Naamloos.Fennec.Sdk.Entities;
+using MauiIcons.Core;
+using MauiIcons.Material;
 using System.Net;
 using System.Text.RegularExpressions;
 using System.Windows.Input;
@@ -36,6 +38,9 @@ public sealed partial class ChatComposer : ContentView
 
     [BindableProperty]
     public partial ICommand? AttachCommand { get; set; }
+
+    [BindableProperty]
+    public partial ICommand? InlineAttachmentCommand { get; set; }
 
     [BindableProperty]
     public partial ICommand? SendCommand { get; set; }
@@ -116,18 +121,19 @@ public sealed partial class ChatComposer : ContentView
                             stringFormat: "Replying to {0}", source: this)
                         .Column(0),
 
-                        new Button
+                        new MauiIcon
                         {
-                            Text = "×",
-                            FontSize = 20,
-                            FontAttributes = FontAttributes.Bold,
-                            TextColor = Colors.Red,
+                            Icon = MaterialIcons.Close,
+                            IconSize = 20,
+                            IconColor = Colors.Red,
                             WidthRequest = 32,
                             HeightRequest = 32,
-                            Padding = 0,
-                            BackgroundColor = Colors.Transparent,
+                            GestureRecognizers =
+                            {
+                                new TapGestureRecognizer()
+                                    .BindCommand(nameof(CancelReplyCommand), source: this),
+                            },
                         }
-                        .BindCommand(nameof(CancelReplyCommand), source: this)
                         .Column(1),
                     },
                 }
@@ -158,18 +164,19 @@ public sealed partial class ChatComposer : ContentView
                             stringFormat: "Editing {0}", source: this)
                         .Column(0),
 
-                        new Button
+                        new MauiIcon
                         {
-                            Text = "×",
-                            FontSize = 20,
-                            FontAttributes = FontAttributes.Bold,
-                            TextColor = Colors.Red,
+                            Icon = MaterialIcons.Close,
+                            IconSize = 20,
+                            IconColor = Colors.Red,
                             WidthRequest = 32,
                             HeightRequest = 32,
-                            Padding = 0,
-                            BackgroundColor = Colors.Transparent,
+                            GestureRecognizers =
+                            {
+                                new TapGestureRecognizer()
+                                    .BindCommand(nameof(CancelEditCommand), source: this),
+                            },
                         }
-                        .BindCommand(nameof(CancelEditCommand), source: this)
                         .Column(1),
                     },
                 }
@@ -204,26 +211,34 @@ public sealed partial class ChatComposer : ContentView
                             },
                             Children =
                             {
-                                new Button
+                                new MauiIcon
                                 {
-                                    Text = "+",
-                                    FontSize = 24,
+                                    Icon = MaterialIcons.AttachFile,
+                                    IconSize = 24,
                                     WidthRequest = 40,
                                     HeightRequest = 40,
-                                    CornerRadius = 999,
-                                    Padding = 0,
                                     VerticalOptions = LayoutOptions.Center,
+                                    GestureRecognizers =
+                                    {
+                                        new TapGestureRecognizer()
+                                            .BindCommand(nameof(AttachCommand), source: this),
+                                    },
                                 }
-                                .BindCommand(nameof(AttachCommand), source: this)
-                                .Invoke(b => SemanticProperties.SetDescription(b, "Attach a file"))
                                 .Column(0),
                                 CreateEntry().Column(1),
-                                new Button
+                                new MauiIcon
                                 {
-                                    Text = "Send",
-                                    VerticalOptions = LayoutOptions.Center
+                                    Icon = MaterialIcons.Send,
+                                    IconSize = 24,
+                                    WidthRequest = 40,
+                                    HeightRequest = 40,
+                                    VerticalOptions = LayoutOptions.Center,
+                                    GestureRecognizers =
+                                    {
+                                        new TapGestureRecognizer()
+                                            .BindCommand(nameof(SendCommand), source: this),
+                                    },
                                 }
-                                .BindCommand(nameof(SendCommand), source: this)
                                 .Column(2)
                             }
                         },
@@ -256,11 +271,42 @@ public sealed partial class ChatComposer : ContentView
             VerticalOptions = LayoutOptions.Center,
         };
         _entry.TextChanged += OnTextChanged;
+#if ANDROID
+        _entry.HandlerChanged += OnEntryHandlerChanged;
+#endif
 
         return _entry
             .Bind(Entry.TextProperty, nameof(Text), BindingMode.TwoWay, source: this)
             .Bind(Entry.ReturnCommandProperty, nameof(SendCommand), source: this);
     }
+
+#if ANDROID
+    private void OnEntryHandlerChanged(object? sender, EventArgs args)
+    {
+        if (_entry?.Handler?.PlatformView is Android.Views.View view)
+            AndroidX.Core.View.ViewCompat.SetOnReceiveContentListener(view, ["image/gif", "image/webp", "image/*"], new InlineContentListener(this));
+    }
+
+    private sealed class InlineContentListener(ChatComposer composer) : Java.Lang.Object, AndroidX.Core.View.IOnReceiveContentListener
+    {
+        public AndroidX.Core.View.ContentInfoCompat? OnReceiveContent(Android.Views.View? view, AndroidX.Core.View.ContentInfoCompat? payload)
+        {
+            var uri = payload?.Clip?.GetItemAt(0)?.Uri;
+            if (uri is null || view?.Context?.ContentResolver is not { } resolver) return payload;
+            _ = Task.Run(async () =>
+            {
+                await using var input = resolver.OpenInputStream(uri);
+                if (input is null) return;
+                using var data = new MemoryStream();
+                await input.CopyToAsync(data);
+                var mime = resolver.GetType(uri) ?? "application/octet-stream";
+                var attachment = new PickedAttachment("gboard" + (mime == "image/gif" ? ".gif" : ".webp"), mime, data.ToArray());
+                await MainThread.InvokeOnMainThreadAsync(() => composer.InlineAttachmentCommand?.Execute(attachment));
+            });
+            return null;
+        }
+    }
+#endif
 
     private void OnTextChanged(object? sender, TextChangedEventArgs args)
     {

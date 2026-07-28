@@ -1,6 +1,5 @@
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
-using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.Sdk;
 using Dev.Naamloos.Fennec.Sdk.Entities;
 using System.Collections.ObjectModel;
@@ -15,6 +14,8 @@ public sealed partial class ChatTimeline : ContentView
     private readonly CollectionView _collectionView;
     private INotifyCollectionChanged? _itemsSource;
     private bool _initialScrollPending = true;
+    private bool _followingLatest = true;
+    private bool _loadMoreArmed = true;
     private bool _scrollQueued;
 
     [BindableProperty(PropertyChangedMethodName = nameof(OnItemsChanged))]
@@ -47,35 +48,31 @@ public sealed partial class ChatTimeline : ContentView
     [BindableProperty]
     public partial ICommand? OpenMediaCommand { get; set; }
 
-    [BindableProperty(DefaultBindingMode = BindingMode.TwoWay)]
+    [BindableProperty]
+    public partial ICommand? OpenProfileCommand { get; set; }
+
+    [BindableProperty(DefaultBindingMode = BindingMode.TwoWay,
+        PropertyChangedMethodName = nameof(OnIsNearBottomChanged))]
     public partial bool IsNearBottom { get; set; } = true;
 
-    [BindableProperty(PropertyChangedMethodName = nameof(OnLoadMoreVisibilityChanged))]
-    public partial bool ShowLoadMore { get; set; }
+    [BindableProperty]
+    public partial bool IsLoadingHistory { get; set; }
 
-    [BindableProperty(PropertyChangedMethodName = nameof(OnLoadMoreVisibilityChanged))]
+    [BindableProperty]
     public partial bool HasMoreHistory { get; set; }
 
-    public bool IsLoadMoreVisible => ShowLoadMore && HasMoreHistory;
+    public bool IsScrollToBottomVisible => !IsNearBottom && Items is { Count: > 0 };
 
     public ChatTimeline()
     {
         _collectionView = new CollectionView
         {
+            BackgroundColor = Colors.Transparent,
             SelectionMode = SelectionMode.None,
             ItemsUpdatingScrollMode = ItemsUpdatingScrollMode.KeepScrollOffset,
             ItemSizingStrategy = ItemSizingStrategy.MeasureAllItems,
             ItemsLayout = new LinearItemsLayout(ItemsLayoutOrientation.Vertical),
-            ItemTemplate = new DataTemplate(() => new ChatTimelineItemView()
-                .Bind(ChatTimelineItemView.ItemProperty, ".")
-                .Bind(ChatTimelineItemView.ClientProperty, nameof(Client), source: this)
-                .Bind(ChatTimelineItemView.MembersProperty, nameof(Members), source: this)
-                .Bind(ChatTimelineItemView.ReplyCommandProperty, nameof(ReplyCommand), source: this)
-                .Bind(ChatTimelineItemView.EditCommandProperty, nameof(EditCommand), source: this)
-                .Bind(ChatTimelineItemView.LinkCommandProperty, nameof(LinkCommand), source: this)
-                .Bind(ChatTimelineItemView.MenuCommandProperty, nameof(MenuCommand), source: this)
-                .Bind(ChatTimelineItemView.AddReactionCommandProperty, nameof(AddReactionCommand), source: this)
-                .Bind(ChatTimelineItemView.OpenMediaCommandProperty, nameof(OpenMediaCommand), source: this)),
+            ItemTemplate = new ChatTimelineTemplateSelector(this),
             EmptyView = new Grid
             {
                 Children =
@@ -89,44 +86,50 @@ public sealed partial class ChatTimeline : ContentView
                     },
                 },
             },
-            Behaviors =
-            {
-                new CommunityToolkit.Maui.Behaviors.EventToCommandBehavior
-                {
-                    EventName = nameof(CollectionView.Scrolled),
-                }
-                .Bind(CommunityToolkit.Maui.Behaviors.EventToCommandBehavior.CommandProperty,
-                    nameof(ScrolledCommand), source: this),
-            },
         }
         .Bind(ItemsView.ItemsSourceProperty, nameof(Items), source: this);
+        _collectionView.Scrolled += (_, eventArgs) => OnScrolled(eventArgs);
+        _collectionView.SizeChanged += (_, _) =>
+        {
+            if (_followingLatest)
+            {
+                QueueScrollToLatest();
+            }
+        };
 
         Content = new Grid
         {
-            RowDefinitions =
-            {
-                new RowDefinition(GridLength.Auto),
-                new RowDefinition(GridLength.Star),
-            },
+            BackgroundColor = Colors.Transparent,
             Children =
             {
+                _collectionView,
+                new ActivityIndicator
+                {
+                    Margin = new Thickness(12),
+                    HorizontalOptions = LayoutOptions.Center,
+                    VerticalOptions = LayoutOptions.Start,
+                }
+                .Bind(ActivityIndicator.IsRunningProperty, nameof(IsLoadingHistory), source: this)
+                .Bind(IsVisibleProperty, nameof(IsLoadingHistory), source: this),
                 new Button
                 {
-                    Text = "Load older messages",
-                    Margin = new Thickness(12, 8),
-                    HorizontalOptions = LayoutOptions.Center,
+                    Text = "↓ Latest",
+                    Margin = new Thickness(12),
+                    HorizontalOptions = LayoutOptions.End,
+                    VerticalOptions = LayoutOptions.End,
                 }
-                .Bind(Button.CommandProperty, nameof(HistoryCommand), source: this)
-                .Bind(IsVisibleProperty, nameof(IsLoadMoreVisible), source: this)
-                .Row(0),
-                _collectionView.Row(1),
+                .Bind(IsVisibleProperty, nameof(IsScrollToBottomVisible), source: this)
+                .Invoke(button => button.Clicked += (_, _) =>
+                {
+                    _followingLatest = true;
+                    QueueScrollToLatest();
+                }),
             },
         };
         Loaded += (_, _) => QueueScrollToLatest();
     }
 
-    [RelayCommand]
-    private void Scrolled(ItemsViewScrolledEventArgs? eventArgs)
+    private void OnScrolled(ItemsViewScrolledEventArgs? eventArgs)
     {
         if (eventArgs is null || Items is not { Count: > 0 })
         {
@@ -134,12 +137,30 @@ public sealed partial class ChatTimeline : ContentView
         }
 
         IsNearBottom = eventArgs.LastVisibleItemIndex >= Items.Count - 1;
-        ShowLoadMore = eventArgs.FirstVisibleItemIndex <= 1 ||
-            eventArgs.VerticalOffset <= 24;
+        var isNearTop = eventArgs.FirstVisibleItemIndex <= 3;
 
-        if (ShowLoadMore && HistoryCommand?.CanExecute(null) == true)
+        if (_initialScrollPending && IsNearBottom)
         {
+            _initialScrollPending = false;
+        }
+
+        if (!_initialScrollPending && _followingLatest &&
+            eventArgs.VerticalDelta < 0 && !IsNearBottom)
+        {
+            _followingLatest = false;
+        }
+
+        if (!_initialScrollPending && !_followingLatest && _loadMoreArmed &&
+            isNearTop && eventArgs.VerticalDelta < 0 && HasMoreHistory &&
+            !IsLoadingHistory && HistoryCommand?.CanExecute(null) == true)
+        {
+            _loadMoreArmed = false;
             HistoryCommand.Execute(null);
+        }
+
+        if (!isNearTop && eventArgs.VerticalDelta > 0 && !IsLoadingHistory)
+        {
+            _loadMoreArmed = true;
         }
     }
 
@@ -148,11 +169,11 @@ public sealed partial class ChatTimeline : ContentView
         object oldValue,
         object newValue) => ((ChatTimeline)bindable).SetItemsSource();
 
-    private static void OnLoadMoreVisibilityChanged(
+    private static void OnIsNearBottomChanged(
         BindableObject bindable,
         object oldValue,
         object newValue) => ((ChatTimeline)bindable).OnPropertyChanged(
-            nameof(IsLoadMoreVisible));
+            nameof(IsScrollToBottomVisible));
 
     private void SetItemsSource()
     {
@@ -168,12 +189,15 @@ public sealed partial class ChatTimeline : ContentView
         }
 
         _initialScrollPending = true;
+        _followingLatest = true;
+        _loadMoreArmed = true;
+        OnPropertyChanged(nameof(IsScrollToBottomVisible));
         QueueScrollToLatest();
     }
 
     private void OnItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs args)
     {
-        if (_initialScrollPending ||
+        if (_followingLatest ||
             (IsNearBottom && args.Action == NotifyCollectionChangedAction.Add &&
              args.NewStartingIndex >= Items!.Count - (args.NewItems?.Count ?? 0)))
         {
@@ -197,8 +221,44 @@ public sealed partial class ChatTimeline : ContentView
                 return;
             }
 
-            _collectionView.ScrollTo(Items.Count - 1, ScrollToPosition.End, animate: false);
-            _initialScrollPending = false;
+            if (Items.LastOrDefault() is { } latest)
+            {
+                _collectionView.ScrollTo(latest, ScrollToPosition.End, animate: false);
+            }
         });
+    }
+
+    private sealed class ChatTimelineTemplateSelector : DataTemplateSelector
+    {
+        private readonly DataTemplate _eventTemplate;
+        private readonly DataTemplate _messageTemplate;
+
+        public ChatTimelineTemplateSelector(ChatTimeline owner)
+        {
+            _eventTemplate = new DataTemplate(() => new ChatEventView()
+                .Bind(ChatEventView.ItemProperty, ".")
+                .Bind(ChatEventView.MenuCommandProperty,
+                    nameof(MenuCommand), source: owner));
+            _messageTemplate = new DataTemplate(() => new ChatMessageView()
+                .Bind(ChatMessageView.ItemProperty, ".")
+                .Bind(ChatMessageView.ClientProperty, nameof(Client), source: owner)
+                .Bind(ChatMessageView.MembersProperty, nameof(Members), source: owner)
+                .Bind(ChatMessageView.ReplyCommandProperty, nameof(ReplyCommand), source: owner)
+                .Bind(ChatMessageView.EditCommandProperty, nameof(EditCommand), source: owner)
+                .Bind(ChatMessageView.LinkCommandProperty, nameof(LinkCommand), source: owner)
+                .Bind(ChatMessageView.MenuCommandProperty, nameof(MenuCommand), source: owner)
+                .Bind(ChatMessageView.AddReactionCommandProperty,
+                    nameof(AddReactionCommand), source: owner)
+                .Bind(ChatMessageView.OpenMediaCommandProperty,
+                    nameof(OpenMediaCommand), source: owner)
+                .Bind(ChatMessageView.OpenProfileCommandProperty,
+                    nameof(OpenProfileCommand), source: owner));
+        }
+
+        protected override DataTemplate OnSelectTemplate(
+            object item,
+            BindableObject container) => item is ChatTimelineItem { IsMessage: true }
+                ? _messageTemplate
+                : _eventTemplate;
     }
 }

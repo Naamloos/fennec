@@ -3,6 +3,8 @@ using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.Sdk;
 using Dev.Naamloos.Fennec.Sdk.Entities;
 using Dev.Naamloos.Fennec.Sdk.Helpers;
+using MauiIcons.Core;
+using MauiIcons.Material;
 using System.Diagnostics;
 using uniffi.matrix_sdk_ffi;
 
@@ -16,18 +18,18 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
     private readonly SpaceRoomListView _spaceRoomListView;
     private readonly SidebarSection[] _sections =
     [
-        new("Favorites", "★", new RoomListEntriesDynamicFilterKind.All(
+        new("Favorites", MaterialIcons.Star, new RoomListEntriesDynamicFilterKind.All(
         [
             new RoomListEntriesDynamicFilterKind.Favourite(),
             new RoomListEntriesDynamicFilterKind.NonSpace(),
         ])),
-        new("DMs", "@", new RoomListEntriesDynamicFilterKind.All(
+        new("DMs", MaterialIcons.Person, new RoomListEntriesDynamicFilterKind.All(
         [
             new RoomListEntriesDynamicFilterKind.NonSpace(),
             new RoomListEntriesDynamicFilterKind.Category(
                 RoomListFilterCategory.People),
         ])),
-        new("Rooms", "#", new RoomListEntriesDynamicFilterKind.All(
+        new("Rooms", MaterialIcons.Tag, new RoomListEntriesDynamicFilterKind.All(
         [
             new RoomListEntriesDynamicFilterKind.NonSpace(),
             new RoomListEntriesDynamicFilterKind.Category(
@@ -108,6 +110,11 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
         ItemSizingStrategy = ItemSizingStrategy.MeasureFirstItem,
         ItemTemplate = new DataTemplate(() =>
         {
+            var icon = new MauiIcon
+            {
+                IconSize = 20,
+                HorizontalOptions = LayoutOptions.Center,
+            };
             var row = new Grid
             {
                 Padding = new Thickness(0, 8, 4, 8),
@@ -129,16 +136,17 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
                     .Bind(IsVisibleProperty, nameof(SidebarSection.IsSelected))
                     .DynamicResource(BackgroundColorProperty, "Primary")
                     .Column(0),
-                    new Label
-                    {
-                        FontSize = 20,
-                        HorizontalTextAlignment = TextAlignment.Center,
-                    }
-                    .Bind(Label.TextProperty, nameof(SidebarSection.Icon))
-                    .Column(1),
+                    icon.Column(1),
                 },
             };
 
+            row.BindingContextChanged += (_, _) =>
+            {
+                if (row.BindingContext is SidebarSection section)
+                {
+                    icon.Icon = section.Icon;
+                }
+            };
             var tap = new TapGestureRecognizer();
             tap.Tapped += (_, _) => ShowSection(row.BindingContext as SidebarSection);
             row.GestureRecognizers.Add(tap);
@@ -285,14 +293,14 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
 
     private sealed class SidebarSection(
         string title,
-        string icon,
+        MaterialIcons icon,
         RoomListEntriesDynamicFilterKind filter)
         : ObservableModel
     {
         private bool _isSelected;
 
         public string Title { get; } = title;
-        public string Icon { get; } = icon;
+        public MaterialIcons Icon { get; } = icon;
         public RoomListEntriesDynamicFilterKind Filter { get; } = filter;
 
         public bool IsSelected

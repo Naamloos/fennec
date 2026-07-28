@@ -1,6 +1,8 @@
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.Sdk.Entities;
+using MauiIcons.Core;
+using MauiIcons.Material;
 using System.Windows.Input;
 
 namespace Dev.Naamloos.Fennec.App.Components;
@@ -20,15 +22,20 @@ public sealed partial class MessageReactionsView : ContentView
             Spacing = 4,
             Children =
             {
-                new Button
+                new MauiIcon
                 {
-                    Text = "+",
-                    Padding = new Thickness(6, 0),
+                    Icon = MaterialIcons.AddReaction,
+                    IconSize = 20,
+                    WidthRequest = 28,
                     HeightRequest = 28,
                     MinimumHeightRequest = 28,
-                }
-                .BindCommand(nameof(AddReactionCommand), source: this)
-                .Bind(Button.CommandParameterProperty, nameof(Item), source: this),
+                    GestureRecognizers =
+                    {
+                        new TapGestureRecognizer()
+                            .BindCommand(nameof(AddReactionCommand), source: this)
+                            .Bind(TapGestureRecognizer.CommandParameterProperty, nameof(Item), source: this),
+                    },
+                },
             },
         }
         .Bind(BindableLayout.ItemsSourceProperty,

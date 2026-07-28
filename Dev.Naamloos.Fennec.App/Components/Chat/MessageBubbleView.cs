@@ -40,6 +40,9 @@ public sealed partial class MessageBubbleView : ContentView
     [BindableProperty]
     public partial ICommand? OpenMediaCommand { get; set; }
 
+    [BindableProperty]
+    public partial ICommand? OpenProfileCommand { get; set; }
+
     public MessageBubbleView()
     {
         var bubble = new Border
@@ -109,7 +112,9 @@ public sealed partial class MessageBubbleView : ContentView
                         {
                             Size = 20,
                         }.Bind(MatrixAvatar.MatrixSourceProperty,
-                            nameof(ChatReadReceipt.AvatarUrl))),
+                            nameof(ChatReadReceipt.AvatarUrl))
+                        .Bind(MatrixAvatar.DisplayNameProperty,
+                            nameof(ChatReadReceipt.Name))),
                     }
                     .Bind(ItemsView.ItemsSourceProperty,
                         $"{nameof(Item)}.{nameof(ChatTimelineItem.ReadReceipts)}",

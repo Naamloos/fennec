@@ -14,6 +14,9 @@ public partial class MatrixImage : Image
     [BindableProperty]
     public partial bool IsJson { get; set; }
 
+    [BindableProperty]
+    public partial bool UseFullSize { get; set; }
+
     private int _loadId;
     private CancellationTokenSource? _loadCancellation;
 
@@ -33,7 +36,8 @@ public partial class MatrixImage : Image
         {
             if (e.PropertyName is nameof(MatrixSource)
                 or nameof(Client)
-                or nameof(IsJson))
+                or nameof(IsJson)
+                or nameof(UseFullSize))
             {
                 Load();
             }
@@ -61,12 +65,14 @@ public partial class MatrixImage : Image
 
         try
         {
-            var data = await client.GetThumbnailAsync(
-                source,
-                200,
-                200,
-                IsJson,
-                cancellationToken);
+            var data = UseFullSize
+                ? await client.GetMediaContentAsync(source, IsJson)
+                : await client.GetThumbnailAsync(
+                    source,
+                    200,
+                    200,
+                    IsJson,
+                    cancellationToken);
 
             if (loadId != _loadId)
             {

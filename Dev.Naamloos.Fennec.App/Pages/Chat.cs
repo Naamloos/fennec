@@ -20,8 +20,11 @@ public sealed partial class Chat : ContentView, IAsyncDisposable
     private CancellationTokenSource? _loadCancellation;
     private ChatSession? _subscribedSession;
     private bool _disposed;
+    private string? _roomWallpaperUrl;
+    private string? _globalWallpaperUrl;
+    private readonly UserProfileSheet _profileSheet = new();
 
-    [BindableProperty]
+    [BindableProperty(PropertyChangedMethodName = nameof(OnMatrixClientChanged))]
     public partial ManagedMatrixClient? MatrixClient { get; set; }
 
     [BindableProperty(PropertyChangedMethodName = nameof(OnSelectedRoomChanged))]
@@ -42,6 +45,12 @@ public sealed partial class Chat : ContentView, IAsyncDisposable
     [BindableProperty]
     public partial ChatMedia? FullscreenMedia { get; set; }
 
+    [BindableProperty]
+    public partial bool IsRoomInfoOpen { get; set; }
+
+    [BindableProperty]
+    public partial string? RoomWallpaperUrl { get; set; }
+
     public Chat()
     {
         Content = new Grid
@@ -58,8 +67,12 @@ public sealed partial class Chat : ContentView, IAsyncDisposable
             },
             Children =
             {
+                new MatrixImage { IsJson = false, UseFullSize = true, Aspect = Aspect.AspectFill, Opacity = .42, InputTransparent = true }
+                    .Bind(MatrixImage.MatrixSourceProperty, nameof(RoomWallpaperUrl), source: this)
+                    .Bind(MatrixImage.ClientProperty, nameof(MatrixClient), source: this),
                 new Grid
                 {
+                    BackgroundColor = Colors.Transparent,
                     RowDefinitions =
                     {
                         new RowDefinition(GridLength.Star),
@@ -80,6 +93,9 @@ public sealed partial class Chat : ContentView, IAsyncDisposable
                             .Bind(ChatTimeline.HasMoreHistoryProperty,
                                 $"{nameof(Session)}.{nameof(ChatSession.CanLoadMoreHistory)}",
                                 source: this)
+                            .Bind(ChatTimeline.IsLoadingHistoryProperty,
+                                $"{nameof(Session)}.{nameof(ChatSession.IsLoadingHistory)}",
+                                source: this)
                             .Bind(ChatTimeline.ReplyCommandProperty,
                                 nameof(ReplyCommand), source: this)
                             .Bind(ChatTimeline.EditCommandProperty,
@@ -92,6 +108,8 @@ public sealed partial class Chat : ContentView, IAsyncDisposable
                                 nameof(OpenReactionPickerCommand), source: this)
                             .Bind(ChatTimeline.OpenMediaCommandProperty,
                                 nameof(OpenMediaCommand), source: this)
+                            .Bind(ChatTimeline.OpenProfileCommandProperty,
+                                nameof(OpenProfileCommand), source: this)
                             .Bind(ChatTimeline.IsNearBottomProperty,
                                 nameof(TimelineIsNearBottom), BindingMode.TwoWay, source: this)
                             .Row(0),
@@ -134,15 +152,23 @@ public sealed partial class Chat : ContentView, IAsyncDisposable
                                 nameof(SendMessageCommand), source: this)
                             .Bind(ChatComposer.AttachCommandProperty,
                                 nameof(AttachFileCommand), source: this)
+                            .Bind(ChatComposer.InlineAttachmentCommandProperty,
+                                nameof(ReceiveInlineAttachmentCommand), source: this)
                             .Bind(ChatComposer.MembersProperty,
                                 $"{nameof(Session)}.{nameof(ChatSession.Members)}", source: this)
                             .Bind(ChatComposer.EmotesProperty,
                                 $"{nameof(Session)}.{nameof(ChatSession.Emotes)}", source: this)
                             .Row(2),
                     },
-                }
-                .Bind(IsVisibleProperty, nameof(IsLoading),
-                    converter: new BooleanInverterConverter(), source: this),
+                },
+
+                new RoomInfoFlyout()
+                    .Bind(RoomInfoFlyout.ClientProperty, nameof(MatrixClient), source: this)
+                    .Bind(RoomInfoFlyout.RoomProperty, $"{nameof(Session)}.{nameof(ChatSession.Room)}", source: this)
+                    .Bind(RoomInfoFlyout.MembersProperty, $"{nameof(Session)}.{nameof(ChatSession.Members)}", source: this)
+                    .Bind(RoomInfoFlyout.OpenProfileCommandProperty, nameof(OpenProfileCommand), source: this)
+                    .Bind(RoomInfoFlyout.WallpaperChangedCommandProperty, nameof(WallpaperChangedCommand), source: this)
+                    .Bind(RoomInfoFlyout.IsOpenProperty, nameof(IsRoomInfoOpen), BindingMode.TwoWay, source: this),
 
                 new Grid
                 {
@@ -166,6 +192,8 @@ public sealed partial class Chat : ContentView, IAsyncDisposable
                         nameof(CloseFullscreenMediaCommand), source: this)
                     .Bind(IsVisibleProperty, nameof(FullscreenMedia),
                         converter: new NotNullConverter(), source: this),
+
+                _profileSheet,
             },
         };
     }
@@ -183,15 +211,25 @@ public sealed partial class Chat : ContentView, IAsyncDisposable
 
         IsLoading = true;
         RoomLoadError = string.Empty;
+        _roomWallpaperUrl = null;
+        UpdateWallpaper();
 
         try
         {
             await DisposeSessionAsync();
 
+            var client = MatrixClient ?? throw new InvalidOperationException("Matrix client is required.");
             Session = await ChatSession.CreateAsync(
-                MatrixClient ?? throw new InvalidOperationException("Matrix client is required."),
+                client,
                 room,
                 token);
+            var roomWallpaper = TryGetRoomWallpaperAsync(client, room.Id());
+            var globalWallpaper = TryGetGlobalWallpaperAsync(client);
+            await Task.WhenAll(roomWallpaper, globalWallpaper);
+            token.ThrowIfCancellationRequested();
+            _roomWallpaperUrl = await roomWallpaper;
+            _globalWallpaperUrl = await globalWallpaper;
+            UpdateWallpaper();
             _subscribedSession = Session;
             _subscribedSession.Items.CollectionChanged += OnSessionItemsChanged;
             await Session.MarkAsReadAsync();
@@ -222,22 +260,24 @@ public sealed partial class Chat : ContentView, IAsyncDisposable
     [RelayCommand]
     private async Task AttachFileAsync()
     {
-        var file = await FilePicker.Default.PickAsync();
-
-        if (file is null || Session is null)
+        var attachment = await AttachmentPicker.PickConfirmedAsync();
+        if (attachment is null || Session is null)
         {
             return;
         }
 
-        await using var stream = await file.OpenReadAsync();
-        using var data = new MemoryStream();
-        await stream.CopyToAsync(data);
         await Session.SendAttachmentAsync(
-            file.FileName,
-            string.IsNullOrWhiteSpace(file.ContentType)
-                ? "application/octet-stream"
-                : file.ContentType,
-            data.ToArray());
+            attachment.FileName,
+            attachment.MimeType,
+            attachment.Data);
+    }
+
+    [RelayCommand]
+    private async Task ReceiveInlineAttachmentAsync(PickedAttachment? attachment)
+    {
+        if (attachment is null || Session is null) return;
+        var confirmed = await AttachmentPicker.ConfirmAsync(attachment);
+        if (confirmed is not null) await Session.SendAttachmentAsync(confirmed.FileName, confirmed.MimeType, confirmed.Data);
     }
 
     [RelayCommand]
@@ -292,6 +332,26 @@ public sealed partial class Chat : ContentView, IAsyncDisposable
     private void OpenMedia(ChatMedia? media)
     {
         FullscreenMedia = media;
+    }
+
+    [RelayCommand]
+    private async Task OpenProfileAsync(object? value)
+    {
+        if (MatrixClient is null) return;
+
+        var member = value as RoomMember;
+        var userId = member?.UserId ?? value as string;
+        if (string.IsNullOrWhiteSpace(userId)) return;
+
+        member ??= Session?.Members.FirstOrDefault(candidate => candidate.UserId == userId);
+        await _profileSheet.ShowAsync(MatrixClient, userId, member?.DisplayName, member?.AvatarUrl);
+    }
+
+    [RelayCommand]
+    private void WallpaperChanged(string? url)
+    {
+        _roomWallpaperUrl = url;
+        UpdateWallpaper();
     }
 
     [RelayCommand]
@@ -405,11 +465,69 @@ public sealed partial class Chat : ContentView, IAsyncDisposable
         object oldValue,
         object newValue)
     {
+        var chat = (Chat)bindable;
+        chat._roomWallpaperUrl = null;
+        chat.UpdateWallpaper();
         if (newValue is Room room)
         {
-            _ = ((Chat)bindable).SetRoomAsync(room);
+            _ = chat.SetRoomAsync(room);
         }
     }
+
+    private static void OnMatrixClientChanged(BindableObject bindable, object oldValue, object newValue)
+    {
+        var chat = (Chat)bindable;
+        if (oldValue is ManagedMatrixClient oldClient)
+            oldClient.GlobalWallpaperChanged -= chat.OnGlobalWallpaperChanged;
+        if (newValue is ManagedMatrixClient newClient)
+        {
+            newClient.GlobalWallpaperChanged += chat.OnGlobalWallpaperChanged;
+            _ = chat.LoadGlobalWallpaperAsync(newClient);
+        }
+    }
+
+    private async Task LoadGlobalWallpaperAsync(ManagedMatrixClient client)
+    {
+        var wallpaper = await TryGetGlobalWallpaperAsync(client);
+        if (!ReferenceEquals(MatrixClient, client) || _disposed) return;
+
+        _globalWallpaperUrl = wallpaper;
+        UpdateWallpaper();
+    }
+
+    private static async Task<string?> TryGetGlobalWallpaperAsync(ManagedMatrixClient client)
+    {
+        try
+        {
+            return await client.GetGlobalWallpaperAsync();
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Could not load global wallpaper: {exception}");
+            return null;
+        }
+    }
+
+    private static async Task<string?> TryGetRoomWallpaperAsync(ManagedMatrixClient client, string roomId)
+    {
+        try
+        {
+            return await client.GetRoomWallpaperAsync(roomId);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Could not load room wallpaper for {roomId}: {exception}");
+            return null;
+        }
+    }
+
+    private void OnGlobalWallpaperChanged(string? url) => Dispatcher.Dispatch(() =>
+    {
+        _globalWallpaperUrl = url;
+        UpdateWallpaper();
+    });
+
+    private void UpdateWallpaper() => RoomWallpaperUrl = _roomWallpaperUrl ?? _globalWallpaperUrl;
 
     private static void OnTimelineIsNearBottomChanged(
         BindableObject bindable,
@@ -461,6 +579,8 @@ public sealed partial class Chat : ContentView, IAsyncDisposable
         _loadCancellation?.Cancel();
         _loadCancellation?.Dispose();
         _loadCancellation = null;
+        if (MatrixClient is not null)
+            MatrixClient.GlobalWallpaperChanged -= OnGlobalWallpaperChanged;
         await DisposeSessionAsync();
     }
 

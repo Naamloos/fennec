@@ -590,6 +590,11 @@ public partial class VerificationPopupV2 : ContentView
 
     private static Page? FindCurrentPage()
     {
+        if (Shell.Current?.Navigation.NavigationStack.LastOrDefault() is { } page)
+        {
+            return page;
+        }
+
         if (Shell.Current?.CurrentPage is { } shellPage)
         {
             return shellPage;

@@ -84,6 +84,25 @@ namespace Dev.Naamloos.Fennec.Sdk.Entities
             this.IsSpace = room.IsSpace();
         }
 
+        public async Task ResolveDirectAvatarAsync()
+        {
+            if (!string.IsNullOrWhiteSpace(AvatarUrl))
+            {
+                return;
+            }
+
+            var info = await NativeRoom.RoomInfo();
+            if (!info.IsDm)
+            {
+                return;
+            }
+
+            using var members = await NativeRoom.Members();
+            var otherMember = members.NextChunk(100)?.FirstOrDefault(member =>
+                member.UserId != NativeRoom.OwnUserId());
+            AvatarUrl = otherMember?.AvatarUrl;
+        }
+
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             this.PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

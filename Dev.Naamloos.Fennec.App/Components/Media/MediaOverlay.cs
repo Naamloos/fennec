@@ -2,6 +2,8 @@ using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.Sdk;
 using Dev.Naamloos.Fennec.Sdk.Entities;
+using MauiIcons.Core;
+using MauiIcons.Material;
 using System.Windows.Input;
 
 namespace Dev.Naamloos.Fennec.App.Components;
@@ -29,20 +31,22 @@ public sealed partial class MediaOverlay : ContentView
                     .Bind(MatrixMedia.ClientProperty, nameof(Client), source: this)
                     .Bind(MatrixMedia.MediaProperty, nameof(Media), source: this),
 
-                new Button
+                new MauiIcon
                 {
-                    Text = "×",
-                    FontSize = 28,
+                    Icon = MaterialIcons.Close,
+                    IconSize = 28,
+                    IconColor = Colors.White,
                     WidthRequest = 48,
                     HeightRequest = 48,
-                    Padding = 0,
-                    BackgroundColor = Colors.Transparent,
-                    TextColor = Colors.White,
                     HorizontalOptions = LayoutOptions.End,
                     VerticalOptions = LayoutOptions.Start,
                     ZIndex = 1,
-                }
-                .BindCommand(nameof(CloseCommand), source: this),
+                    GestureRecognizers =
+                    {
+                        new TapGestureRecognizer()
+                            .BindCommand(nameof(CloseCommand), source: this),
+                    },
+                },
             },
         };
     }

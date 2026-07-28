@@ -119,6 +119,9 @@ public partial class Login : ContentPage
 
     private readonly ManagedMatrixClient _matrixClient;
     private readonly AppNavigationService _appNavigation;
+    private Entry? _homeserverEntry;
+    private Entry? _usernameEntry;
+    private Entry? _passwordEntry;
 
     public Login(ManagedMatrixClient matrixClient, AppNavigationService appNavigation)
 	{
@@ -213,24 +216,33 @@ public partial class Login : ContentPage
                         ItemsSource = Homeservers.ToList(),
                     }.Bind(Picker.SelectedItemProperty, nameof(SelectedServer), BindingMode.TwoWay)
                     .Bind(Picker.IsEnabledProperty, nameof(IsLoading), BindingMode.Default, new InvertedBoolConverter()),
-                    new Entry()
+                    (_homeserverEntry = new Entry()
                     {
                         Placeholder = "Homeserver URL",
-                        Text = HomeServer
-                    }.Bind(Entry.TextProperty, nameof(HomeServer), BindingMode.TwoWay)
+                        Text = HomeServer,
+                        ReturnType = ReturnType.Next,
+                    })
+                    .Invoke(entry => entry.Completed += (_, _) => _usernameEntry?.Focus())
+                    .Bind(Entry.TextProperty, nameof(HomeServer), BindingMode.TwoWay)
                     .Bind(Entry.IsEnabledProperty, nameof(IsLoading), BindingMode.Default, new InvertedBoolConverter()),
-                    new Entry()
+                    (_usernameEntry = new Entry()
                     {
                         Placeholder = "Username",
                         Text = Username,
-                    }.Bind(Entry.TextProperty, nameof(Username), BindingMode.TwoWay)
+                        ReturnType = ReturnType.Next,
+                    })
+                    .Invoke(entry => entry.Completed += (_, _) => _passwordEntry?.Focus())
+                    .Bind(Entry.TextProperty, nameof(Username), BindingMode.TwoWay)
                     .Bind(Entry.IsEnabledProperty, nameof(IsLoading), BindingMode.Default, new InvertedBoolConverter()),
-                    new Entry()
+                    (_passwordEntry = new Entry()
                     {
                         Placeholder = "Password",
                         IsPassword = true,
-                        Text = Password
-                    }.Bind(Entry.TextProperty, nameof(Password), BindingMode.TwoWay)
+                        Text = Password,
+                        ReturnType = ReturnType.Go,
+                    })
+                    .Bind(Entry.ReturnCommandProperty, nameof(LoginCommand))
+                    .Bind(Entry.TextProperty, nameof(Password), BindingMode.TwoWay)
                     .Bind(Entry.IsEnabledProperty, nameof(IsLoading), BindingMode.Default, new InvertedBoolConverter()),
                     new Label()
                     {

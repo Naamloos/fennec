@@ -20,8 +20,6 @@ public sealed class ChatTimelineItem : ObservableModel
     private string? _eventId;
     private string? _replyPreview;
     private ChatMedia? _media;
-    private ChatEventGroup? _eventGroup;
-    private bool _isEventGroupHeader;
 
     public ChatTimelineItem(string id)
     {
@@ -97,66 +95,6 @@ public sealed class ChatTimelineItem : ObservableModel
 
     public ChatMedia? Media { get => _media; set => Set(ref _media, value); }
 
-    public ChatEventGroup? EventGroup
-    {
-        get => _eventGroup;
-        set
-        {
-            if (ReferenceEquals(_eventGroup, value))
-            {
-                return;
-            }
-
-            if (_eventGroup is not null)
-            {
-                _eventGroup.PropertyChanged -= OnEventGroupChanged;
-            }
-
-            _eventGroup = value;
-
-            if (_eventGroup is not null)
-            {
-                _eventGroup.PropertyChanged += OnEventGroupChanged;
-            }
-
-            Raise();
-            RaiseEventGroupProperties();
-        }
-    }
-
-    public bool IsEventGroupHeader
-    {
-        get => _isEventGroupHeader;
-        set
-        {
-            if (Set(ref _isEventGroupHeader, value))
-            {
-                Raise(nameof(IsEventVisible));
-                Raise(nameof(ShowEventGroupToggle));
-            }
-        }
-    }
-
-    public bool HasEventGroup => EventGroup?.Count > 1;
-
-    public bool IsEventGroupCollapsed => HasEventGroup && EventGroup?.IsCollapsed == true;
-
-    public bool IsEventVisible => !HasEventGroup || IsEventGroupHeader || !IsEventGroupCollapsed;
-
-    public bool ShowEventGroupToggle => HasEventGroup && IsEventGroupHeader;
-
-    public string EventGroupToggleText => EventGroup is { Count: > 1 } group
-        ? IsEventGroupCollapsed ? $"Collapsed {group.Count} events" : $"Collapse {group.Count} events"
-        : string.Empty;
-
-    public void ToggleEventGroup()
-    {
-        if (EventGroup is { Count: > 1 } group)
-        {
-            group.IsCollapsed = !group.IsCollapsed;
-        }
-    }
-
     public ObservableCollection<ChatReaction> Reactions { get; } = [];
 
     public ObservableCollection<ChatReadReceipt> ReadReceipts { get; } = [];
@@ -188,18 +126,6 @@ public sealed class ChatTimelineItem : ObservableModel
 
         Replace(Reactions, source.Reactions);
         Replace(ReadReceipts, source.ReadReceipts);
-    }
-
-    private void OnEventGroupChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args) =>
-        RaiseEventGroupProperties();
-
-    private void RaiseEventGroupProperties()
-    {
-        Raise(nameof(HasEventGroup));
-        Raise(nameof(IsEventGroupCollapsed));
-        Raise(nameof(IsEventVisible));
-        Raise(nameof(EventGroupToggleText));
-        Raise(nameof(ShowEventGroupToggle));
     }
 
     private static void Replace<T>(

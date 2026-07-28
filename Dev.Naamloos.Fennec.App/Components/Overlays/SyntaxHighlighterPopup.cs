@@ -2,6 +2,8 @@ using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Maui.Views;
 using CommunityToolkit.Mvvm.Input;
+using MauiIcons.Core;
+using MauiIcons.Material;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
@@ -33,15 +35,20 @@ public sealed class SyntaxHighlighterPopup : Popup
                 },
                 Children =
                 {
-                    new Button
+                    new MauiIcon
                     {
-                        Text = "×",
-                        FontSize = 24,
-                        Padding = 0,
+                        Icon = MaterialIcons.Close,
+                        IconSize = 24,
                         WidthRequest = 40,
                         HeightRequest = 40,
                         HorizontalOptions = LayoutOptions.End,
-                        Command = new AsyncRelayCommand(CloseAsync),
+                        GestureRecognizers =
+                        {
+                            new TapGestureRecognizer
+                            {
+                                Command = new AsyncRelayCommand(CloseAsync),
+                            },
+                        },
                     }
                     .Row(0),
                     new ScrollView

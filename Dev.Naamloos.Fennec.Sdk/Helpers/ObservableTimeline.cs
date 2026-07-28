@@ -1,4 +1,5 @@
 using Dev.Naamloos.Fennec.Sdk.Events;
+using uniffi.matrix_sdk;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using uniffi.matrix_sdk_ffi;
@@ -10,14 +11,17 @@ public sealed class ObservableTimeline :
     IDisposable
 {
   private const ushort DefaultPageSize = 50;
-  private const int DefaultInitialItemTarget = 50;
 
   private readonly ManagedMatrixClient _client;
   private readonly Timeline _timeline;
   private readonly SynchronizationContext? _synchronizationContext;
+  private readonly TaskCompletionSource _initialItemsLoaded = new(
+      TaskCreationOptions.RunContinuationsAsynchronously);
 
   private TimelineListenerCallback? _listener;
   private TaskHandle? _listenerHandle;
+  private PaginationStatusListenerCallback? _paginationListener;
+  private TaskHandle? _paginationListenerHandle;
 
   private bool _isLoadingHistory;
   private bool _hasReachedStart;
@@ -84,45 +88,34 @@ public sealed class ObservableTimeline :
   internal static async Task<ObservableTimeline> CreateAsync(
       ManagedMatrixClient client,
       Timeline timeline,
-      ushort initialPageSize = DefaultPageSize,
-      int initialItemTarget = DefaultInitialItemTarget,
       CancellationToken cancellationToken = default)
   {
     ArgumentNullException.ThrowIfNull(timeline);
-
-    if (initialPageSize == 0)
-    {
-      throw new ArgumentOutOfRangeException(
-          nameof(initialPageSize),
-          "The page size must be greater than zero.");
-    }
-
-    if (initialItemTarget < 0)
-    {
-      throw new ArgumentOutOfRangeException(
-          nameof(initialItemTarget));
-    }
-
     cancellationToken.ThrowIfCancellationRequested();
 
     var observableTimeline =
         new ObservableTimeline(client, timeline);
 
-    await observableTimeline.InitializeListener();
-
-    await observableTimeline.LoadInitialHistoryAsync(
-        initialPageSize,
-        initialItemTarget,
-        cancellationToken);
-
-    return observableTimeline;
+    try
+    {
+      await observableTimeline.InitializeListener();
+      await observableTimeline._initialItemsLoaded.Task.WaitAsync(cancellationToken);
+      await observableTimeline.LoadMoreHistoryAsync(cancellationToken: cancellationToken);
+      return observableTimeline;
+    }
+    catch
+    {
+      observableTimeline.Dispose();
+      throw;
+    }
   }
 
   private async Task InitializeListener()
   {
     ThrowIfDisposed();
 
-        _listener = TimelineListenerCallback.Create(diff => UpdateEntries(diff));
+        _listener = TimelineListenerCallback.Create(UpdateEntries);
+        _paginationListener = PaginationStatusListenerCallback.Create(UpdatePaginationStatus);
 
     /*
      * In the generated Matrix FFI bindings, AddListener commonly returns
@@ -131,6 +124,8 @@ public sealed class ObservableTimeline :
      */
     _listenerHandle =
         await _timeline.AddListener(_listener);
+    _paginationListenerHandle =
+        await _timeline.SubscribeToBackPaginationStatus(_paginationListener);
   }
 
   private void OnConnectionRecovered(
@@ -153,6 +148,10 @@ public sealed class ObservableTimeline :
       _listenerHandle?.Dispose();
       _listenerHandle = null;
       _listener = null;
+      _paginationListenerHandle?.Cancel();
+      _paginationListenerHandle?.Dispose();
+      _paginationListenerHandle = null;
+      _paginationListener = null;
 
       await InitializeListener();
     }
@@ -171,61 +170,6 @@ public sealed class ObservableTimeline :
   {
     Dispose();
     return Task.CompletedTask;
-  }
-
-  private async Task LoadInitialHistoryAsync(
-      ushort pageSize,
-      int targetItemCount,
-      CancellationToken cancellationToken)
-  {
-    if (targetItemCount == 0)
-    {
-      return;
-    }
-
-    /*
-     * The initial listener Reset may be posted to the UI synchronization
-     * context. Yield once so that update can be applied before deciding
-     * how much history still needs to be loaded.
-     */
-    await Task.Yield();
-
-    while (!_disposed &&
-           !HasReachedStart &&
-           Count < targetItemCount)
-    {
-      cancellationToken.ThrowIfCancellationRequested();
-
-      var countBeforePagination = Count;
-
-      var reachedStart = await LoadMoreHistoryAsync(
-          pageSize,
-          cancellationToken);
-
-      if (reachedStart)
-      {
-        break;
-      }
-
-      /*
-       * Timeline diffs can arrive through the listener immediately
-       * after pagination completes. Give the callback an opportunity
-       * to apply them.
-       */
-      await Task.Yield();
-
-      /*
-       * Prevent an infinite loop if the SDK reports that more history
-       * exists but does not emit any additional items.
-       */
-      if (Count <= countBeforePagination)
-      {
-        Debug.WriteLine(
-            "Timeline pagination returned without adding items.");
-
-        break;
-      }
-    }
   }
 
   public async Task<bool> LoadMoreHistoryAsync(
@@ -252,22 +196,10 @@ public sealed class ObservableTimeline :
     }
 
     IsLoadingHistory = true;
-
     try
     {
       cancellationToken.ThrowIfCancellationRequested();
-
-      /*
-       * PaginateBackwards requests older events. The resulting
-       * timeline changes arrive through UpdateEntries as PushFront,
-       * Insert, Reset or other TimelineDiff variants.
-       *
-       * In these bindings the returned bool indicates whether the
-       * beginning of the timeline was reached.
-       */
-      var reachedStart =
-          await _timeline.PaginateBackwards(eventCount);
-
+      var reachedStart = await _timeline.PaginateBackwards(eventCount);
       cancellationToken.ThrowIfCancellationRequested();
 
       if (reachedStart)
@@ -300,6 +232,21 @@ public sealed class ObservableTimeline :
       foreach (var update in updates)
       {
         ApplyUpdate(update);
+      }
+
+      _initialItemsLoaded.TrySetResult();
+    });
+  }
+
+  private void UpdatePaginationStatus(PaginationStatus status)
+  {
+    RunOnCapturedContext(() =>
+    {
+      IsLoadingHistory = status is PaginationStatus.Paginating;
+
+      if (status is PaginationStatus.Idle { HitTimelineStart: true })
+      {
+        HasReachedStart = true;
       }
     });
   }
@@ -501,8 +448,22 @@ public sealed class ObservableTimeline :
 
     _listenerHandle?.Dispose();
 
+    try
+    {
+      _paginationListenerHandle?.Cancel();
+    }
+    catch (Exception exception)
+    {
+      Debug.WriteLine(
+          $"Failed to cancel pagination status listener: {exception}");
+    }
+
+    _paginationListenerHandle?.Dispose();
+
     _listenerHandle = null;
     _listener = null;
+    _paginationListenerHandle = null;
+    _paginationListener = null;
 
     _timeline.Dispose();
     _timeline.Destroy();

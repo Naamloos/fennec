@@ -12,6 +12,8 @@ using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.Sdk.Entities;
 using Dev.Naamloos.Fennec.Sdk.Helpers;
+using MauiIcons.Core;
+using MauiIcons.Material;
 
 namespace Dev.Naamloos.Fennec.App;
 
@@ -25,6 +27,9 @@ public sealed partial class AppShell : Shell
     private string _accountUserId = string.Empty;
     private string _accountInitial = "@";
     private string _roomErrorMessage = string.Empty;
+    private bool _isRoomInfoOpen;
+
+    public bool IsRoomInfoOpen { get => _isRoomInfoOpen; set { _isRoomInfoOpen = value; OnPropertyChanged(); } }
 
     public Room? SelectedRoom
     {
@@ -37,7 +42,9 @@ public sealed partial class AppShell : Shell
             }
 
             _selectedRoom = value;
+            IsRoomInfoOpen = false;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(HasSelectedRoom));
             OnPropertyChanged(nameof(ShowChat));
 
             if (value is not null)
@@ -76,6 +83,8 @@ public sealed partial class AppShell : Shell
     public bool ShowChat =>
         SelectedRoom is not null &&
         string.IsNullOrEmpty(RoomErrorMessage);
+
+    public bool HasSelectedRoom => SelectedRoom is not null;
 
     public string RoomErrorMessage
     {
@@ -280,7 +289,8 @@ public sealed partial class AppShell : Shell
                                         Chat.RoomLoadErrorProperty,
                                         nameof(RoomErrorMessage),
                                         BindingMode.TwoWay,
-                                        source: BindingContext),
+                                        source: BindingContext)
+                                    .Bind(Chat.IsRoomInfoOpenProperty, nameof(IsRoomInfoOpen), BindingMode.TwoWay, source: BindingContext),
                                 new VerticalStackLayout
                                 {
                                     HorizontalOptions = LayoutOptions.Center,
@@ -361,7 +371,62 @@ public sealed partial class AppShell : Shell
             },
         });
         CurrentItem = Items.Single();
+#if ANDROID || IOS
+        ConfigureMobileTitleBar();
+#endif
     }
+
+#if ANDROID || IOS
+    private void ConfigureMobileTitleBar()
+    {
+        if (CurrentPage is not { } page) return;
+
+        Shell.SetNavBarIsVisible(page, true);
+        if (Shell.GetTitleView(page) is null)
+        {
+            Shell.SetTitleView(page, CreateMobileTitleView());
+        }
+    }
+
+    private View CreateMobileTitleView() => new Grid
+    {
+        HorizontalOptions = LayoutOptions.Fill,
+        ColumnDefinitions =
+        {
+            new ColumnDefinition(GridLength.Star),
+            new ColumnDefinition(GridLength.Auto),
+        },
+        Children =
+        {
+            new Label
+            {
+                FontAttributes = FontAttributes.Bold,
+                LineBreakMode = LineBreakMode.TailTruncation,
+                VerticalTextAlignment = TextAlignment.Center,
+            }.Bind(
+                Label.TextProperty,
+                $"{nameof(ManagedSelectedRoom)}.{nameof(ManagedRoom.DisplayName)}",
+                source: this),
+            new MauiIcon
+            {
+                Icon = MaterialIcons.Info,
+                IconSize = 22,
+                WidthRequest = 48,
+                HeightRequest = 44,
+                HorizontalOptions = LayoutOptions.End,
+                GestureRecognizers =
+                {
+                    new TapGestureRecognizer { Command = new Command(ToggleRoomInfo) },
+                },
+            }
+            .Bind(
+                IsVisibleProperty,
+                nameof(HasSelectedRoom),
+                source: this)
+            .Column(1),
+        },
+    };
+#endif
 
     private void ConfigureTitleBar()
     {
@@ -374,7 +439,9 @@ public sealed partial class AppShell : Shell
         {
             Title = "Fennec",
             HeightRequest = 42,
-            TrailingContent = new AccountButton
+            TrailingContent = new HorizontalStackLayout { Children =
+            {
+                new AccountButton
             {
                 Margin = new Thickness(0, 0, 8, 0),
                 TransparentBackground = true,
@@ -399,6 +466,10 @@ public sealed partial class AppShell : Shell
                 AccountButton.OpenCommandProperty,
                 nameof(ShowUserSettingsCommand),
                 source: BindingContext),
+                new MauiIcon { Icon = MaterialIcons.Info, IconSize = 22, WidthRequest = 40, HeightRequest = 40,
+                    GestureRecognizers = { new TapGestureRecognizer { Command = new Command(ToggleRoomInfo) } } }
+                    .Bind(IsVisibleProperty, nameof(HasSelectedRoom), source: this),
+            }},
         };
     }
 
@@ -441,9 +512,12 @@ public sealed partial class AppShell : Shell
         }
     }
 
+    private void ToggleRoomInfo() => IsRoomInfoOpen = !IsRoomInfoOpen;
+
     [RelayCommand]
     private async Task ShowUserSettingsAsync()
     {
+        FlyoutIsPresented = false;
         await Navigation.PushAsync(new Settings(this));
     }
 
@@ -487,6 +561,8 @@ public sealed partial class AppShell : Shell
     {
 #if WINDOWS || MACCATALYST
         ConfigureTitleBar();
+#elif ANDROID || IOS
+        ConfigureMobileTitleBar();
 #endif
         _ = LoadOwnAvatarAsync();
     }

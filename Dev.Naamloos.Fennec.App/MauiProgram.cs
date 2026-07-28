@@ -3,6 +3,7 @@ using CommunityToolkit.Maui;
 using Plugin.Maui.Audio;
 using Dev.Naamloos.Fennec.Sdk;
 using MaterialColorUtilities.Maui;
+using MauiIcons.Material;
 using Dev.Naamloos.Fennec.Sdk.Helpers;
 
 
@@ -17,7 +18,12 @@ public static class MauiProgram
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder()
-            .UseMaterialColors()
+            .UseMaterialColors(options =>
+            {
+                options.FallbackSeed = 0xE6BB8B;
+                options.EnableDynamicColor = false;
+            })
+            .UseMaterialMauiIcons()
             .UseMauiApp<App>()
             .UseMauiCommunityToolkitMediaElement(true)
             .UseMauiCommunityToolkit(opt =>
@@ -46,6 +52,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<AppNavigationService>();
         builder.Services.AddSingleton<ToastService>();
         builder.Services.AddSingleton<MatrixRecoveryService>();
+        builder.Services.AddSingleton<UserSettingsService>();
 
         // Pages
         builder.Services.AddTransient<Login>();

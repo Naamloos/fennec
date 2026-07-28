@@ -5,9 +5,11 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.Sdk;
@@ -654,6 +656,396 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
             client.UserId());
     }
 
+    public Task<MatrixProfile> GetOwnMatrixProfileAsync() =>
+        GetMatrixProfileAsync(GetRequiredClient().UserId());
+
+    public async Task<MatrixProfile> GetMatrixProfileAsync(string userId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+        var displayName = userId;
+        string? avatarUrl = null, bio = null, timeZone = null;
+        IReadOnlyList<string> pronouns = [];
+
+        try
+        {
+            var basic = await GetRequiredClient().GetProfile(userId);
+            displayName = string.IsNullOrWhiteSpace(basic.DisplayName) ? userId : basic.DisplayName;
+            avatarUrl = string.IsNullOrWhiteSpace(basic.AvatarUrl) ? null : basic.AvatarUrl;
+        }
+        catch { }
+
+        try
+        {
+            using var response = await SendHttpRequestAsync(HttpMethod.Get,
+                $"/_matrix/client/v3/profile/{Uri.EscapeDataString(userId)}");
+            using var profile = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var root = profile.RootElement;
+            if (root.TryGetProperty("displayname", out var value) && !string.IsNullOrWhiteSpace(value.GetString()))
+                displayName = value.GetString()!;
+            if (root.TryGetProperty("avatar_url", out value) && !string.IsNullOrWhiteSpace(value.GetString()))
+                avatarUrl = value.GetString();
+            bio = root.TryGetProperty("m.bio", out value) ? value.GetString() : null;
+            timeZone = root.TryGetProperty("m.tz", out value) || root.TryGetProperty("us.cloke.msc4175.tz", out value)
+                ? value.GetString() : null;
+            if (!(root.TryGetProperty("m.pronouns", out var pronounValue) ||
+                  root.TryGetProperty("io.fsky.nyx.pronouns", out pronounValue)) ||
+                pronounValue.ValueKind != JsonValueKind.Array)
+            {
+                pronounValue = default;
+            }
+            pronouns = pronounValue.ValueKind == JsonValueKind.Array
+                ? pronounValue.EnumerateArray().Where(pronoun => pronoun.TryGetProperty("summary", out _))
+                    .Select(pronoun => pronoun.GetProperty("summary").GetString()).OfType<string>().ToArray()
+                : [];
+        }
+        catch { }
+
+        string? presence = null, status = null;
+        try
+        {
+            using var presenceResponse = await SendHttpRequestAsync(HttpMethod.Get,
+                $"/_matrix/client/v3/presence/{Uri.EscapeDataString(userId)}/status");
+            using var presenceDocument = JsonDocument.Parse(await presenceResponse.Content.ReadAsStringAsync());
+            presence = presenceDocument.RootElement.TryGetProperty("presence", out var presenceValue) ? presenceValue.GetString() : null;
+            status = presenceDocument.RootElement.TryGetProperty("status_msg", out presenceValue) ? presenceValue.GetString() : null;
+        }
+        catch { }
+
+        return new MatrixProfile(userId,
+            displayName,
+            avatarUrl,
+            bio,
+            status, presence,
+            timeZone,
+            pronouns,
+            userId[(userId.IndexOf(':') + 1)..]);
+    }
+
+    public async Task SetOwnMatrixProfileAsync(MatrixProfile profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        await SetOwnDisplayNameAsync(profile.DisplayName);
+        await SetProfileFieldAsync("m.bio", profile.Bio);
+        await SetProfileFieldAsync("m.tz", profile.TimeZone);
+        await SetProfileFieldAsync("m.pronouns", profile.Pronouns.Select(summary => new { language = "en", summary }).ToArray());
+        using var body = JsonContent.Create(new { presence = profile.Presence ?? "online", status_msg = profile.Status });
+        using var response = await SendHttpRequestAsync(HttpMethod.Put,
+            $"/_matrix/client/v3/presence/{Uri.EscapeDataString(GetRequiredClient().UserId())}/status", body);
+    }
+
+    private async Task SetProfileFieldAsync(string field, object? value)
+    {
+        using var body = JsonContent.Create(new Dictionary<string, object?> { [field] = value });
+        using var response = await SendHttpRequestAsync(HttpMethod.Put,
+            $"/_matrix/client/v3/profile/{Uri.EscapeDataString(GetRequiredClient().UserId())}/{Uri.EscapeDataString(field)}", body);
+    }
+
+    /// <summary>Updates the authenticated user's display name.</summary>
+    public Task SetOwnDisplayNameAsync(string displayName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+        return GetRequiredClient().SetDisplayName(displayName);
+    }
+
+    /// <summary>Uploads and sets the authenticated user's avatar.</summary>
+    public async Task SetOwnAvatarAsync(string mimeType, byte[] data)
+    {
+        var url = await UploadMediaAsync(mimeType, data);
+        await GetRequiredClient().SetAvatarUrl(url);
+    }
+
+    /// <summary>Gets the user's active Matrix sessions.</summary>
+    public async Task<IReadOnlyList<MatrixSession>> GetSessionsAsync()
+    {
+        using var response = await SendHttpRequestAsync(
+            HttpMethod.Get,
+            "/_matrix/client/v3/devices");
+        var content = await response.Content.ReadAsStringAsync();
+        var devices = JsonSerializer.Deserialize<DeviceListResponse>(content) ?? new([]);
+        var session = GetRequiredClient().Session();
+        var verifiedDeviceIds = await GetVerifiedDeviceIdsAsync(session.UserId);
+
+        return devices.Devices.Select(device => new MatrixSession(
+            device.DeviceId,
+            device.DisplayName ?? device.DeviceId,
+            device.LastSeenTimestamp is { } timestamp
+                ? DateTimeOffset.FromUnixTimeMilliseconds(timestamp)
+                : null,
+            device.LastSeenIp,
+            device.DeviceId == session.DeviceId,
+            verifiedDeviceIds.Contains(device.DeviceId))).ToArray();
+    }
+
+    /// <summary>Renames a Matrix session.</summary>
+    public async Task RenameSessionAsync(string deviceId, string displayName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(deviceId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+
+        using var body = JsonContent.Create(new { display_name = displayName });
+        using var response = await SendHttpRequestAsync(
+            HttpMethod.Put,
+            $"/_matrix/client/v3/devices/{Uri.EscapeDataString(deviceId)}",
+            body);
+    }
+
+    /// <summary>Removes a Matrix session after password-based UI authentication.</summary>
+    public async Task RemoveSessionAsync(string deviceId, string password)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(deviceId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(password);
+
+        var session = GetRequiredClient().Session();
+        using var body = JsonContent.Create(new
+        {
+            auth = new
+            {
+                type = "m.login.password",
+                identifier = new { type = "m.id.user", user = session.UserId },
+                password,
+            },
+        });
+
+        using var response = await SendHttpRequestAsync(
+            HttpMethod.Delete,
+            $"/_matrix/client/v3/devices/{Uri.EscapeDataString(deviceId)}",
+            body);
+    }
+
+    /// <summary>Reads a global account-data event.</summary>
+    public async Task<string?> GetAccountDataAsync(string eventType)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventType);
+        return await GetRequiredClient().AccountData(eventType);
+    }
+
+    /// <summary>Writes a global account-data event.</summary>
+    public Task SetAccountDataAsync(string eventType, string content)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventType);
+        ArgumentException.ThrowIfNullOrWhiteSpace(content);
+        return GetRequiredClient().SetAccountData(eventType, content);
+    }
+
+    private const string WallpaperTag = "u.fennec.wallpaper";
+    private const string LegacyWallpaperTagPrefix = WallpaperTag + ".";
+    private const string GlobalWallpaperEventType = "dev.naamloos.fennec.wallpaper";
+
+    public event Action<string?>? GlobalWallpaperChanged;
+
+    public async Task<string?> GetGlobalWallpaperAsync()
+    {
+        var content = await GetAccountDataAsync(GlobalWallpaperEventType);
+        if (string.IsNullOrWhiteSpace(content)) return null;
+
+        using var document = JsonDocument.Parse(content);
+        return document.RootElement.TryGetProperty("url", out var url) &&
+               !string.IsNullOrWhiteSpace(url.GetString())
+            ? url.GetString()
+            : null;
+    }
+
+    public async Task SetGlobalWallpaperAsync(string mxcUrl)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(mxcUrl);
+        await SetAccountDataAsync(GlobalWallpaperEventType, JsonSerializer.Serialize(new { url = mxcUrl }));
+        GlobalWallpaperChanged?.Invoke(mxcUrl);
+    }
+
+    public async Task ClearGlobalWallpaperAsync()
+    {
+        await SetAccountDataAsync(GlobalWallpaperEventType, "{}");
+        GlobalWallpaperChanged?.Invoke(null);
+    }
+
+    public async Task<string?> GetRoomWallpaperAsync(string roomId)
+    {
+        using var response = await SendHttpRequestAsync(HttpMethod.Get,
+            RoomTagsPath(roomId));
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        if (!document.RootElement.TryGetProperty("tags", out var tags)) return null;
+        if (tags.TryGetProperty(WallpaperTag, out var wallpaperTag) &&
+            wallpaperTag.TryGetProperty("url", out var url) &&
+            !string.IsNullOrWhiteSpace(url.GetString()))
+        {
+            return url.GetString();
+        }
+
+        var tag = tags.EnumerateObject().FirstOrDefault(tag => tag.Name.StartsWith(LegacyWallpaperTagPrefix, StringComparison.Ordinal));
+        if (tag.Name is null) return null;
+        var encoded = tag.Name[LegacyWallpaperTagPrefix.Length..].Replace('-', '+').Replace('_', '/');
+        return Encoding.UTF8.GetString(Convert.FromBase64String(encoded.PadRight(encoded.Length + (4 - encoded.Length % 4) % 4, '=')));
+    }
+
+    public async Task SetRoomWallpaperAsync(string roomId, string mxcUrl)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(roomId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(mxcUrl);
+
+        await ClearRoomWallpaperAsync(roomId);
+        var tagsPath = RoomTagsPath(roomId);
+        var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(mxcUrl))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        var tag = LegacyWallpaperTagPrefix + encoded;
+        using var body = JsonContent.Create(new { });
+        using var response = await SendHttpRequestAsync(HttpMethod.Put,
+            $"{tagsPath}/{Uri.EscapeDataString(tag)}", body);
+
+    }
+
+    public async Task ClearRoomWallpaperAsync(string roomId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(roomId);
+        var tagsPath = RoomTagsPath(roomId);
+        using (var existingResponse = await SendHttpRequestAsync(HttpMethod.Get, tagsPath))
+        using (var document = JsonDocument.Parse(await existingResponse.Content.ReadAsStringAsync()))
+        {
+            if (document.RootElement.TryGetProperty("tags", out var tags))
+            {
+                foreach (var existing in tags.EnumerateObject()
+                             .Where(tag => tag.Name == WallpaperTag || tag.Name.StartsWith(LegacyWallpaperTagPrefix, StringComparison.Ordinal))
+                             .Select(tag => tag.Name)
+                             .ToArray())
+                {
+                    using var deleteResponse = await SendHttpRequestAsync(
+                        HttpMethod.Delete,
+                        $"{tagsPath}/{Uri.EscapeDataString(existing)}");
+                }
+            }
+        }
+
+    }
+
+    private string RoomTagsPath(string roomId) =>
+        $"/_matrix/client/v3/user/{Uri.EscapeDataString(GetRequiredClient().UserId())}/rooms/{Uri.EscapeDataString(roomId)}/tags";
+
+    /// <summary>Gets Fennec's personal emote pack.</summary>
+    public async Task<IReadOnlyList<MatrixEmote>> GetUserEmotesAsync()
+    {
+        var content = await GetAccountDataAsync("im.ponies.user_emotes");
+        if (string.IsNullOrWhiteSpace(content)) return [];
+
+        using var document = JsonDocument.Parse(content);
+        var images = document.RootElement.TryGetProperty("images", out var pack)
+            ? pack : document.RootElement;
+        if (images.ValueKind != JsonValueKind.Object) return [];
+
+        return images.EnumerateObject()
+            .Where(image => image.Value.TryGetProperty("url", out var url) &&
+                !string.IsNullOrWhiteSpace(url.GetString()))
+            .Select(image => new MatrixEmote(
+                image.Name,
+                image.Value.TryGetProperty("body", out var body)
+                    ? body.GetString() ?? image.Name
+                    : image.Name,
+                image.Value.GetProperty("url").GetString()!))
+            .ToArray();
+    }
+
+    /// <summary>Saves Fennec's personal emote pack.</summary>
+    public Task SetUserEmotesAsync(IEnumerable<MatrixEmote> emotes) =>
+        SetAccountDataAsync(
+            "im.ponies.user_emotes",
+            JsonSerializer.Serialize(new
+            {
+                images = emotes.ToDictionary(
+                    emote => emote.Name,
+                    emote => new { url = emote.Source, body = emote.Body, usage = new[] { "emoticon", "sticker" } }),
+            }));
+
+    /// <summary>Returns the global account-data events currently visible to this client.</summary>
+    public async Task<IReadOnlyList<GlobalAccountData>> GetGlobalAccountDataAsync()
+    {
+        var filter = JsonSerializer.Serialize(new
+        {
+            presence = new { limit = 0 },
+            room = new
+            {
+                timeline = new { limit = 0 },
+                state = new { lazy_load_members = true },
+                ephemeral = new { limit = 0 },
+                account_data = new { limit = 0 },
+            },
+            account_data = new { limit = 1000 },
+        });
+
+        using var response = await SendHttpRequestAsync(
+            HttpMethod.Get,
+            $"/_matrix/client/v3/sync?timeout=0&filter={Uri.EscapeDataString(filter)}");
+        using var document = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync());
+        var result = new List<GlobalAccountData>();
+        if (!document.RootElement.TryGetProperty("account_data", out var accountData) ||
+            !accountData.TryGetProperty("events", out var events))
+        {
+            return result;
+        }
+
+        foreach (var @event in events.EnumerateArray())
+        {
+            if (@event.TryGetProperty("type", out var type) &&
+                @event.TryGetProperty("content", out var content))
+            {
+                result.Add(new GlobalAccountData(
+                    type.GetString() ?? string.Empty,
+                    content.GetRawText()));
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>Gets the access token for the current authenticated session.</summary>
+    public string GetAccessToken() => GetRequiredClient().Session().AccessToken;
+
+    private async Task<HashSet<string>> GetVerifiedDeviceIdsAsync(string userId)
+    {
+        try
+        {
+            using var body = JsonContent.Create(new
+            {
+                device_keys = new Dictionary<string, string[]> { [userId] = [] },
+            });
+            using var response = await SendHttpRequestAsync(
+                HttpMethod.Post,
+                "/_matrix/client/v3/keys/query",
+                body);
+            using var document = JsonDocument.Parse(
+                await response.Content.ReadAsStringAsync());
+
+            if (!document.RootElement.TryGetProperty("self_signing_keys", out var selfSigningKeys) ||
+                !selfSigningKeys.TryGetProperty(userId, out var selfSigningKey) ||
+                !selfSigningKey.TryGetProperty("keys", out var keys) ||
+                !document.RootElement.TryGetProperty("device_keys", out var deviceKeys) ||
+                !deviceKeys.TryGetProperty(userId, out var userDevices))
+            {
+                return [];
+            }
+
+            var signingKeyIds = keys.EnumerateObject()
+                .Select(key => key.Name)
+                .ToHashSet(StringComparer.Ordinal);
+            var verified = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var device in userDevices.EnumerateObject())
+            {
+                if (device.Value.TryGetProperty("signatures", out var signatures) &&
+                    signatures.TryGetProperty(userId, out var userSignatures) &&
+                    userSignatures.EnumerateObject().Any(signature =>
+                        signingKeyIds.Contains(signature.Name)))
+                {
+                    verified.Add(device.Name);
+                }
+            }
+
+            return verified;
+        }
+        catch
+        {
+            // Treat unavailable verification data as unverified rather than hiding it.
+            return [];
+        }
+    }
+
     /// <summary>
     /// Downloads a Matrix media thumbnail.
     /// </summary>
@@ -693,13 +1085,18 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// <param name="sourceJson">
     /// The serialized Matrix media source.
     /// </param>
-    public async Task<byte[]> GetMediaContentAsync(
-        string sourceJson)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(sourceJson);
+    public Task<byte[]> GetMediaContentAsync(string sourceJson) =>
+        GetMediaContentAsync(sourceJson, isJson: true);
 
-        using var source =
-            MediaSource.FromJson(sourceJson);
+    public async Task<byte[]> GetMediaContentAsync(
+        string sourceValue,
+        bool isJson)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceValue);
+
+        using var source = isJson
+            ? MediaSource.FromJson(sourceValue)
+            : MediaSource.FromUrl(sourceValue);
 
         return await GetRequiredClient()
             .GetMediaContent(source);
@@ -1081,6 +1478,20 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
             response.Dispose();
         }
     }
+
+    private sealed record DeviceListResponse(
+        [property: JsonPropertyName("devices")]
+        DeviceResponse[] Devices);
+
+    private sealed record DeviceResponse(
+        [property: JsonPropertyName("device_id")]
+        string DeviceId,
+        [property: JsonPropertyName("display_name")]
+        string? DisplayName,
+        [property: JsonPropertyName("last_seen_ip")]
+        string? LastSeenIp,
+        [property: JsonPropertyName("last_seen_ts")]
+        long? LastSeenTimestamp);
 
     private HttpClient GetHttpClient()
     {

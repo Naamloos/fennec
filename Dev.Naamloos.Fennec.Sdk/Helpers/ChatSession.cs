@@ -44,6 +44,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         _timeline.CollectionChanged += OnTimelineChanged;
         _typing.Start();
         ResetItems();
+        UpdateMessageGroups();
     }
 
     public ObservableCollection<ChatTimelineItem> Items { get; } = [];
@@ -127,6 +128,8 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
     public bool CanLoadMoreHistory => !_timeline.HasReachedStart;
 
+    public bool IsLoadingHistory => _timeline.IsLoadingHistory;
+
     public bool CanSend =>
         !IsLoading &&
         !IsSending &&
@@ -143,6 +146,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
         var session = new ChatSession(client, room, timeline);
         _ = session.LoadMembersAsync();
+        _ = session.LoadUserEmotesAsync();
         return session;
     }
 
@@ -361,6 +365,10 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         {
             RunOnCapturedContext(() => Raise(nameof(CanLoadMoreHistory)));
         }
+        else if (eventArgs.PropertyName == nameof(ObservableTimeline.IsLoadingHistory))
+        {
+            RunOnCapturedContext(() => Raise(nameof(IsLoadingHistory)));
+        }
     }
 
     private void ApplyTimelineChange(NotifyCollectionChangedEventArgs eventArgs)
@@ -394,7 +402,21 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                 break;
         }
 
-        UpdateGroups();
+        switch (eventArgs.Action)
+        {
+            case NotifyCollectionChangedAction.Add when eventArgs.NewStartingIndex >= 0:
+            case NotifyCollectionChangedAction.Replace when eventArgs.NewStartingIndex >= 0:
+                UpdateMessageGroups(
+                    eventArgs.NewStartingIndex,
+                    eventArgs.NewItems?.Count ?? 1);
+                break;
+            case NotifyCollectionChangedAction.Remove when eventArgs.OldStartingIndex >= 0:
+                UpdateMessageGroups(eventArgs.OldStartingIndex, 0);
+                break;
+            default:
+                UpdateMessageGroups();
+                break;
+        }
     }
 
     private void ResetItems()
@@ -425,7 +447,18 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
             Items.RemoveAt(index);
         }
 
-        UpdateGroups();
+    }
+
+    private void UpdateMessageGroups(int start, int count)
+    {
+        for (var index = Math.Max(0, start - 1);
+             index < Math.Min(Items.Count, start + count + 1);
+             index++)
+        {
+            var item = Items[index];
+            item.IsGroupStart = index == 0 || !IsSameMessageGroup(item, Items[index - 1]);
+            item.IsGroupEnd = index == Items.Count - 1 || !IsSameMessageGroup(item, Items[index + 1]);
+        }
     }
 
     private int FindItemIndex(string id, int startIndex)
@@ -554,37 +587,13 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         }
     }
 
-    private void UpdateGroups()
+    private void UpdateMessageGroups()
     {
         for (var index = 0; index < Items.Count; index++)
         {
             var item = Items[index];
             item.IsGroupStart = index == 0 || !IsSameMessageGroup(item, Items[index - 1]);
             item.IsGroupEnd = index == Items.Count - 1 || !IsSameMessageGroup(item, Items[index + 1]);
-        }
-
-        for (var index = 0; index < Items.Count;)
-        {
-            if (Items[index].IsMessage)
-            {
-                Items[index].EventGroup = null;
-                Items[index].IsEventGroupHeader = false;
-                index++;
-                continue;
-            }
-
-            var start = index;
-            while (index < Items.Count && !Items[index].IsMessage)
-            {
-                index++;
-            }
-
-            var group = new ChatEventGroup(index - start);
-            for (var eventIndex = start; eventIndex < index; eventIndex++)
-            {
-                Items[eventIndex].EventGroup = group;
-                Items[eventIndex].IsEventGroupHeader = eventIndex == start;
-            }
         }
     }
 
@@ -634,6 +643,24 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         catch (JsonException)
         {
             // The SDK can expose local echoes without raw JSON.
+        }
+    }
+
+    private async Task LoadUserEmotesAsync()
+    {
+        try
+        {
+            foreach (var emote in await _client.GetUserEmotesAsync())
+            {
+                if (!Emotes.Any(existing => existing.Name == emote.Name))
+                {
+                    Emotes.Add(emote);
+                }
+            }
+        }
+        catch
+        {
+            // Personal emotes are optional and must not block a chat session.
         }
     }
 
@@ -746,6 +773,14 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                                  Members.All(existing => existing.UserId != member.UserId)))
                     {
                         Members.Add(member);
+                    }
+
+                    foreach (var item in Items.Where(item => string.IsNullOrWhiteSpace(item.SenderAvatarUrl)))
+                    {
+                        var member = joined.FirstOrDefault(candidate => candidate.UserId == item.SenderId);
+                        if (member is null) continue;
+                        item.SenderAvatarUrl = member.AvatarUrl;
+                        item.Sender = member.DisplayName ?? member.UserId;
                     }
                 });
             }
