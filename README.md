@@ -68,7 +68,7 @@ I will be tracking feature support in the following table. This table is based o
 
 | Feature                          | Desktop/Mobile Required? | Implemented | Notes |
 |----------------------------------|--------------------------|-------------|-------|
-| Content Repository               | Both                     | 〰️          |       |
+| Content Repository               | Both                     | 〰️          | uploading files and images and viewing them works |
 | Direct Messaging                 | Both                     | ✅          |       |
 | Ignoring Users                   | Both                     |             |       |
 | Instant Messaging                | Both                     | ✅          |       |
@@ -79,7 +79,7 @@ I will be tracking feature support in the following table. This table is based o
 | Room Upgrades                    | Both                     |             |       |
 | Third-party Invites              | Mobile                   |             |       |
 | Typing Notifications             | Both                     | ✅          |       |
-| User and Room Mentions           | Both                     | 〰️          |       |
+| User and Room Mentions           | Both                     | 〰️          | You can mention users, not rooms. |
 | Voice over IP                    | Both                     |             |       |
 | Client Config                    | Optional                 |             |       |
 | Device Management                | Optional                 |             |       |
