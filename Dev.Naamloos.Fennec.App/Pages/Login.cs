@@ -1,12 +1,12 @@
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Converters;
 using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.Sdk;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
 using static uniffi.matrix_sdk_ffi.AuthData;
 
 namespace Dev.Naamloos.Fennec.App.Pages;
@@ -19,7 +19,7 @@ public partial class Login : ContentPage
         new("Matrix.org", "https://matrix.org", "matrix.org"),
         new("envs.net", "https://matrix.envs.net", "envs.net"),
         new("tchncs.de", "https://matrix.tchncs.de", "tchncs.de"),
-        new("Naamloos", "https://m.naamloos.dev", "m.naamloos.dev")
+        new("Naamloos", "https://m.naamloos.dev", "m.naamloos.dev"),
     ];
 
     // Binding properties
@@ -111,7 +111,7 @@ public partial class Login : ContentPage
 
     // Backing fields
     private string _homeserver = string.Empty;
-	private MatrixHomeserverOption? _selectedServer = Homeservers[0];
+    private MatrixHomeserverOption? _selectedServer = Homeservers[0];
     private string _username = string.Empty;
     private string _password = string.Empty;
     private bool _isLoading = false;
@@ -124,13 +124,13 @@ public partial class Login : ContentPage
     private Entry? _passwordEntry;
 
     public Login(ManagedMatrixClient matrixClient, AppNavigationService appNavigation)
-	{
+    {
         _matrixClient = matrixClient;
         _appNavigation = appNavigation;
 
         BindingContext = this;
         build();
-	}
+    }
 
     // Commands
     [RelayCommand]
@@ -139,28 +139,25 @@ public partial class Login : ContentPage
         IsLoading = true;
         try
         {
-            var normalizedHomeserver = await ManagedMatrixClient
-                .DiscoverHomeserverAsync(NormalizeHomeserver(_homeserver));
-            var serverName = _selectedServer is not null &&
-                             normalizedHomeserver == NormalizeHomeserver(_selectedServer.Url)
-                ? _selectedServer.ServerName
-                : new Uri(normalizedHomeserver).Authority;
-            var loggedIn = await (_matrixClient ??
-                throw new InvalidOperationException(
-                    "Matrix client is required."))
-                .LoginAsync(
-                normalizedHomeserver,
-                NormalizeUsername(_username, serverName),
-                _password);
+            var normalizedHomeserver = await ManagedMatrixClient.DiscoverHomeserverAsync(
+                NormalizeHomeserver(_homeserver)
+            );
+            var serverName =
+                _selectedServer is not null
+                && normalizedHomeserver == NormalizeHomeserver(_selectedServer.Url)
+                    ? _selectedServer.ServerName
+                    : new Uri(normalizedHomeserver).Authority;
+            var loggedIn = await (
+                _matrixClient ?? throw new InvalidOperationException("Matrix client is required.")
+            ).LoginAsync(normalizedHomeserver, NormalizeUsername(_username, serverName), _password);
             if (!loggedIn)
             {
                 ErrorMessage = "Could not sign in. Check your username and password.";
                 return;
             }
-            (_appNavigation ??
-                throw new InvalidOperationException(
-                    "Navigation is required."))
-                .ShowShell();
+            (
+                _appNavigation ?? throw new InvalidOperationException("Navigation is required.")
+            ).ShowShell();
         }
         catch (Exception exception)
         {
@@ -175,9 +172,13 @@ public partial class Login : ContentPage
     internal static string NormalizeHomeserver(string? value)
     {
         var result = value?.Trim() ?? string.Empty;
-        if (!result.Contains("://", StringComparison.Ordinal)) result = $"https://{result}";
-        if (!Uri.TryCreate(result, UriKind.Absolute, out var uri) ||
-            uri.Scheme is not ("http" or "https") || string.IsNullOrWhiteSpace(uri.Host))
+        if (!result.Contains("://", StringComparison.Ordinal))
+            result = $"https://{result}";
+        if (
+            !Uri.TryCreate(result, UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("http" or "https")
+            || string.IsNullOrWhiteSpace(uri.Host)
+        )
             throw new ArgumentException("Enter a valid homeserver.");
         return uri.GetLeftPart(UriPartial.Authority);
     }
@@ -185,14 +186,16 @@ public partial class Login : ContentPage
     internal static string NormalizeUsername(string? value, string serverName)
     {
         var result = value?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(result)) throw new ArgumentException("Enter a username.");
-        if (result.Contains(':')) return result.StartsWith('@') ? result : $"@{result}";
+        if (string.IsNullOrWhiteSpace(result))
+            throw new ArgumentException("Enter a username.");
+        if (result.Contains(':'))
+            return result.StartsWith('@') ? result : $"@{result}";
         return $"@{result.TrimStart('@')}:{serverName}";
     }
 
     // UI Builder
     private void build()
-	{
+    {
         Content = new ScrollView
         {
             SafeAreaEdges = SafeAreaEdges.All,
@@ -208,64 +211,72 @@ public partial class Login : ContentPage
                     {
                         Text = "Fennec",
                         FontSize = 32,
-                        FontAttributes = FontAttributes.Bold
+                        FontAttributes = FontAttributes.Bold,
                     },
                     new Label()
                     {
                         Text = "A [Matrix] client for .NET MAUI",
                         FontSize = 16,
-                        FontAttributes = FontAttributes.Italic
+                        FontAttributes = FontAttributes.Italic,
                     },
                     new Picker()
                     {
                         Title = "Choose a homeserver",
                         ItemsSource = Homeservers.ToList(),
-                    }.Bind(Picker.SelectedItemProperty, nameof(SelectedServer), BindingMode.TwoWay)
-                    .Bind(Picker.IsEnabledProperty, nameof(IsLoading), BindingMode.Default, new InvertedBoolConverter()),
-                    (_homeserverEntry = new Entry()
-                    {
-                        Placeholder = "Homeserver URL",
-                        Text = HomeServer,
-                        ReturnType = ReturnType.Next,
-                    })
-                    .Invoke(entry => entry.Completed += (_, _) => _usernameEntry?.Focus())
-                    .Bind(Entry.TextProperty, nameof(HomeServer), BindingMode.TwoWay)
-                    .Bind(Entry.IsEnabledProperty, nameof(IsLoading), BindingMode.Default, new InvertedBoolConverter()),
-                    (_usernameEntry = new Entry()
-                    {
-                        Placeholder = "Username",
-                        Text = Username,
-                        ReturnType = ReturnType.Next,
-                    })
-                    .Invoke(entry => entry.Completed += (_, _) => _passwordEntry?.Focus())
-                    .Bind(Entry.TextProperty, nameof(Username), BindingMode.TwoWay)
-                    .Bind(Entry.IsEnabledProperty, nameof(IsLoading), BindingMode.Default, new InvertedBoolConverter()),
-                    (_passwordEntry = new Entry()
-                    {
-                        Placeholder = "Password",
-                        IsPassword = true,
-                        Text = Password,
-                        ReturnType = ReturnType.Go,
-                    })
-                    .Bind(Entry.ReturnCommandProperty, nameof(LoginCommand))
-                    .Bind(Entry.TextProperty, nameof(Password), BindingMode.TwoWay)
-                    .Bind(Entry.IsEnabledProperty, nameof(IsLoading), BindingMode.Default, new InvertedBoolConverter()),
-                    new Label()
-                    {
-                        TextColor = Colors.Red,
-                    }.Bind(Label.TextProperty, nameof(ErrorMessage)),
-                    new Button()
-                    {
-                        Text= "Login",
-                    }.Bind(Button.CommandProperty, nameof(LoginCommand))
-                    .Bind(Button.IsEnabledProperty, nameof(IsLoading), BindingMode.Default, new InvertedBoolConverter()),
-                    new ActivityIndicator()
-                    {
-                        IsRunning = true,
-                    }.Bind(ActivityIndicator.IsVisibleProperty, nameof(IsLoading))
-                    .Bind(ActivityIndicator.IsRunningProperty, nameof(IsLoading))
-                }
-            }
+                    }
+                        .Bind(
+                            Picker.SelectedItemProperty,
+                            nameof(SelectedServer),
+                            BindingMode.TwoWay
+                        )
+                        .Bind(
+                            Picker.IsEnabledProperty,
+                            nameof(IsLoading),
+                            BindingMode.Default,
+                            new InvertedBoolConverter()
+                        ),
+                    (
+                        _homeserverEntry = new Entry()
+                        {
+                            Placeholder = "Homeserver URL",
+                            Text = HomeServer,
+                            ReturnType = ReturnType.Next,
+                        }
+                    ).Invoke(entry => entry.Completed += (_, _) => _usernameEntry?.Focus()).Bind(Entry.TextProperty, nameof(HomeServer), BindingMode.TwoWay).Bind(Entry.IsEnabledProperty, nameof(IsLoading), BindingMode.Default, new InvertedBoolConverter()),
+                    (
+                        _usernameEntry = new Entry()
+                        {
+                            Placeholder = "Username",
+                            Text = Username,
+                            ReturnType = ReturnType.Next,
+                        }
+                    ).Invoke(entry => entry.Completed += (_, _) => _passwordEntry?.Focus()).Bind(Entry.TextProperty, nameof(Username), BindingMode.TwoWay).Bind(Entry.IsEnabledProperty, nameof(IsLoading), BindingMode.Default, new InvertedBoolConverter()),
+                    (
+                        _passwordEntry = new Entry()
+                        {
+                            Placeholder = "Password",
+                            IsPassword = true,
+                            Text = Password,
+                            ReturnType = ReturnType.Go,
+                        }
+                    ).Bind(Entry.ReturnCommandProperty, nameof(LoginCommand)).Bind(Entry.TextProperty, nameof(Password), BindingMode.TwoWay).Bind(Entry.IsEnabledProperty, nameof(IsLoading), BindingMode.Default, new InvertedBoolConverter()),
+                    new Label() { TextColor = Colors.Red }.Bind(
+                        Label.TextProperty,
+                        nameof(ErrorMessage)
+                    ),
+                    new Button() { Text = "Login" }
+                        .Bind(Button.CommandProperty, nameof(LoginCommand))
+                        .Bind(
+                            Button.IsEnabledProperty,
+                            nameof(IsLoading),
+                            BindingMode.Default,
+                            new InvertedBoolConverter()
+                        ),
+                    new ActivityIndicator() { IsRunning = true }
+                        .Bind(ActivityIndicator.IsVisibleProperty, nameof(IsLoading))
+                        .Bind(ActivityIndicator.IsRunningProperty, nameof(IsLoading)),
+                },
+            },
         };
     }
 }

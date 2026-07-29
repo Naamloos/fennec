@@ -1,12 +1,12 @@
-using Dev.Naamloos.Fennec.Sdk.Entities;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Net;
-using System.Text.RegularExpressions;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using Dev.Naamloos.Fennec.Sdk.Entities;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.Sdk.Helpers;
@@ -34,10 +34,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
     private string? _roomAvatarUrl;
     private bool _canInvalidateAvatars;
 
-    private ChatSession(
-        ManagedMatrixClient client,
-        Room room,
-        ObservableTimeline timeline)
+    private ChatSession(ManagedMatrixClient client, Room room, ObservableTimeline timeline)
     {
         _client = client;
         _room = room;
@@ -48,8 +45,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         _roomInfoSubscription = room.SubscribeToRoomInfoUpdates(_roomInfoListener);
         _roomAvatarUrl = room.AvatarUrl();
         _typing.PropertyChanged += OnTypingChanged;
-        ((INotifyPropertyChanged)_timeline).PropertyChanged +=
-            OnTimelinePropertyChanged;
+        ((INotifyPropertyChanged)_timeline).PropertyChanged += OnTimelinePropertyChanged;
         _timeline.CollectionChanged += OnTimelineChanged;
         _typing.Start();
         ResetItems();
@@ -148,19 +144,15 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
     public bool IsLoadingHistory => _timeline.IsLoadingHistory;
 
-    public bool CanSend =>
-        !IsLoading &&
-        !IsSending &&
-        !string.IsNullOrWhiteSpace(DraftText);
+    public bool CanSend => !IsLoading && !IsSending && !string.IsNullOrWhiteSpace(DraftText);
 
     public static async Task<ChatSession> CreateAsync(
         ManagedMatrixClient client,
         Room room,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
-        var timeline = await client.GetObservableTimelineAsync(
-            room,
-            cancellationToken);
+        var timeline = await client.GetObservableTimelineAsync(room, cancellationToken);
 
         var session = new ChatSession(client, room, timeline);
         _ = session.LoadRoomsAsync();
@@ -201,13 +193,17 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                         ["event_id"] = threadRoot,
                     },
                 };
-                await _room.SendRaw("m.room.message", JsonSerializer.Serialize(
-                    new Dictionary<string, object?>
-                    {
-                        ["body"] = text,
-                        ["msgtype"] = "m.text",
-                        ["m.relates_to"] = threadRelation,
-                    }));
+                await _room.SendRaw(
+                    "m.room.message",
+                    JsonSerializer.Serialize(
+                        new Dictionary<string, object?>
+                        {
+                            ["body"] = text,
+                            ["msgtype"] = "m.text",
+                            ["m.relates_to"] = threadRelation,
+                        }
+                    )
+                );
             }
             else if (ReplyTarget?.EventId is { } eventId)
             {
@@ -234,10 +230,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         }
     }
 
-    public async Task SendAttachmentAsync(
-        string filename,
-        string mimeType,
-        byte[] data)
+    public async Task SendAttachmentAsync(string filename, string mimeType, byte[] data)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filename);
         ArgumentException.ThrowIfNullOrWhiteSpace(mimeType);
@@ -250,10 +243,10 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         {
             var url = await _client.UploadMediaAsync(mimeType, data);
             using var source = MediaSource.FromUrl(url);
-            using var content = _timeline.Timeline.CreateMessageContent(
-                CreateAttachment(filename, mimeType, (ulong)data.Length, source))
-                ?? throw new InvalidOperationException(
-                    "Could not create attachment content.");
+            using var content =
+                _timeline.Timeline.CreateMessageContent(
+                    CreateAttachment(filename, mimeType, (ulong)data.Length, source)
+                ) ?? throw new InvalidOperationException("Could not create attachment content.");
 
             await _timeline.Timeline.Send(content);
         }
@@ -270,7 +263,8 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
     public async Task LoadMoreHistoryAsync(
         ushort eventCount = 50,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         if (_timeline.IsLoadingHistory || _timeline.HasReachedStart)
         {
@@ -279,13 +273,9 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
         try
         {
-            await _timeline.LoadMoreHistoryAsync(
-                eventCount,
-                cancellationToken: cancellationToken);
+            await _timeline.LoadMoreHistoryAsync(eventCount, cancellationToken: cancellationToken);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception exception)
         {
             ErrorMessage = exception.Message;
@@ -294,8 +284,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
     public async Task MarkAsReadAsync()
     {
-        var eventId = Items.LastOrDefault(item => item.EventId is not null)
-            ?.EventId;
+        var eventId = Items.LastOrDefault(item => item.EventId is not null)?.EventId;
 
         if (eventId is null || eventId == _lastReadEventId)
         {
@@ -313,9 +302,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         }
     }
 
-    public async Task ToggleReactionAsync(
-        ChatTimelineItem item,
-        string key)
+    public async Task ToggleReactionAsync(ChatTimelineItem item, string key)
     {
         ArgumentNullException.ThrowIfNull(item);
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
@@ -323,9 +310,9 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         await _timeline.Timeline.ToggleReaction(
             item.EventId is { } eventId
                 ? new EventOrTransactionId.EventId(eventId)
-                : new EventOrTransactionId.TransactionId(
-                    item.EventOrTransactionId),
-            key);
+                : new EventOrTransactionId.TransactionId(item.EventOrTransactionId),
+            key
+        );
     }
 
     public void ReplyTo(ChatTimelineItem? item)
@@ -356,7 +343,8 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
     public void ReplyInThread(ChatTimelineItem? item)
     {
-        if (item is not { IsMessage: true, EventId: not null }) return;
+        if (item is not { IsMessage: true, EventId: not null })
+            return;
         ReplyTarget = null;
         EditTarget = null;
         ThreadTarget = item;
@@ -374,21 +362,27 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
     public async Task CreatePollAsync(
         string question,
         IEnumerable<string> answers,
-        byte maxSelections = 1)
+        byte maxSelections = 1
+    )
     {
-        var choices = answers.Select(answer => answer.Trim())
+        var choices = answers
+            .Select(answer => answer.Trim())
             .Where(answer => !string.IsNullOrWhiteSpace(answer))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
         if (string.IsNullOrWhiteSpace(question) || choices.Length < 2)
         {
-            throw new ArgumentException("A poll needs a question and at least two distinct answers.");
+            throw new ArgumentException(
+                "A poll needs a question and at least two distinct answers."
+            );
         }
 
         await _timeline.Timeline.CreatePoll(
-            question.Trim(), choices,
+            question.Trim(),
+            choices,
             Math.Clamp(maxSelections, (byte)1, (byte)choices.Length),
-            PollKind.Disclosed);
+            PollKind.Disclosed
+        );
     }
 
     public async Task VoteInPollAsync(ChatTimelineItem item, string answerId)
@@ -402,7 +396,8 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
         var snapshot = poll.Snapshot();
         var answers = poll.Select(answerId);
-        if (answers.Length == 0) return;
+        if (answers.Length == 0)
+            return;
 
         IsSending = true;
         ErrorMessage = string.Empty;
@@ -427,26 +422,39 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(geoUri);
         if (!geoUri.StartsWith("geo:", StringComparison.OrdinalIgnoreCase))
         {
-            throw new ArgumentException("Use a geo: URI, for example geo:52.3676,4.9041.", nameof(geoUri));
+            throw new ArgumentException(
+                "Use a geo: URI, for example geo:52.3676,4.9041.",
+                nameof(geoUri)
+            );
         }
 
-        return _room.SendRaw("m.room.message", JsonSerializer.Serialize(new
-        {
-            body = description ?? geoUri,
-            msgtype = "m.location",
-            geo_uri = geoUri,
-        }));
+        return _room.SendRaw(
+            "m.room.message",
+            JsonSerializer.Serialize(
+                new
+                {
+                    body = description ?? geoUri,
+                    msgtype = "m.location",
+                    geo_uri = geoUri,
+                }
+            )
+        );
     }
 
     public Task SendStickerAsync(MatrixEmote emote)
     {
         ArgumentNullException.ThrowIfNull(emote);
-        return _room.SendRaw("m.sticker", JsonSerializer.Serialize(new
-        {
-            body = emote.Body,
-            url = emote.Source,
-            info = new { },
-        }));
+        return _room.SendRaw(
+            "m.sticker",
+            JsonSerializer.Serialize(
+                new
+                {
+                    body = emote.Body,
+                    url = emote.Source,
+                    info = new { },
+                }
+            )
+        );
     }
 
     public async Task<bool> CanDeleteAsync(ChatTimelineItem item)
@@ -492,16 +500,12 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         }
     }
 
-    private void OnTimelineChanged(
-        object? sender,
-        NotifyCollectionChangedEventArgs eventArgs)
+    private void OnTimelineChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs)
     {
         RunOnCapturedContext(() => ApplyTimelineChange(eventArgs));
     }
 
-    private void OnTimelinePropertyChanged(
-        object? sender,
-        PropertyChangedEventArgs eventArgs)
+    private void OnTimelinePropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
     {
         if (eventArgs.PropertyName == nameof(ObservableTimeline.HasReachedStart))
         {
@@ -535,8 +539,11 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                 break;
 
             case NotifyCollectionChangedAction.Move:
-                MoveItems(eventArgs.OldStartingIndex, eventArgs.NewStartingIndex,
-                    eventArgs.NewItems?.Count ?? 1);
+                MoveItems(
+                    eventArgs.OldStartingIndex,
+                    eventArgs.NewStartingIndex,
+                    eventArgs.NewItems?.Count ?? 1
+                );
                 break;
 
             case NotifyCollectionChangedAction.Reset:
@@ -548,9 +555,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         {
             case NotifyCollectionChangedAction.Add when eventArgs.NewStartingIndex >= 0:
             case NotifyCollectionChangedAction.Replace when eventArgs.NewStartingIndex >= 0:
-                UpdateMessageGroups(
-                    eventArgs.NewStartingIndex,
-                    eventArgs.NewItems?.Count ?? 1);
+                UpdateMessageGroups(eventArgs.NewStartingIndex, eventArgs.NewItems?.Count ?? 1);
                 break;
             case NotifyCollectionChangedAction.Remove when eventArgs.OldStartingIndex >= 0:
                 UpdateMessageGroups(eventArgs.OldStartingIndex, 0);
@@ -588,18 +593,20 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         {
             Items.RemoveAt(index);
         }
-
     }
 
     private void UpdateMessageGroups(int start, int count)
     {
-        for (var index = Math.Max(0, start - 1);
-             index < Math.Min(Items.Count, start + count + 1);
-             index++)
+        for (
+            var index = Math.Max(0, start - 1);
+            index < Math.Min(Items.Count, start + count + 1);
+            index++
+        )
         {
             var item = Items[index];
             item.IsGroupStart = index == 0 || !IsSameMessageGroup(item, Items[index - 1]);
-            item.IsGroupEnd = index == Items.Count - 1 || !IsSameMessageGroup(item, Items[index + 1]);
+            item.IsGroupEnd =
+                index == Items.Count - 1 || !IsSameMessageGroup(item, Items[index + 1]);
         }
     }
 
@@ -706,19 +713,22 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                 SenderId = eventItem.Sender,
                 SenderAvatarUrl = AvatarUrl(eventItem),
                 EventType = eventItem.EventTypeRaw ?? "unknown",
-                EventId = (eventItem.EventOrTransactionId as EventOrTransactionId.EventId)
-                    ?.EventIdValue,
-                EventOrTransactionId = EventOrTransactionIdValue(
-                    eventItem.EventOrTransactionId),
+                EventId = (
+                    eventItem.EventOrTransactionId as EventOrTransactionId.EventId
+                )?.EventIdValue,
+                EventOrTransactionId = EventOrTransactionIdValue(eventItem.EventOrTransactionId),
                 IsRemoteEvent = eventItem.IsRemote,
                 SourceJson = FormatSource(
                     eventItem.LazyProvider.LatestJson(),
                     new
                     {
-                        event_id = (eventItem.EventOrTransactionId as EventOrTransactionId.EventId)?.EventIdValue,
+                        event_id = (
+                            eventItem.EventOrTransactionId as EventOrTransactionId.EventId
+                        )?.EventIdValue,
                         type = eventItem.EventTypeRaw,
                         sender = eventItem.Sender,
-                    }),
+                    }
+                ),
             };
 
             UpdateEmotes(eventItem.EventTypeRaw, result.SourceJson);
@@ -735,15 +745,16 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         {
             var item = Items[index];
             item.IsGroupStart = index == 0 || !IsSameMessageGroup(item, Items[index - 1]);
-            item.IsGroupEnd = index == Items.Count - 1 || !IsSameMessageGroup(item, Items[index + 1]);
+            item.IsGroupEnd =
+                index == Items.Count - 1 || !IsSameMessageGroup(item, Items[index + 1]);
         }
     }
 
     private static bool IsSameMessageGroup(ChatTimelineItem left, ChatTimelineItem right) =>
-        left.IsMessage &&
-        right.IsMessage &&
-        left.IsOwn == right.IsOwn &&
-        left.SenderId == right.SenderId;
+        left.IsMessage
+        && right.IsMessage
+        && left.IsOwn == right.IsOwn
+        && left.SenderId == right.SenderId;
 
     private void UpdateEmotes(string? eventType, string source)
     {
@@ -756,9 +767,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         {
             using var document = JsonDocument.Parse(source);
             var content = document.RootElement.GetProperty("content");
-            var images = content.TryGetProperty("images", out var imagePack)
-                ? imagePack
-                : content;
+            var images = content.TryGetProperty("images", out var imagePack) ? imagePack : content;
 
             if (images.ValueKind != JsonValueKind.Object)
             {
@@ -767,19 +776,24 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
             foreach (var image in images.EnumerateObject())
             {
-                if (!image.Value.TryGetProperty("url", out var url) ||
-                    url.GetString() is not { } mediaSource ||
-                    Emotes.Any(emote => emote.Name == image.Name))
+                if (
+                    !image.Value.TryGetProperty("url", out var url)
+                    || url.GetString() is not { } mediaSource
+                    || Emotes.Any(emote => emote.Name == image.Name)
+                )
                 {
                     continue;
                 }
 
-                Emotes.Add(new MatrixEmote(
-                    image.Name,
-                    image.Value.TryGetProperty("body", out var body)
-                        ? body.GetString() ?? image.Name
-                        : image.Name,
-                    mediaSource));
+                Emotes.Add(
+                    new MatrixEmote(
+                        image.Name,
+                        image.Value.TryGetProperty("body", out var body)
+                            ? body.GetString() ?? image.Name
+                            : image.Name,
+                        mediaSource
+                    )
+                );
             }
         }
         catch (JsonException)
@@ -809,14 +823,19 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
     private async Task LoadRoomsAsync()
     {
         await Task.Yield();
-        if (_disposed) return;
+        if (_disposed)
+            return;
 
         try
         {
-            foreach (var room in _client.GetRooms().Where(room =>
-                         !room.IsSpace() && room.Id() != _room.Id()))
+            foreach (
+                var room in _client
+                    .GetRooms()
+                    .Where(room => !room.IsSpace() && room.Id() != _room.Id())
+            )
             {
-                if (_disposed) return;
+                if (_disposed)
+                    return;
                 Rooms.Add(new ManagedRoom(room));
             }
         }
@@ -826,13 +845,12 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         }
     }
 
-    private void PopulateContent(
-        ChatTimelineItem result,
-        EventTimelineItem eventItem)
+    private void PopulateContent(ChatTimelineItem result, EventTimelineItem eventItem)
     {
         switch (eventItem.Content)
         {
-            case TimelineItemContent.MsgLike msg when msg.Content.Kind is MsgLikeKind.Message message:
+            case TimelineItemContent.MsgLike msg
+                when msg.Content.Kind is MsgLikeKind.Message message:
                 result.IsMessage = true;
                 result.Body = message.Content.Body;
                 result.FormattedBody = GetFormattedBody(message.Content.MsgType)?.Body;
@@ -848,7 +866,8 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                     sticker.Source.ToJson(),
                     sticker.Body,
                     sticker.Info.Mimetype,
-                    sticker.Info.ThumbnailSource?.ToJson());
+                    sticker.Info.ThumbnailSource?.ToJson()
+                );
                 return;
 
             case TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Poll poll }:
@@ -860,13 +879,17 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                         answer.Id,
                         answer.Text,
                         poll.Votes.TryGetValue(answer.Id, out var voters) ? voters.Length : 0,
-                        poll.Votes.TryGetValue(answer.Id, out voters) && voters.Contains(_room.OwnUserId()))),
+                        poll.Votes.TryGetValue(answer.Id, out voters)
+                            && voters.Contains(_room.OwnUserId())
+                    )),
                     poll.MaxSelections,
-                    poll.EndTime is not null);
+                    poll.EndTime is not null
+                );
                 return;
 
             case TimelineItemContent.RoomMembership membership:
-                result.Body = $"{membership.UserDisplayName ?? membership.UserId} {MembershipText(membership.Change)}";
+                result.Body =
+                    $"{membership.UserDisplayName ?? membership.UserId} {MembershipText(membership.Change)}";
                 return;
 
             case TimelineItemContent.ProfileChange profile:
@@ -900,9 +923,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         }
     }
 
-    private void PopulateReactions(
-        ChatTimelineItem result,
-        EventTimelineItem eventItem)
+    private void PopulateReactions(ChatTimelineItem result, EventTimelineItem eventItem)
     {
         if (eventItem.Content is not TimelineItemContent.MsgLike message)
         {
@@ -911,55 +932,67 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
         foreach (var reaction in message.Content.Reactions)
         {
-            result.Reactions.Add(new ChatReaction(
-                reaction.Key,
-                reaction.Senders.Length,
-                reaction.Senders.Any(sender => sender.SenderId == _room.OwnUserId())));
+            result.Reactions.Add(
+                new ChatReaction(
+                    reaction.Key,
+                    reaction.Senders.Length,
+                    reaction.Senders.Any(sender => sender.SenderId == _room.OwnUserId())
+                )
+            );
         }
     }
 
-    private static ChatMedia? CreateMedia(MessageType type) => type switch
-    {
-        MessageType.Image image => new ChatMedia(
-            ChatMediaKind.Image,
-            image.Content.Source.ToJson(),
-            image.Content.Filename,
-            image.Content.Info?.Mimetype,
-            image.Content.Info?.ThumbnailSource?.ToJson()),
-        MessageType.Video video => new ChatMedia(
-            ChatMediaKind.Video,
-            video.Content.Source.ToJson(),
-            video.Content.Filename,
-            video.Content.Info?.Mimetype,
-            video.Content.Info?.ThumbnailSource?.ToJson()),
-        MessageType.Audio audio => new ChatMedia(
-            ChatMediaKind.Audio,
-            audio.Content.Source.ToJson(),
-            audio.Content.Filename,
-            audio.Content.Info?.Mimetype),
-        MessageType.File file => new ChatMedia(
-            ChatMediaKind.File,
-            file.Content.Source.ToJson(),
-            file.Content.Filename,
-            file.Content.Info?.Mimetype),
-        _ => null,
-    };
+    private static ChatMedia? CreateMedia(MessageType type) =>
+        type switch
+        {
+            MessageType.Image image => new ChatMedia(
+                ChatMediaKind.Image,
+                image.Content.Source.ToJson(),
+                image.Content.Filename,
+                image.Content.Info?.Mimetype,
+                image.Content.Info?.ThumbnailSource?.ToJson()
+            ),
+            MessageType.Video video => new ChatMedia(
+                ChatMediaKind.Video,
+                video.Content.Source.ToJson(),
+                video.Content.Filename,
+                video.Content.Info?.Mimetype,
+                video.Content.Info?.ThumbnailSource?.ToJson()
+            ),
+            MessageType.Audio audio => new ChatMedia(
+                ChatMediaKind.Audio,
+                audio.Content.Source.ToJson(),
+                audio.Content.Filename,
+                audio.Content.Info?.Mimetype
+            ),
+            MessageType.File file => new ChatMedia(
+                ChatMediaKind.File,
+                file.Content.Source.ToJson(),
+                file.Content.Filename,
+                file.Content.Info?.Mimetype
+            ),
+            _ => null,
+        };
 
     private async Task LoadMembersAsync()
     {
         await _membersLoadGate.WaitAsync();
         try
         {
-            if (_disposed) return;
+            if (_disposed)
+                return;
             using var iterator = await _room.Members();
 
             // ponytail: one page feeds typeahead; add query-backed search for very large rooms.
             if (iterator.NextChunk(100) is { Length: > 0 } members)
             {
-                var joined = members.Where(member => member.Membership is MembershipState.Join).ToArray();
+                var joined = members
+                    .Where(member => member.Membership is MembershipState.Join)
+                    .ToArray();
                 RunOnCapturedContext(() =>
                 {
-                    if (_disposed) return;
+                    if (_disposed)
+                        return;
 
                     Members.Clear();
                     foreach (var member in joined)
@@ -967,10 +1000,17 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                         Members.Add(member);
                     }
 
-                    foreach (var item in Items.Where(item => string.IsNullOrWhiteSpace(item.SenderAvatarUrl)))
+                    foreach (
+                        var item in Items.Where(item =>
+                            string.IsNullOrWhiteSpace(item.SenderAvatarUrl)
+                        )
+                    )
                     {
-                        var member = joined.FirstOrDefault(candidate => candidate.UserId == item.SenderId);
-                        if (member is null) continue;
+                        var member = joined.FirstOrDefault(candidate =>
+                            candidate.UserId == item.SenderId
+                        );
+                        if (member is null)
+                            continue;
                         item.SenderAvatarUrl = member.AvatarUrl;
                         item.Sender = member.DisplayName ?? member.UserId;
                     }
@@ -999,33 +1039,48 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
     {
         var userIds = new HashSet<string>(StringComparer.Ordinal);
         var roomMention = markdown.Contains("@room", StringComparison.Ordinal);
-        var content = MentionPattern.Replace(markdown, match =>
-        {
-            var value = match.Groups["value"].Value;
-            var member = Members.FirstOrDefault(candidate =>
-                candidate.UserId == $"@{value}" ||
-                string.Equals(candidate.DisplayName, value, StringComparison.OrdinalIgnoreCase));
-
-            if (member is null)
+        var content = MentionPattern.Replace(
+            markdown,
+            match =>
             {
-                return match.Value;
+                var value = match.Groups["value"].Value;
+                var member = Members.FirstOrDefault(candidate =>
+                    candidate.UserId == $"@{value}"
+                    || string.Equals(
+                        candidate.DisplayName,
+                        value,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
+
+                if (member is null)
+                {
+                    return match.Value;
+                }
+
+                userIds.Add(member.UserId);
+                var label = WebUtility.HtmlEncode(match.Value);
+                return $"<a href=\"https://matrix.to/#/{member.UserId}\">{label}</a>";
             }
+        );
 
-            userIds.Add(member.UserId);
-            var label = WebUtility.HtmlEncode(match.Value);
-            return $"<a href=\"https://matrix.to/#/{member.UserId}\">{label}</a>";
-        });
+        content = EmotePattern.Replace(
+            content,
+            match =>
+            {
+                var emote = Emotes.FirstOrDefault(candidate =>
+                    string.Equals(
+                        candidate.Name,
+                        match.Groups["name"].Value,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
 
-        content = EmotePattern.Replace(content, match =>
-        {
-            var emote = Emotes.FirstOrDefault(candidate =>
-                string.Equals(candidate.Name, match.Groups["name"].Value,
-                    StringComparison.OrdinalIgnoreCase));
-
-            return emote is null
-                ? match.Value
-                : $"<img data-mx-emoticon src=\"{WebUtility.HtmlEncode(emote.Source)}\" alt=\"{WebUtility.HtmlEncode(match.Value)}\" title=\"{WebUtility.HtmlEncode(emote.Body)}\" height=\"32\" />";
-        });
+                return emote is null
+                    ? match.Value
+                    : $"<img data-mx-emoticon src=\"{WebUtility.HtmlEncode(emote.Source)}\" alt=\"{WebUtility.HtmlEncode(match.Value)}\" title=\"{WebUtility.HtmlEncode(emote.Body)}\" height=\"32\" />";
+            }
+        );
 
         var result = MatrixSdkFfiMethods.MessageEventContentFromMarkdown(content);
         if (userIds.Count == 0 && !roomMention)
@@ -1038,13 +1093,14 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         return mentioned;
     }
 
-    private static FormattedBody? GetFormattedBody(MessageType type) => type switch
-    {
-        MessageType.Text text => text.Content.Formatted,
-        MessageType.Notice notice => notice.Content.Formatted,
-        MessageType.Emote emote => emote.Content.Formatted,
-        _ => null,
-    };
+    private static FormattedBody? GetFormattedBody(MessageType type) =>
+        type switch
+        {
+            MessageType.Text text => text.Content.Formatted,
+            MessageType.Notice notice => notice.Content.Formatted,
+            MessageType.Emote emote => emote.Content.Formatted,
+            _ => null,
+        };
 
     private static string MarkdownFromHtml(string? html, string fallback)
     {
@@ -1064,12 +1120,13 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         }
     }
 
-    private static string MarkdownNode(XNode node) => node switch
-    {
-        XText text => text.Value,
-        XElement element => MarkdownElement(element),
-        _ => string.Empty,
-    };
+    private static string MarkdownNode(XNode node) =>
+        node switch
+        {
+            XText text => text.Value,
+            XElement element => MarkdownElement(element),
+            _ => string.Empty,
+        };
 
     private static string MarkdownElement(XElement element)
     {
@@ -1083,8 +1140,15 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
             "s" or "del" or "strike" => $"~~{content}~~",
             "code" => $"`{content}`",
             "pre" => $"```\n{element.Value}\n```\n",
-            "blockquote" => string.Join('\n', content.TrimEnd().Split('\n').Select(line => $"> {line}")) + "\n",
-            "a" when element.Attribute("href")?.Value.Contains("matrix.to/#/@", StringComparison.OrdinalIgnoreCase) == true => content,
+            "blockquote" => string.Join(
+                '\n',
+                content.TrimEnd().Split('\n').Select(line => $"> {line}")
+            ) + "\n",
+            "a"
+                when element
+                    .Attribute("href")
+                    ?.Value.Contains("matrix.to/#/@", StringComparison.OrdinalIgnoreCase) == true =>
+                content,
             "a" when element.Attribute("href")?.Value is { } href => $"[{content}]({href})",
             "img" => element.Attribute("alt")?.Value ?? string.Empty,
             "li" => $"- {content.Trim()}\n",
@@ -1096,49 +1160,75 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
     private static readonly Regex MentionPattern = new(
         @"(?<![\w@])@(?<value>[\w.=/\-]+(?::[\w.\-]+)?)",
-        RegexOptions.Compiled);
+        RegexOptions.Compiled
+    );
 
-    private static readonly Regex EmotePattern = new(
-        @":(?<name>[\w+\-]+):",
-        RegexOptions.Compiled);
+    private static readonly Regex EmotePattern = new(@":(?<name>[\w+\-]+):", RegexOptions.Compiled);
 
     private static readonly Regex EditVoidTag = new(
         @"<(br|hr|img)(\s[^>]*?)?(?<!/)>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
 
     private static MessageType CreateAttachment(
         string filename,
         string mimeType,
         ulong size,
-        MediaSource source) => mimeType switch
-    {
-        _ when mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) =>
-            new MessageType.Image(new ImageMessageContent(
-                filename, null, null, source,
-                new ImageInfo(null, null, mimeType, size, null, null, null, null))),
-        _ when mimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase) =>
-            new MessageType.Video(new VideoMessageContent(
-                filename, null, null, source,
-                new VideoInfo(null, null, null, mimeType, size, null, null, null))),
-        _ when mimeType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) =>
-            new MessageType.Audio(new AudioMessageContent(
-                filename, null, null, source,
-                new AudioInfo(null, size, mimeType), null, null)),
-        _ => new MessageType.File(new FileMessageContent(
-            filename, null, null, source,
-            new uniffi.matrix_sdk_ffi.FileInfo(mimeType, size, null, null))),
-    };
+        MediaSource source
+    ) =>
+        mimeType switch
+        {
+            _ when mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) =>
+                new MessageType.Image(
+                    new ImageMessageContent(
+                        filename,
+                        null,
+                        null,
+                        source,
+                        new ImageInfo(null, null, mimeType, size, null, null, null, null)
+                    )
+                ),
+            _ when mimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase) =>
+                new MessageType.Video(
+                    new VideoMessageContent(
+                        filename,
+                        null,
+                        null,
+                        source,
+                        new VideoInfo(null, null, null, mimeType, size, null, null, null)
+                    )
+                ),
+            _ when mimeType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) =>
+                new MessageType.Audio(
+                    new AudioMessageContent(
+                        filename,
+                        null,
+                        null,
+                        source,
+                        new AudioInfo(null, size, mimeType),
+                        null,
+                        null
+                    )
+                ),
+            _ => new MessageType.File(
+                new FileMessageContent(
+                    filename,
+                    null,
+                    null,
+                    source,
+                    new uniffi.matrix_sdk_ffi.FileInfo(mimeType, size, null, null)
+                )
+            ),
+        };
 
     private static string DisplayName(EventTimelineItem item) =>
-        item.SenderProfile is ProfileDetails.Ready ready &&
-        !string.IsNullOrWhiteSpace(ready.DisplayName)
+        item.SenderProfile is ProfileDetails.Ready ready
+        && !string.IsNullOrWhiteSpace(ready.DisplayName)
             ? ready.DisplayName
             : item.Sender;
 
     private static string? AvatarUrl(EventTimelineItem item) =>
-        item.SenderProfile is ProfileDetails.Ready ready
-            ? ready.AvatarUrl
-            : null;
+        item.SenderProfile is ProfileDetails.Ready ready ? ready.AvatarUrl : null;
 
     private void RefreshAvatar(string? previous, string? current)
     {
@@ -1148,38 +1238,41 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         }
     }
 
-    private static string EventOrTransactionIdValue(EventOrTransactionId id) => id switch
-    {
-        EventOrTransactionId.EventId eventId => eventId.EventIdValue,
-        EventOrTransactionId.TransactionId transactionId => transactionId.TransactionIdValue,
-        _ => string.Empty,
-    };
+    private static string EventOrTransactionIdValue(EventOrTransactionId id) =>
+        id switch
+        {
+            EventOrTransactionId.EventId eventId => eventId.EventIdValue,
+            EventOrTransactionId.TransactionId transactionId => transactionId.TransactionIdValue,
+            _ => string.Empty,
+        };
 
-    private static string MembershipText(MembershipChange? change) => change switch
-    {
-        MembershipChange.Joined => "joined the room",
-        MembershipChange.Left => "left the room",
-        MembershipChange.Invited => "was invited",
-        MembershipChange.Kicked => "was removed",
-        MembershipChange.Banned => "was banned",
-        _ => "changed membership",
-    };
+    private static string MembershipText(MembershipChange? change) =>
+        change switch
+        {
+            MembershipChange.Joined => "joined the room",
+            MembershipChange.Left => "left the room",
+            MembershipChange.Invited => "was invited",
+            MembershipChange.Kicked => "was removed",
+            MembershipChange.Banned => "was banned",
+            _ => "changed membership",
+        };
 
     private static string ProfileText(TimelineItemContent.ProfileChange profile) =>
         profile.DisplayName is not null
             ? $"changed their display name to {profile.DisplayName}"
             : "updated their profile";
 
-    private static string StateText(OtherState state) => state switch
-    {
-        OtherState.RoomName { Name: { } name } => $"changed the room name to {name}",
-        OtherState.RoomTopic { Topic: { } topic } => $"changed the room topic to {topic}",
-        OtherState.RoomAvatar => "changed the room avatar",
-        OtherState.RoomEncryption => "enabled encryption",
-        OtherState.RoomCreate => "created the room",
-        OtherState.Custom { EventType: { } type } => $"Unknown event: {type}",
-        _ => "Room settings changed",
-    };
+    private static string StateText(OtherState state) =>
+        state switch
+        {
+            OtherState.RoomName { Name: { } name } => $"changed the room name to {name}",
+            OtherState.RoomTopic { Topic: { } topic } => $"changed the room topic to {topic}",
+            OtherState.RoomAvatar => "changed the room avatar",
+            OtherState.RoomEncryption => "enabled encryption",
+            OtherState.RoomCreate => "created the room",
+            OtherState.Custom { EventType: { } type } => $"Unknown event: {type}",
+            _ => "Room settings changed",
+        };
 
     private static string? ReplyPreview(InReplyToDetails? reply)
     {
@@ -1189,14 +1282,16 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         }
 
         using var details = reply.Event();
-        return details is EmbeddedEventDetails.Ready
-        {
-            Content: TimelineItemContent.MsgLike
-            {
-                Content.Kind: MsgLikeKind.Message message,
-            },
-        }
-            ? $"Replying to: {message.Content.Body.ReplaceLineEndings(" ")}" 
+        return
+            details
+                is EmbeddedEventDetails.Ready
+                {
+                    Content: TimelineItemContent.MsgLike
+                    {
+                        Content.Kind: MsgLikeKind.Message message,
+                    },
+                }
+            ? $"Replying to: {message.Content.Body.ReplaceLineEndings(" ")}"
             : "Replying to a message";
     }
 
@@ -1207,24 +1302,24 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
             return source;
         }
 
-        return JsonSerializer.Serialize(fallback, new JsonSerializerOptions
-        {
-            WriteIndented = true,
-        });
+        return JsonSerializer.Serialize(
+            fallback,
+            new JsonSerializerOptions { WriteIndented = true }
+        );
     }
 
     private void RunOnCapturedContext(System.Action action)
     {
-        if (_synchronizationContext is null ||
-            ReferenceEquals(SynchronizationContext.Current, _synchronizationContext))
+        if (
+            _synchronizationContext is null
+            || ReferenceEquals(SynchronizationContext.Current, _synchronizationContext)
+        )
         {
             action();
             return;
         }
 
-        _synchronizationContext.Post(
-            static state => ((System.Action)state!).Invoke(),
-            action);
+        _synchronizationContext.Post(static state => ((System.Action)state!).Invoke(), action);
     }
 
     public async ValueTask DisposeAsync()
@@ -1236,8 +1331,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
         _disposed = true;
         _timeline.CollectionChanged -= OnTimelineChanged;
-        ((INotifyPropertyChanged)_timeline).PropertyChanged -=
-            OnTimelinePropertyChanged;
+        ((INotifyPropertyChanged)_timeline).PropertyChanged -= OnTimelinePropertyChanged;
         _typing.PropertyChanged -= OnTypingChanged;
         _roomInfoSubscription.Cancel();
         _roomInfoSubscription.Dispose();

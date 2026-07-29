@@ -1,18 +1,19 @@
+using System.Collections.Specialized;
+using System.Text.RegularExpressions;
+using System.Windows.Input;
+using System.Xml.Linq;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.Sdk;
-using uniffi.matrix_sdk_ffi;
 using Microsoft.Maui.Layouts;
-using System.Collections.Specialized;
-using System.Text.RegularExpressions;
-using System.Xml.Linq;
-using System.Windows.Input;
+using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
 public sealed partial class MatrixHtmlView : ContentView
 {
     private INotifyCollectionChanged? _membersSource;
+
     [BindableProperty]
     public partial string? Html { get; set; }
 
@@ -46,7 +47,13 @@ public sealed partial class MatrixHtmlView : ContentView
                 }
             }
 
-            if (args.PropertyName is nameof(Html) or nameof(FallbackText) or nameof(Client) or nameof(Members))
+            if (
+                args.PropertyName
+                is nameof(Html)
+                    or nameof(FallbackText)
+                    or nameof(Client)
+                    or nameof(Members)
+            )
             {
                 Build();
             }
@@ -69,8 +76,10 @@ public sealed partial class MatrixHtmlView : ContentView
 
         try
         {
-            var document = XDocument.Parse($"<root>{NormalizeHtml(html)}</root>",
-                LoadOptions.PreserveWhitespace);
+            var document = XDocument.Parse(
+                $"<root>{NormalizeHtml(html)}</root>",
+                LoadOptions.PreserveWhitespace
+            );
             AddBlocks(layout, document.Root!.Nodes());
         }
         catch
@@ -83,8 +92,11 @@ public sealed partial class MatrixHtmlView : ContentView
 
     private void OnMembersChanged(object? sender, NotifyCollectionChangedEventArgs args)
     {
-        if (args.NewItems?.OfType<RoomMember>().Any(member =>
-                Html?.Contains(member.UserId, StringComparison.Ordinal) == true) == true)
+        if (
+            args.NewItems?.OfType<RoomMember>()
+                .Any(member => Html?.Contains(member.UserId, StringComparison.Ordinal) == true)
+            == true
+        )
         {
             Build();
         }
@@ -137,18 +149,35 @@ public sealed partial class MatrixHtmlView : ContentView
 
         if (name == "hr")
         {
-            layout.Add(new BoxView { HeightRequest = 1, Opacity = .35, Margin = new Thickness(0, 4) });
+            layout.Add(
+                new BoxView
+                {
+                    HeightRequest = 1,
+                    Opacity = .35,
+                    Margin = new Thickness(0, 4),
+                }
+            );
             return;
         }
 
         if (name is "ul" or "ol")
         {
             var index = 1;
-            foreach (var item in element.Elements().Where(child => child.Name.LocalName.Equals("li", StringComparison.OrdinalIgnoreCase)))
+            foreach (
+                var item in element
+                    .Elements()
+                    .Where(child =>
+                        child.Name.LocalName.Equals("li", StringComparison.OrdinalIgnoreCase)
+                    )
+            )
             {
                 var listRow = new Grid
                 {
-                    ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) },
+                    ColumnDefinitions =
+                    {
+                        new ColumnDefinition(GridLength.Auto),
+                        new ColumnDefinition(GridLength.Star),
+                    },
                     ColumnSpacing = 5,
                     Margin = new Thickness(0, 1),
                 };
@@ -165,25 +194,29 @@ public sealed partial class MatrixHtmlView : ContentView
         {
             var quote = new VerticalStackLayout { Spacing = 2 };
             AddBlocks(quote, element.Nodes());
-            layout.Add(new Border
-            {
-                Padding = new Thickness(8, 3),
-                StrokeThickness = 1,
-                Opacity = .8,
-                Content = quote,
-            });
+            layout.Add(
+                new Border
+                {
+                    Padding = new Thickness(8, 3),
+                    StrokeThickness = 1,
+                    Opacity = .8,
+                    Content = quote,
+                }
+            );
             return;
         }
 
         if (name == "pre")
         {
-            layout.Add(new Label
-            {
-                Text = element.Value,
-                FontFamily = "Courier New",
-                LineBreakMode = LineBreakMode.WordWrap,
-                Padding = new Thickness(6, 3),
-            });
+            layout.Add(
+                new Label
+                {
+                    Text = element.Value,
+                    FontFamily = "Courier New",
+                    LineBreakMode = LineBreakMode.WordWrap,
+                    Padding = new Thickness(6, 3),
+                }
+            );
             return;
         }
 
@@ -193,14 +226,18 @@ public sealed partial class MatrixHtmlView : ContentView
             Wrap = FlexWrap.Wrap,
             AlignItems = FlexAlignItems.Center,
         };
-        AddInline(row, element.Nodes(), name switch
-        {
-            "h1" => new InlineStyle(Bold: true, Size: 24),
-            "h2" => new InlineStyle(Bold: true, Size: 20),
-            "h3" => new InlineStyle(Bold: true, Size: 17),
-            "h4" or "h5" or "h6" => new InlineStyle(Bold: true, Size: 15),
-            _ => default,
-        });
+        AddInline(
+            row,
+            element.Nodes(),
+            name switch
+            {
+                "h1" => new InlineStyle(Bold: true, Size: 24),
+                "h2" => new InlineStyle(Bold: true, Size: 20),
+                "h3" => new InlineStyle(Bold: true, Size: 17),
+                "h4" or "h5" or "h6" => new InlineStyle(Bold: true, Size: 15),
+                _ => default,
+            }
+        );
         layout.Add(row);
     }
 
@@ -234,15 +271,17 @@ public sealed partial class MatrixHtmlView : ContentView
             var source = element.Attribute("src")?.Value;
             if (source?.StartsWith("mxc://", StringComparison.OrdinalIgnoreCase) == true)
             {
-                layout.Add(new MatrixImage
-                {
-                    Client = Client,
-                    MatrixSource = source,
-                    WidthRequest = 28,
-                    HeightRequest = 28,
-                    Aspect = Aspect.AspectFit,
-                    Margin = new Thickness(1, 0),
-                });
+                layout.Add(
+                    new MatrixImage
+                    {
+                        Client = Client,
+                        MatrixSource = source,
+                        WidthRequest = 28,
+                        HeightRequest = 28,
+                        Aspect = Aspect.AspectFit,
+                        Margin = new Thickness(1, 0),
+                    }
+                );
             }
             else
             {
@@ -251,8 +290,11 @@ public sealed partial class MatrixHtmlView : ContentView
             return;
         }
 
-        if (name == "a" && element.Attribute("href")?.Value is { } href &&
-            TryMatrixMention(href, out var userId))
+        if (
+            name == "a"
+            && element.Attribute("href")?.Value is { } href
+            && TryMatrixMention(href, out var userId)
+        )
         {
             layout.Add(MentionBadge(userId));
             return;
@@ -272,7 +314,11 @@ public sealed partial class MatrixHtmlView : ContentView
             "a" => style with
             {
                 Link = element.Attribute("href")?.Value,
-                Mention = element.Attribute("href")?.Value?.Contains("matrix.to/#/@", StringComparison.OrdinalIgnoreCase) == true,
+                Mention =
+                    element
+                        .Attribute("href")
+                        ?.Value?.Contains("matrix.to/#/@", StringComparison.OrdinalIgnoreCase)
+                    == true,
             },
             _ => style,
         };
@@ -284,9 +330,11 @@ public sealed partial class MatrixHtmlView : ContentView
         var label = new Label
         {
             Text = value,
-            FontAttributes = style.Bold && style.Italic
-                ? FontAttributes.Bold | FontAttributes.Italic
-                : style.Bold ? FontAttributes.Bold : style.Italic ? FontAttributes.Italic : FontAttributes.None,
+            FontAttributes =
+                style.Bold && style.Italic ? FontAttributes.Bold | FontAttributes.Italic
+                : style.Bold ? FontAttributes.Bold
+                : style.Italic ? FontAttributes.Italic
+                : FontAttributes.None,
             FontFamily = style.Code ? "Courier New" : null,
             TextDecorations = style.Strike ? TextDecorations.Strikethrough : TextDecorations.None,
             LineBreakMode = LineBreakMode.WordWrap,
@@ -306,26 +354,42 @@ public sealed partial class MatrixHtmlView : ContentView
 
         if (style is { Mention: false, Link: { } link })
         {
-            label.GestureRecognizers.Add(new TapGestureRecognizer
-            {
-                CommandParameter = link,
-            }
-            .BindCommand(nameof(LinkCommand), source: this));
+            label.GestureRecognizers.Add(
+                new TapGestureRecognizer { CommandParameter = link }.BindCommand(
+                    nameof(LinkCommand),
+                    source: this
+                )
+            );
         }
 
         return label;
     }
 
-    private static bool IsBlock(string name) => name.ToLowerInvariant() is
-        "p" or "div" or "blockquote" or "pre" or "ul" or "ol" or "li" or "hr" or
-        "h1" or "h2" or "h3" or "h4" or "h5" or "h6" or "mx-reply";
+    private static bool IsBlock(string name) =>
+        name.ToLowerInvariant()
+            is "p"
+                or "div"
+                or "blockquote"
+                or "pre"
+                or "ul"
+                or "ol"
+                or "li"
+                or "hr"
+                or "h1"
+                or "h2"
+                or "h3"
+                or "h4"
+                or "h5"
+                or "h6"
+                or "mx-reply";
 
-    private static string NormalizeHtml(string html) => VoidTag.Replace(
-        html.Replace("&nbsp;", "&#160;"), "<$1$2 />");
+    private static string NormalizeHtml(string html) =>
+        VoidTag.Replace(html.Replace("&nbsp;", "&#160;"), "<$1$2 />");
 
     private static readonly Regex VoidTag = new(
         @"<(br|hr|img)(\s[^>]*?)?(?<!/)>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
 
     private View MentionBadge(string userId)
     {
@@ -373,5 +437,6 @@ public sealed partial class MatrixHtmlView : ContentView
         bool Code = false,
         bool Mention = false,
         string? Link = null,
-        double Size = 0);
+        double Size = 0
+    );
 }

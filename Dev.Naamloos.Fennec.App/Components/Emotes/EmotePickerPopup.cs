@@ -2,8 +2,8 @@ using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Maui.Views;
 using CommunityToolkit.Mvvm.Input;
-using Dev.Naamloos.Fennec.Sdk.Helpers;
 using Dev.Naamloos.Fennec.Sdk.Entities;
+using Dev.Naamloos.Fennec.Sdk.Helpers;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
@@ -27,17 +27,13 @@ public sealed class EmotePickerPopup : Popup
             MaximumWidthRequest = 420,
             HeightRequest = 480,
             StrokeThickness = 0,
-            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
-            {
-                CornerRadius = 12,
-            },
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 12 },
             Content = new EmotePicker
             {
                 Emotes = session.Emotes,
                 PickCommand = new AsyncRelayCommand<string>(PickAsync),
             },
-        }
-        .DynamicResource(VisualElement.BackgroundColorProperty, "Surface");
+        }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface");
     }
 
     private async Task PickAsync(string? key)

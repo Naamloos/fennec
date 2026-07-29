@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Behaviors;
 using CommunityToolkit.Maui.Markup;
@@ -5,14 +6,11 @@ using CommunityToolkit.Maui.Views;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.Controls.Shapes;
-using System.Diagnostics;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
-public sealed partial class VerificationPopup :
-    ContentView,
-    SessionVerificationControllerDelegate
+public sealed partial class VerificationPopup : ContentView, SessionVerificationControllerDelegate
 {
     private bool _started;
 
@@ -20,8 +18,7 @@ public sealed partial class VerificationPopup :
     public partial SessionVerificationController? Controller { get; set; }
 
     [BindableProperty]
-    public partial string Status { get; set; } =
-        "Waiting for another signed-in session…";
+    public partial string Status { get; set; } = "Waiting for another signed-in session…";
 
     [BindableProperty]
     public partial string Sas { get; set; } = string.Empty;
@@ -51,16 +48,12 @@ public sealed partial class VerificationPopup :
                 {
                     BindingContext = this,
                     EventName = nameof(Loaded),
-                }.Bind(
-                    EventToCommandBehavior.CommandProperty,
-                    nameof(StartCommand)),
+                }.Bind(EventToCommandBehavior.CommandProperty, nameof(StartCommand)),
                 new EventToCommandBehavior
                 {
                     BindingContext = this,
                     EventName = nameof(Unloaded),
-                }.Bind(
-                    EventToCommandBehavior.CommandProperty,
-                    nameof(CleanupCommand)),
+                }.Bind(EventToCommandBehavior.CommandProperty, nameof(CleanupCommand)),
             },
             Content = new VerticalStackLayout
             {
@@ -76,45 +69,38 @@ public sealed partial class VerificationPopup :
                     },
                     new Label
                     {
-                        Text = "Open Fennec on another verified session and compare the symbols shown on both devices.",
+                        Text =
+                            "Open Fennec on another verified session and compare the symbols shown on both devices.",
                         HorizontalTextAlignment = TextAlignment.Center,
                     },
-                    new Label
-                    {
-                        HorizontalTextAlignment = TextAlignment.Center,
-                    }.Bind(Label.TextProperty, nameof(Status)),
-                    new Label
-                    {
-                        FontSize = 20,
-                        HorizontalTextAlignment = TextAlignment.Center,
-                    }
-                    .Bind(Label.TextProperty, nameof(Sas))
-                    .Bind(IsVisibleProperty, nameof(ShowSas)),
+                    new Label { HorizontalTextAlignment = TextAlignment.Center }.Bind(
+                        Label.TextProperty,
+                        nameof(Status)
+                    ),
+                    new Label { FontSize = 20, HorizontalTextAlignment = TextAlignment.Center }
+                        .Bind(Label.TextProperty, nameof(Sas))
+                        .Bind(IsVisibleProperty, nameof(ShowSas)),
                     new HorizontalStackLayout
                     {
                         Spacing = 8,
                         HorizontalOptions = LayoutOptions.Center,
                         Children =
                         {
-                            new Button { Text = "No match" }
-                                .BindCommand(nameof(DeclineCommand)),
-                            new Button { Text = "They match" }
-                                .BindCommand(nameof(ApproveCommand)),
+                            new Button { Text = "No match" }.BindCommand(nameof(DeclineCommand)),
+                            new Button { Text = "They match" }.BindCommand(nameof(ApproveCommand)),
                         },
                     }.Bind(IsVisibleProperty, nameof(ShowActions)),
-                    new Button { Text = "Cancel" }
-                        .BindCommand(nameof(CancelCommand)),
+                    new Button { Text = "Cancel" }.BindCommand(nameof(CancelCommand)),
                 },
             },
-        }.DynamicResource(
-            BackgroundColorProperty,
-            "Surface");
+        }.DynamicResource(BackgroundColorProperty, "Surface");
     }
 
     private static void OnControllerChanged(
         BindableObject bindable,
         object oldValue,
-        object newValue)
+        object newValue
+    )
     {
         if (oldValue is SessionVerificationController oldController)
         {
@@ -123,16 +109,14 @@ public sealed partial class VerificationPopup :
 
         if (newValue is SessionVerificationController newController)
         {
-            newController.SetDelegate(
-                (VerificationPopup)bindable);
+            newController.SetDelegate((VerificationPopup)bindable);
         }
     }
 
     [RelayCommand]
     private async Task StartAsync()
     {
-        if (_started ||
-            Controller is null)
+        if (_started || Controller is null)
         {
             return;
         }
@@ -141,12 +125,12 @@ public sealed partial class VerificationPopup :
         await Run(Controller.RequestDeviceVerification);
     }
 
-    public void DidReceiveVerificationRequest(
-        SessionVerificationRequestDetails details) =>
+    public void DidReceiveVerificationRequest(SessionVerificationRequestDetails details) =>
         _ = Run(async () =>
         {
             SetStatus(
-                $"Verification requested by {details.DeviceDisplayName ?? details.DeviceId}.");
+                $"Verification requested by {details.DeviceDisplayName ?? details.DeviceId}."
+            );
 
             if (Controller is null)
             {
@@ -155,7 +139,8 @@ public sealed partial class VerificationPopup :
 
             await Controller.AcknowledgeVerificationRequest(
                 details.SenderProfile.UserId,
-                details.FlowId);
+                details.FlowId
+            );
             await Controller.AcceptVerificationRequest();
         });
 
@@ -167,21 +152,17 @@ public sealed partial class VerificationPopup :
         }
     }
 
-    public void DidStartSasVerification() =>
-        SetStatus("Compare the symbols on both sessions.");
+    public void DidStartSasVerification() => SetStatus("Compare the symbols on both sessions.");
 
-    public void DidReceiveVerificationData(
-        SessionVerificationData data)
+    public void DidReceiveVerificationData(SessionVerificationData data)
     {
         var text = data switch
         {
-            SessionVerificationData.Emojis emojis =>
-                string.Join(
-                    "   ",
-                    emojis.EmojisValue.Select(
-                        emoji => emoji.Symbol())),
-            SessionVerificationData.Decimals decimals =>
-                FormatDecimals(decimals.Values),
+            SessionVerificationData.Emojis emojis => string.Join(
+                "   ",
+                emojis.EmojisValue.Select(emoji => emoji.Symbol())
+            ),
+            SessionVerificationData.Decimals decimals => FormatDecimals(decimals.Values),
             _ => string.Empty,
         };
         data.Dispose();
@@ -194,18 +175,13 @@ public sealed partial class VerificationPopup :
         });
     }
 
-    public void DidFail() =>
-        Complete("Verification failed.");
+    public void DidFail() => Complete("Verification failed.");
 
-    public void DidCancel() =>
-        Complete("Verification was cancelled.");
+    public void DidCancel() => Complete("Verification was cancelled.");
 
-    public void DidFinish() =>
-        Complete("Session verified.");
+    public void DidFinish() => Complete("Session verified.");
 
-    private static string FormatDecimals(
-        IEnumerable<ushort> values) =>
-        string.Join("   ", values);
+    private static string FormatDecimals(IEnumerable<ushort> values) => string.Join("   ", values);
 
     [RelayCommand]
     private async Task ApproveAsync()
@@ -239,9 +215,7 @@ public sealed partial class VerificationPopup :
         }
     }
 
-    private void SetStatus(string text) =>
-        MainThread.BeginInvokeOnMainThread(
-            () => Status = text);
+    private void SetStatus(string text) => MainThread.BeginInvokeOnMainThread(() => Status = text);
 
     private void Complete(string text) =>
         MainThread.BeginInvokeOnMainThread(() =>

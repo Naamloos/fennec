@@ -6,7 +6,12 @@ public sealed class ChatPoll : ObservableModel
 {
     private bool _hasVoted;
 
-    public ChatPoll(string question, IEnumerable<ChatPollAnswer> answers, ulong maxSelections, bool isClosed)
+    public ChatPoll(
+        string question,
+        IEnumerable<ChatPollAnswer> answers,
+        ulong maxSelections,
+        bool isClosed
+    )
     {
         Question = question;
         Answers = new ObservableCollection<ChatPollAnswer>(answers);
@@ -28,7 +33,11 @@ public sealed class ChatPoll : ObservableModel
 
     public bool IsClosed { get; }
 
-    public bool HasVoted { get => _hasVoted; private set => Set(ref _hasVoted, value); }
+    public bool HasVoted
+    {
+        get => _hasVoted;
+        private set => Set(ref _hasVoted, value);
+    }
 
     public string[] Select(string answerId)
     {
@@ -100,7 +109,8 @@ public sealed class ChatPollAnswer : ObservableModel
         get => _voteCount;
         set
         {
-            if (Set(ref _voteCount, value)) Raise(nameof(DisplayText));
+            if (Set(ref _voteCount, value))
+                Raise(nameof(DisplayText));
         }
     }
 
@@ -109,11 +119,13 @@ public sealed class ChatPollAnswer : ObservableModel
         get => _isSelected;
         set
         {
-            if (Set(ref _isSelected, value)) Raise(nameof(DisplayText));
+            if (Set(ref _isSelected, value))
+                Raise(nameof(DisplayText));
         }
     }
 
-    public string DisplayText => $"{(IsSelected ? "✓ " : string.Empty)}{Text} · {VoteCount} {(VoteCount == 1 ? "vote" : "votes")}";
+    public string DisplayText =>
+        $"{(IsSelected ? "✓ " : string.Empty)}{Text} · {VoteCount} {(VoteCount == 1 ? "vote" : "votes")}";
 }
 
 public sealed record ChatPollVote(ChatTimelineItem Item, string AnswerId);

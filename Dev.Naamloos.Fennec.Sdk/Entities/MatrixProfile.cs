@@ -9,4 +9,5 @@ public sealed record MatrixProfile(
     string? Presence,
     string? TimeZone,
     IReadOnlyList<string> Pronouns,
-    string Homeserver);
+    string Homeserver
+);

@@ -22,7 +22,12 @@ public sealed class AttachmentPreviewPopup : Popup<bool>
                 Spacing = 12,
                 Children =
                 {
-                    new Label { Text = "Send attachment", FontSize = 20, FontAttributes = FontAttributes.Bold },
+                    new Label
+                    {
+                        Text = "Send attachment",
+                        FontSize = 20,
+                        FontAttributes = FontAttributes.Bold,
+                    },
                     new Image
                     {
                         Source = ImageSource.FromStream(() => new MemoryStream(attachment.Data)),
@@ -30,19 +35,41 @@ public sealed class AttachmentPreviewPopup : Popup<bool>
                         MaximumHeightRequest = 240,
                         IsVisible = isImage,
                     },
-                    new Label { Text = attachment.FileName, LineBreakMode = LineBreakMode.TailTruncation },
-                    new Label { Text = attachment.MimeType, FontSize = 12, Opacity = .7 },
+                    new Label
+                    {
+                        Text = attachment.FileName,
+                        LineBreakMode = LineBreakMode.TailTruncation,
+                    },
+                    new Label
+                    {
+                        Text = attachment.MimeType,
+                        FontSize = 12,
+                        Opacity = .7,
+                    },
                     new Grid
                     {
-                        ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Star) },
+                        ColumnDefinitions =
+                        {
+                            new ColumnDefinition(GridLength.Star),
+                            new ColumnDefinition(GridLength.Star),
+                        },
                         ColumnSpacing = 8,
                         Children =
                         {
-                            new Button { Text = "Cancel", BackgroundColor = Colors.Transparent, Command = new Command(async () => await CloseAsync(false)) }
-                                .DynamicResource(Button.TextColorProperty, "Primary"),
-                            new Button { Text = "Send", Command = new Command(async () => await CloseAsync(true)) }
+                            new Button
+                            {
+                                Text = "Cancel",
+                                BackgroundColor = Colors.Transparent,
+                                Command = new Command(async () => await CloseAsync(false)),
+                            }.DynamicResource(Button.TextColorProperty, "Primary"),
+                            new Button
+                            {
+                                Text = "Send",
+                                Command = new Command(async () => await CloseAsync(true)),
+                            }
                                 .DynamicResource(VisualElement.BackgroundColorProperty, "Primary")
-                                .DynamicResource(Button.TextColorProperty, "OnPrimary").Column(1),
+                                .DynamicResource(Button.TextColorProperty, "OnPrimary")
+                                .Column(1),
                         },
                     },
                 },

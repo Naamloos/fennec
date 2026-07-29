@@ -8,13 +8,13 @@ public sealed class BytesToImageSourceConverter : IValueConverter
         object? value,
         Type targetType,
         object? parameter,
-        CultureInfo culture) => value is byte[] bytes
-            ? ImageSource.FromStream(() => new MemoryStream(bytes))
-            : null;
+        CultureInfo culture
+    ) => value is byte[] bytes ? ImageSource.FromStream(() => new MemoryStream(bytes)) : null;
 
     public object? ConvertBack(
         object? value,
         Type targetType,
         object? parameter,
-        CultureInfo culture) => Binding.DoNothing;
+        CultureInfo culture
+    ) => Binding.DoNothing;
 }

@@ -4,13 +4,13 @@ namespace Dev.Naamloos.Fennec.App.Components;
 
 public class TemplateSwitchView<TValue, TInput> : ContentView
 {
-    public static readonly BindableProperty ValueProperty =
-        BindableProperty.Create(
-            nameof(Value),
-            typeof(object),
-            typeof(TemplateSwitchView<TValue, TInput>),
-            propertyChanged: static (bindable, _, newValue) =>
-                ((TemplateSwitchView<TValue, TInput>)bindable).build());
+    public static readonly BindableProperty ValueProperty = BindableProperty.Create(
+        nameof(Value),
+        typeof(object),
+        typeof(TemplateSwitchView<TValue, TInput>),
+        propertyChanged: static (bindable, _, newValue) =>
+            ((TemplateSwitchView<TValue, TInput>)bindable).build()
+    );
 
     public object? Value
     {
@@ -19,19 +19,23 @@ public class TemplateSwitchView<TValue, TInput> : ContentView
     }
 
     private TemplateInputSelectorDelegate _inputSelector;
-    private IDictionary<TemplatePropertySelectorDelegate, View> _templateSelectors = new Dictionary<TemplatePropertySelectorDelegate, View>();
+    private IDictionary<TemplatePropertySelectorDelegate, View> _templateSelectors =
+        new Dictionary<TemplatePropertySelectorDelegate, View>();
 
     public View? FallbackTemplate = null;
 
     public TemplateSwitchView(TemplateInputSelectorDelegate inputSelector)
-	{
+    {
         _inputSelector = inputSelector;
         _templateSelectors = new Dictionary<TemplatePropertySelectorDelegate, View>();
 
         build();
-	}
+    }
 
-    public TemplateSwitchView<TValue, TInput> Add(TemplatePropertySelectorDelegate selector, View template)
+    public TemplateSwitchView<TValue, TInput> Add(
+        TemplatePropertySelectorDelegate selector,
+        View template
+    )
     {
         _templateSelectors[selector] = template;
         return this;
@@ -54,7 +58,7 @@ public class TemplateSwitchView<TValue, TInput> : ContentView
 
         foreach (var selector in _templateSelectors)
         {
-            if(selector.Key(inputValue))
+            if (selector.Key(inputValue))
             {
                 outputView = selector.Value;
                 break;

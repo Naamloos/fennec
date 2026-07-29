@@ -6,11 +6,11 @@ namespace Dev.Naamloos.Fennec.App
 {
     public static class Extensions
     {
-
         public static TBindable BindService<TService, TBindable>(
             this TBindable bindable,
             BindableProperty targetProperty,
-            BindingMode mode = BindingMode.Default)
+            BindingMode mode = BindingMode.Default
+        )
             where TBindable : BindableObject
             where TService : notnull
         {
@@ -21,13 +21,10 @@ namespace Dev.Naamloos.Fennec.App
 
             bindable.SetBinding(
                 targetProperty,
-                new Binding(
-                    path: ".",
-                    mode: mode,
-                    source: service));
+                new Binding(path: ".", mode: mode, source: service)
+            );
 
             return bindable;
         }
-
     }
 }

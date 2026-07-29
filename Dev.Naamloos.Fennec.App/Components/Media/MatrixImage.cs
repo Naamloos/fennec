@@ -44,11 +44,14 @@ public partial class MatrixImage : Image
 
         PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is nameof(MatrixSource)
-                or nameof(Client)
-                or nameof(IsJson)
-                or nameof(UseFullSize)
-                or nameof(UseAvatarCache))
+            if (
+                e.PropertyName
+                is nameof(MatrixSource)
+                    or nameof(Client)
+                    or nameof(IsJson)
+                    or nameof(UseFullSize)
+                    or nameof(UseAvatarCache)
+            )
             {
                 if (e.PropertyName == nameof(MatrixSource))
                 {
@@ -87,21 +90,16 @@ public partial class MatrixImage : Image
 
         try
         {
-            var data = UseFullSize
-                ? await client.GetMediaContentAsync(source, IsJson).ConfigureAwait(false)
+            var data =
+                UseFullSize
+                    ? await client.GetMediaContentAsync(source, IsJson).ConfigureAwait(false)
                 : UseAvatarCache
-                    ? await client.GetAvatarThumbnailAsync(
-                        source,
-                        200,
-                        200,
-                        IsJson,
-                        cancellationToken).ConfigureAwait(false)
-                : await client.GetThumbnailAsync(
-                    source,
-                    200,
-                    200,
-                    IsJson,
-                    cancellationToken).ConfigureAwait(false);
+                    ? await client
+                        .GetAvatarThumbnailAsync(source, 200, 200, IsJson, cancellationToken)
+                        .ConfigureAwait(false)
+                : await client
+                    .GetThumbnailAsync(source, 200, 200, IsJson, cancellationToken)
+                    .ConfigureAwait(false);
 
             if (loadId != _loadId)
             {
@@ -114,19 +112,17 @@ public partial class MatrixImage : Image
                 Source = imageSource;
             });
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception exception)
         {
-            System.Diagnostics.Debug.WriteLine(
-                $"Failed to load Matrix image: {exception}");
+            System.Diagnostics.Debug.WriteLine($"Failed to load Matrix image: {exception}");
         }
     }
 
     private void SubscribeToAvatarChanges()
     {
-        if (_avatarChangeClient == Client) return;
+        if (_avatarChangeClient == Client)
+            return;
 
         UnsubscribeFromAvatarChanges();
         _avatarChangeClient = Client;
@@ -147,8 +143,10 @@ public partial class MatrixImage : Image
 
     private void OnAvatarChanged(string? previous, string? current)
     {
-        if (!string.Equals(_sourceOverride ?? MatrixSource, previous, StringComparison.Ordinal) ||
-            string.IsNullOrWhiteSpace(current))
+        if (
+            !string.Equals(_sourceOverride ?? MatrixSource, previous, StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(current)
+        )
         {
             return;
         }

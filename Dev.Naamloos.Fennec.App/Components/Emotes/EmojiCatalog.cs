@@ -13,8 +13,10 @@ public static class EmojiCatalog
         {
             for (var codePoint = range.Start; codePoint <= range.End; codePoint++)
             {
-                if (!Rune.TryCreate(codePoint, out var rune) ||
-                    Rune.GetUnicodeCategory(rune) == UnicodeCategory.OtherNotAssigned)
+                if (
+                    !Rune.TryCreate(codePoint, out var rune)
+                    || Rune.GetUnicodeCategory(rune) == UnicodeCategory.OtherNotAssigned
+                )
                 {
                     continue;
                 }

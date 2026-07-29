@@ -8,11 +8,13 @@ public sealed class BooleanInverterConverter : IValueConverter
         object? value,
         Type targetType,
         object? parameter,
-        CultureInfo culture) => value is bool boolean && !boolean;
+        CultureInfo culture
+    ) => value is bool boolean && !boolean;
 
     public object? ConvertBack(
         object? value,
         Type targetType,
         object? parameter,
-        CultureInfo culture) => Binding.DoNothing;
+        CultureInfo culture
+    ) => Binding.DoNothing;
 }

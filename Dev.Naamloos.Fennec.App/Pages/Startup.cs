@@ -36,9 +36,7 @@ public sealed partial class Startup : ContentPage
                 {
                     BindingContext = this,
                     EventName = nameof(Loaded),
-                }.Bind(
-                    EventToCommandBehavior.CommandProperty,
-                    nameof(StartCommand)),
+                }.Bind(EventToCommandBehavior.CommandProperty, nameof(StartCommand)),
             },
             Children =
             {
@@ -60,9 +58,7 @@ public sealed partial class Startup : ContentPage
     [RelayCommand]
     private async Task StartAsync()
     {
-        if (_started ||
-            _matrixClient is null ||
-            _appNavigation is null)
+        if (_started || _matrixClient is null || _appNavigation is null)
         {
             return;
         }

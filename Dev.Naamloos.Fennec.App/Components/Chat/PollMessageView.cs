@@ -1,7 +1,7 @@
+using System.Windows.Input;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.Sdk.Entities;
-using System.Windows.Input;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
@@ -21,28 +21,64 @@ public sealed partial class PollMessageView : ContentView
             Spacing = 8,
             Children =
             {
-                new Label { Text = "POLL", FontSize = 11, FontAttributes = FontAttributes.Bold, Opacity = .7 },
-                new Label { FontSize = 16, FontAttributes = FontAttributes.Bold }
-                    .Bind(Label.TextProperty, $"{nameof(Item)}.{nameof(ChatTimelineItem.Poll)}.{nameof(ChatPoll.Question)}", source: this),
+                new Label
+                {
+                    Text = "POLL",
+                    FontSize = 11,
+                    FontAttributes = FontAttributes.Bold,
+                    Opacity = .7,
+                },
+                new Label { FontSize = 16, FontAttributes = FontAttributes.Bold }.Bind(
+                    Label.TextProperty,
+                    $"{nameof(Item)}.{nameof(ChatTimelineItem.Poll)}.{nameof(ChatPoll.Question)}",
+                    source: this
+                ),
                 new CollectionView
                 {
                     SelectionMode = SelectionMode.None,
-                    ItemsLayout = new LinearItemsLayout(ItemsLayoutOrientation.Vertical) { ItemSpacing = 6 },
-                    ItemTemplate = new DataTemplate(() => new Button
+                    ItemsLayout = new LinearItemsLayout(ItemsLayoutOrientation.Vertical)
                     {
-                        HorizontalOptions = LayoutOptions.Fill,
-                        Command = new Command<ChatPollAnswer>(Vote),
-                    }
-                    .Bind(Button.TextProperty, nameof(ChatPollAnswer.DisplayText))
-                    .Bind(Button.CommandParameterProperty, ".")
-                    .DynamicResource(VisualElement.BackgroundColorProperty, "SurfaceContainerHigh")
-                    .DynamicResource(Button.TextColorProperty, "OnSurface")),
-                }
-                .Bind(ItemsView.ItemsSourceProperty, $"{nameof(Item)}.{nameof(ChatTimelineItem.Poll)}.{nameof(ChatPoll.Answers)}", source: this),
-                new Label { Text = "Poll closed", FontSize = 12, Opacity = .7 }
-                    .Bind(IsVisibleProperty, $"{nameof(Item)}.{nameof(ChatTimelineItem.Poll)}.{nameof(ChatPoll.IsClosed)}", source: this),
-                new Label { Text = "Your vote is recorded", FontSize = 12, Opacity = .7 }
-                    .Bind(IsVisibleProperty, $"{nameof(Item)}.{nameof(ChatTimelineItem.Poll)}.{nameof(ChatPoll.HasVoted)}", source: this),
+                        ItemSpacing = 6,
+                    },
+                    ItemTemplate = new DataTemplate(() =>
+                        new Button
+                        {
+                            HorizontalOptions = LayoutOptions.Fill,
+                            Command = new Command<ChatPollAnswer>(Vote),
+                        }
+                            .Bind(Button.TextProperty, nameof(ChatPollAnswer.DisplayText))
+                            .Bind(Button.CommandParameterProperty, ".")
+                            .DynamicResource(
+                                VisualElement.BackgroundColorProperty,
+                                "SurfaceContainerHigh"
+                            )
+                            .DynamicResource(Button.TextColorProperty, "OnSurface")
+                    ),
+                }.Bind(
+                    ItemsView.ItemsSourceProperty,
+                    $"{nameof(Item)}.{nameof(ChatTimelineItem.Poll)}.{nameof(ChatPoll.Answers)}",
+                    source: this
+                ),
+                new Label
+                {
+                    Text = "Poll closed",
+                    FontSize = 12,
+                    Opacity = .7,
+                }.Bind(
+                    IsVisibleProperty,
+                    $"{nameof(Item)}.{nameof(ChatTimelineItem.Poll)}.{nameof(ChatPoll.IsClosed)}",
+                    source: this
+                ),
+                new Label
+                {
+                    Text = "Your vote is recorded",
+                    FontSize = 12,
+                    Opacity = .7,
+                }.Bind(
+                    IsVisibleProperty,
+                    $"{nameof(Item)}.{nameof(ChatTimelineItem.Poll)}.{nameof(ChatPoll.HasVoted)}",
+                    source: this
+                ),
             },
         };
     }

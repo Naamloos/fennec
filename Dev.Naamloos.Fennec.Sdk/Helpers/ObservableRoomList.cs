@@ -1,10 +1,10 @@
-using Dev.Naamloos.Fennec.Sdk.Entities;
-using Dev.Naamloos.Fennec.Sdk.Events;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Text;
+using Dev.Naamloos.Fennec.Sdk.Entities;
+using Dev.Naamloos.Fennec.Sdk.Events;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.Sdk.Helpers
@@ -23,15 +23,17 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
         internal ObservableRoomList(
             ManagedMatrixClient client,
             RoomList roomList,
-            RoomListEntriesDynamicFilterKind? initialFilter = null)
+            RoomListEntriesDynamicFilterKind? initialFilter = null
+        )
         {
             _client = client;
             _roomList = roomList;
-            _filter = initialFilter ??
-                new RoomListEntriesDynamicFilterKind.All([]);
+            _filter = initialFilter ?? new RoomListEntriesDynamicFilterKind.All([]);
             _synchronizationContext = SynchronizationContext.Current;
 
-            _listenerCallback = RoomListEntriesListenerCallback.Create(entries => this.applyUpdates(entries));
+            _listenerCallback = RoomListEntriesListenerCallback.Create(entries =>
+                this.applyUpdates(entries)
+            );
 
             _emitter = roomList.EntriesWithDynamicAdapters(5000, _listenerCallback);
             _emitter.Controller().SetFilter(_filter);
@@ -56,9 +58,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
             _synchronizationContext = SynchronizationContext.Current;
         }
 
-        private void OnConnectionRecovered(
-            object? sender,
-            EventArgs e)
+        private void OnConnectionRecovered(object? sender, EventArgs e)
         {
             _ = RestartAsync();
         }
@@ -75,24 +75,19 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
                 _emitter?.Dispose();
                 _roomList.Dispose();
 
-                _roomList = await _client.GetSyncService()
-                    .RoomListService()
-                    .AllRooms();
+                _roomList = await _client.GetSyncService().RoomListService().AllRooms();
 
                 if (_disposed)
                 {
                     return;
                 }
 
-                _emitter = _roomList.EntriesWithDynamicAdapters(
-                    5000,
-                    _listenerCallback!);
+                _emitter = _roomList.EntriesWithDynamicAdapters(5000, _listenerCallback!);
                 _emitter.Controller().SetFilter(_filter);
             }
             catch (Exception exception)
             {
-                Debug.WriteLine(
-                    $"Failed to restart room-list listener: {exception}");
+                Debug.WriteLine($"Failed to restart room-list listener: {exception}");
             }
             finally
             {
@@ -108,7 +103,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
 
         private void applyUpdates(RoomListEntriesUpdate[] entries, bool skipContext = false)
         {
-            if(_disposed)
+            if (_disposed)
             {
                 return;
             }

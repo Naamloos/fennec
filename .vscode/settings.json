@@ -9,7 +9,8 @@
   "[csharp]": {
     "editor.insertSpaces": true,
     "editor.tabSize": 4,
-    "editor.formatOnSave": false
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "csharpier.csharpier-vscode"
   },
   "[json]": {
     "editor.tabSize": 2
@@ -19,5 +20,6 @@
   },
   "[xml]": {
     "editor.tabSize": 2
-  }
+  },
+  "editor.formatOnSave": true
 }

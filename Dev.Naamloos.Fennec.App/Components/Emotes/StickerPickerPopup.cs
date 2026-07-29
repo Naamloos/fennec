@@ -34,8 +34,12 @@ public sealed partial class StickerPickerPopup : Popup
                 },
                 Children =
                 {
-                    new Label { Text = "Stickers", FontSize = 20, FontAttributes = FontAttributes.Bold }
-                        .Row(0),
+                    new Label
+                    {
+                        Text = "Stickers",
+                        FontSize = 20,
+                        FontAttributes = FontAttributes.Bold,
+                    }.Row(0),
                     new CollectionView
                     {
                         SelectionMode = SelectionMode.None,
@@ -51,19 +55,27 @@ public sealed partial class StickerPickerPopup : Popup
                             HorizontalItemSpacing = 8,
                             VerticalItemSpacing = 8,
                         },
-                        ItemTemplate = new DataTemplate(() => new MatrixImage
-                        {
-                            IsJson = false,
-                            Aspect = Aspect.AspectFit,
-                            HeightRequest = 84,
-                            GestureRecognizers =
+                        ItemTemplate = new DataTemplate(() =>
+                            new MatrixImage
                             {
-                                new TapGestureRecognizer()
-                                    .BindCommand(nameof(PickStickerCommand), source: this)
-                                    .Bind(TapGestureRecognizer.CommandParameterProperty, "."),
-                            },
-                        }.Bind(MatrixImage.MatrixSourceProperty, nameof(MatrixEmote.Source))),
-                    }.Bind(ItemsView.ItemsSourceProperty, nameof(ChatSession.Emotes), source: session).Row(1),
+                                IsJson = false,
+                                Aspect = Aspect.AspectFit,
+                                HeightRequest = 84,
+                                GestureRecognizers =
+                                {
+                                    new TapGestureRecognizer()
+                                        .BindCommand(nameof(PickStickerCommand), source: this)
+                                        .Bind(TapGestureRecognizer.CommandParameterProperty, "."),
+                                },
+                            }.Bind(MatrixImage.MatrixSourceProperty, nameof(MatrixEmote.Source))
+                        ),
+                    }
+                        .Bind(
+                            ItemsView.ItemsSourceProperty,
+                            nameof(ChatSession.Emotes),
+                            source: session
+                        )
+                        .Row(1),
                 },
             },
         }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface");
@@ -72,7 +84,8 @@ public sealed partial class StickerPickerPopup : Popup
     [RelayCommand]
     private async Task PickStickerAsync(MatrixEmote? emote)
     {
-        if (emote is not null) await _session.SendStickerAsync(emote);
+        if (emote is not null)
+            await _session.SendStickerAsync(emote);
         await CloseAsync();
     }
 }

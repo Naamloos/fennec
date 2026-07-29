@@ -6,7 +6,10 @@ namespace Dev.Naamloos.Fennec.App.Components;
 public sealed class ClientSettingsView : ContentView
 {
     public static readonly BindableProperty UserSettingsProperty = BindableProperty.Create(
-        nameof(UserSettings), typeof(UserSettingsService), typeof(ClientSettingsView));
+        nameof(UserSettings),
+        typeof(UserSettingsService),
+        typeof(ClientSettingsView)
+    );
 
     public UserSettingsService? UserSettings
     {
@@ -18,10 +21,15 @@ public sealed class ClientSettingsView : ContentView
     {
         this.BindService<UserSettingsService, ClientSettingsView>(UserSettingsProperty);
 
-        Content = new SettingsSection("Client",
+        Content = new SettingsSection(
+            "Client",
             new Grid
             {
-                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(GridLength.Star),
+                    new ColumnDefinition(GridLength.Auto),
+                },
                 Children =
                 {
                     new VerticalStackLayout
@@ -30,15 +38,24 @@ public sealed class ClientSettingsView : ContentView
                         Children =
                         {
                             new Label { Text = "Experimental feature" },
-                            new Label { Text = "Reserved for a future Fennec feature.", Opacity = .7, FontSize = 12 },
+                            new Label
+                            {
+                                Text = "Reserved for a future Fennec feature.",
+                                Opacity = .7,
+                                FontSize = 12,
+                            },
                         },
                     },
-                    new Switch().Bind(
-                        Switch.IsToggledProperty,
-                        $"{nameof(UserSettings)}.{nameof(UserSettingsService.ExperimentalFeatureEnabled)}",
-                        BindingMode.TwoWay,
-                        source: this).Column(1),
+                    new Switch()
+                        .Bind(
+                            Switch.IsToggledProperty,
+                            $"{nameof(UserSettings)}.{nameof(UserSettingsService.ExperimentalFeatureEnabled)}",
+                            BindingMode.TwoWay,
+                            source: this
+                        )
+                        .Column(1),
                 },
-            });
+            }
+        );
     }
 }

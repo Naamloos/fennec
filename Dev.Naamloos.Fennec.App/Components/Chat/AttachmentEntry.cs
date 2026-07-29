@@ -1,5 +1,5 @@
-using CommunityToolkit.Maui;
 using System.Windows.Input;
+using CommunityToolkit.Maui;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 

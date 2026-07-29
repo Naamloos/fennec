@@ -1,5 +1,5 @@
-using Dev.Naamloos.Fennec.Sdk.Events;
 using System.Diagnostics;
+using Dev.Naamloos.Fennec.Sdk.Events;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.Sdk.Helpers;
@@ -16,9 +16,7 @@ public sealed class ObservableSpaceRoomIds : IDisposable
     private HashSet<string> _roomIds = [];
     private bool _disposed;
 
-    private ObservableSpaceRoomIds(
-        ManagedMatrixClient client,
-        SpaceService spaceService)
+    private ObservableSpaceRoomIds(ManagedMatrixClient client, SpaceService spaceService)
     {
         _client = client;
         _spaceService = spaceService;
@@ -31,14 +29,12 @@ public sealed class ObservableSpaceRoomIds : IDisposable
 
     public IReadOnlySet<string> RoomIds => _roomIds;
 
-    internal static async Task<ObservableSpaceRoomIds> CreateAsync(
-        ManagedMatrixClient client)
+    internal static async Task<ObservableSpaceRoomIds> CreateAsync(ManagedMatrixClient client)
     {
-        var roomIds = new ObservableSpaceRoomIds(
-            client,
-            await client.GetSpaceServiceAsync());
-        roomIds._subscription = await roomIds._spaceService
-            .SubscribeToSpaceFilters(roomIds._listener);
+        var roomIds = new ObservableSpaceRoomIds(client, await client.GetSpaceServiceAsync());
+        roomIds._subscription = await roomIds._spaceService.SubscribeToSpaceFilters(
+            roomIds._listener
+        );
         await roomIds.RefreshAsync();
         return roomIds;
     }
@@ -94,9 +90,7 @@ public sealed class ObservableSpaceRoomIds : IDisposable
 
     private void NotifyChanged()
     {
-        if (_context is not null && !ReferenceEquals(
-            SynchronizationContext.Current,
-            _context))
+        if (_context is not null && !ReferenceEquals(SynchronizationContext.Current, _context))
         {
             _context.Post(_ => Changed?.Invoke(this, EventArgs.Empty), null);
             return;

@@ -22,10 +22,7 @@ public sealed class AttachmentEntryHandler : EntryHandler
     {
         base.ConnectHandler(platformView);
         _listener = new ReceiveContentListener(this);
-        ViewCompat.SetOnReceiveContentListener(
-            platformView,
-            AcceptedMimeTypes,
-            _listener);
+        ViewCompat.SetOnReceiveContentListener(platformView, AcceptedMimeTypes, _listener);
     }
 
     protected override void DisconnectHandler(MauiAppCompatEditText platformView)
@@ -38,7 +35,8 @@ public sealed class AttachmentEntryHandler : EntryHandler
 
     private async Task ReceiveAsync(
         IReadOnlyList<global::Android.Net.Uri> uris,
-        ContentInfoCompat permissionLease)
+        ContentInfoCompat permissionLease
+    )
     {
         var resolver = PlatformView?.Context?.ContentResolver;
         if (resolver is null)
@@ -60,22 +58,25 @@ public sealed class AttachmentEntryHandler : EntryHandler
                 using var data = new MemoryStream();
                 await input.CopyToAsync(data);
                 var mimeType = resolver.GetType(uri) ?? "image/png";
-                attachments.Add(new PickedAttachment(
-                    FileName(resolver, uri, mimeType),
-                    mimeType,
-                    data.ToArray()));
+                attachments.Add(
+                    new PickedAttachment(
+                        FileName(resolver, uri, mimeType),
+                        mimeType,
+                        data.ToArray()
+                    )
+                );
             }
 
             if (attachments.Count > 0)
             {
                 await MainThread.InvokeOnMainThreadAsync(() =>
-                    (VirtualView as AttachmentEntry)?.ReceiveAttachments(attachments));
+                    (VirtualView as AttachmentEntry)?.ReceiveAttachments(attachments)
+                );
             }
         }
         catch (Exception exception)
         {
-            System.Diagnostics.Debug.WriteLine(
-                $"Could not receive keyboard content: {exception}");
+            System.Diagnostics.Debug.WriteLine($"Could not receive keyboard content: {exception}");
         }
         finally
         {
@@ -86,14 +87,10 @@ public sealed class AttachmentEntryHandler : EntryHandler
     private static string FileName(
         ContentResolver resolver,
         global::Android.Net.Uri uri,
-        string mimeType)
+        string mimeType
+    )
     {
-        using var cursor = resolver.Query(
-            uri,
-            [IOpenableColumns.DisplayName],
-            null,
-            null,
-            null);
+        using var cursor = resolver.Query(uri, [IOpenableColumns.DisplayName], null, null, null);
         if (cursor?.MoveToFirst() == true)
         {
             var index = cursor.GetColumnIndex(IOpenableColumns.DisplayName);
@@ -104,17 +101,18 @@ public sealed class AttachmentEntryHandler : EntryHandler
         }
 
         var extension = MimeTypeMap.Singleton?.GetExtensionFromMimeType(mimeType);
-        return $"keyboard-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}." +
-               (string.IsNullOrWhiteSpace(extension) ? "png" : extension);
+        return $"keyboard-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}."
+            + (string.IsNullOrWhiteSpace(extension) ? "png" : extension);
     }
 
-    private sealed class ReceiveContentListener(AttachmentEntryHandler handler) :
-        Java.Lang.Object,
-        IOnReceiveContentListener
+    private sealed class ReceiveContentListener(AttachmentEntryHandler handler)
+        : Java.Lang.Object,
+            IOnReceiveContentListener
     {
         public ContentInfoCompat? OnReceiveContent(
             global::Android.Views.View? view,
-            ContentInfoCompat? payload)
+            ContentInfoCompat? payload
+        )
         {
             var clip = payload?.Clip;
             if (clip is null)
@@ -122,7 +120,8 @@ public sealed class AttachmentEntryHandler : EntryHandler
                 return payload;
             }
 
-            var uris = Enumerable.Range(0, clip.ItemCount)
+            var uris = Enumerable
+                .Range(0, clip.ItemCount)
                 .Select(index => clip.GetItemAt(index)?.Uri)
                 .Where(uri => uri is not null)
                 .Cast<global::Android.Net.Uri>()
@@ -148,10 +147,7 @@ public sealed class AttachmentEntryHandler : EntryHandler
             }
 
             EditorInfoCompat.SetContentMimeTypes(outAttrs, AcceptedMimeTypes);
-            return InputConnectionCompat.CreateWrapper(
-                this,
-                inputConnection,
-                outAttrs);
+            return InputConnectionCompat.CreateWrapper(this, inputConnection, outAttrs);
         }
     }
 }

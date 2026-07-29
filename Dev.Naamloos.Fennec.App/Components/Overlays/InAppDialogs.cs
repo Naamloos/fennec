@@ -6,10 +6,15 @@ public static class InAppDialogs
         Page? page,
         string title,
         IEnumerable<string> actions,
-        string? message = null)
+        string? message = null
+    )
     {
-        if (page is null) return null;
-        return await FloatingOverlay.ShowAsync(page, new FloatingActionMenu(title, actions, message));
+        if (page is null)
+            return null;
+        return await FloatingOverlay.ShowAsync(
+            page,
+            new FloatingActionMenu(title, actions, message)
+        );
     }
 
     public static async Task<string?> PromptAsync(
@@ -20,11 +25,23 @@ public static class InAppDialogs
         string? placeholder = null,
         string? initialValue = null,
         bool multiline = false,
-        bool isPassword = false)
+        bool isPassword = false
+    )
     {
-        if (page is null) return null;
-        return await FloatingOverlay.ShowAsync(page, new FloatingTextPrompt(
-            title, message, accept, placeholder, initialValue, multiline, isPassword));
+        if (page is null)
+            return null;
+        return await FloatingOverlay.ShowAsync(
+            page,
+            new FloatingTextPrompt(
+                title,
+                message,
+                accept,
+                placeholder,
+                initialValue,
+                multiline,
+                isPassword
+            )
+        );
     }
 
     public static Task<PollDraft?> ComposePollAsync(Page? page) =>

@@ -5,4 +5,5 @@ public sealed record MatrixSearchResult(
     string EventId,
     string SenderId,
     string Body,
-    string Timestamp);
+    string Timestamp
+);

@@ -1,19 +1,19 @@
+using System.Diagnostics;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Behaviors;
 using CommunityToolkit.Maui.Converters;
+using CommunityToolkit.Maui.Extensions;
+using CommunityToolkit.Maui.Markup;
+using CommunityToolkit.Maui.Views;
+using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.App.Components;
 using Dev.Naamloos.Fennec.Sdk;
-using CommunityToolkit.Maui.Extensions;
-using CommunityToolkit.Maui.Views;
-using Microsoft.Maui.Controls.Shapes;
-using System.Diagnostics;
-using uniffi.matrix_sdk_ffi;
-using CommunityToolkit.Maui.Markup;
-using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.Sdk.Entities;
 using Dev.Naamloos.Fennec.Sdk.Helpers;
 using MauiIcons.Core;
 using MauiIcons.Material;
+using Microsoft.Maui.Controls.Shapes;
+using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.App;
 
@@ -29,7 +29,15 @@ public sealed partial class AppShell : Shell
     private string _roomErrorMessage = string.Empty;
     private bool _isRoomInfoOpen;
 
-    public bool IsRoomInfoOpen { get => _isRoomInfoOpen; set { _isRoomInfoOpen = value; OnPropertyChanged(); } }
+    public bool IsRoomInfoOpen
+    {
+        get => _isRoomInfoOpen;
+        set
+        {
+            _isRoomInfoOpen = value;
+            OnPropertyChanged();
+        }
+    }
 
     public Room? SelectedRoom
     {
@@ -86,9 +94,7 @@ public sealed partial class AppShell : Shell
     public string AccountUserId => _accountUserId;
     public string AccountInitial => _accountInitial;
 
-    public bool ShowChat =>
-        SelectedRoom is not null &&
-        string.IsNullOrEmpty(RoomErrorMessage);
+    public bool ShowChat => SelectedRoom is not null && string.IsNullOrEmpty(RoomErrorMessage);
 
     public bool HasSelectedRoom => SelectedRoom is not null;
 
@@ -115,7 +121,8 @@ public sealed partial class AppShell : Shell
     public AppShell(
         ManagedMatrixClient matrixClient,
         AppNavigationService appNavigation,
-        SessionVerificationService sessionVerificationService)
+        SessionVerificationService sessionVerificationService
+    )
     {
         _matrixClient = matrixClient;
         _appNavigation = appNavigation;
@@ -132,25 +139,22 @@ public sealed partial class AppShell : Shell
         Build();
 
         Behaviors.Add(
-            new EventToCommandBehavior
-            {
-                BindingContext = this,
-                EventName = nameof(Loaded),
-            }.Bind(
+            new EventToCommandBehavior { BindingContext = this, EventName = nameof(Loaded) }.Bind(
                 EventToCommandBehavior.CommandProperty,
-                nameof(LoadCommand)));
+                nameof(LoadCommand)
+            )
+        );
         Behaviors.Add(
-            new EventToCommandBehavior
-            {
-                BindingContext = this,
-                EventName = nameof(Unloaded),
-            }.Bind(
+            new EventToCommandBehavior { BindingContext = this, EventName = nameof(Unloaded) }.Bind(
                 EventToCommandBehavior.CommandProperty,
-                nameof(UnloadCommand)));
+                nameof(UnloadCommand)
+            )
+        );
     }
 
     private static async Task InitializeVerificationServiceAsync(
-        SessionVerificationService sessionVerificationService)
+        SessionVerificationService sessionVerificationService
+    )
     {
         try
         {
@@ -158,53 +162,28 @@ public sealed partial class AppShell : Shell
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(
-                $"Unable to initialize session verification: {exception}");
+            Debug.WriteLine($"Unable to initialize session verification: {exception}");
         }
     }
 
     private void ConfigureShell()
     {
-        this
-            .DynamicResource(
-                VisualElement.BackgroundColorProperty,
-                "Surface");
+        this.DynamicResource(VisualElement.BackgroundColorProperty, "Surface");
 #if ANDROID
         FlyoutBackgroundColor = Colors.Transparent;
         FlyoutBackdrop = new SolidColorBrush(Color.FromArgb("#66000000"));
 #else
-        this.DynamicResource(
-                FlyoutBackgroundColorProperty,
-                "Surface");
+        this.DynamicResource(FlyoutBackgroundColorProperty, "Surface");
 #endif
-        this
-            .DynamicResource(
-                Shell.BackgroundColorProperty,
-                "Surface")
-            .DynamicResource(
-                Shell.ForegroundColorProperty,
-                "OnSurface")
-            .DynamicResource(
-                Shell.TitleColorProperty,
-                "OnSurface")
-            .DynamicResource(
-                Shell.DisabledColorProperty,
-                "Outline")
-            .DynamicResource(
-                Shell.UnselectedColorProperty,
-                "OnSurfaceVariant")
-            .DynamicResource(
-                Shell.TabBarBackgroundColorProperty,
-                "Surface2")
-            .DynamicResource(
-                Shell.TabBarForegroundColorProperty,
-                "Primary")
-            .DynamicResource(
-                Shell.TabBarTitleColorProperty,
-                "Primary")
-            .DynamicResource(
-                Shell.TabBarUnselectedColorProperty,
-                "OnSurfaceVariant");
+        this.DynamicResource(Shell.BackgroundColorProperty, "Surface")
+            .DynamicResource(Shell.ForegroundColorProperty, "OnSurface")
+            .DynamicResource(Shell.TitleColorProperty, "OnSurface")
+            .DynamicResource(Shell.DisabledColorProperty, "Outline")
+            .DynamicResource(Shell.UnselectedColorProperty, "OnSurfaceVariant")
+            .DynamicResource(Shell.TabBarBackgroundColorProperty, "Surface2")
+            .DynamicResource(Shell.TabBarForegroundColorProperty, "Primary")
+            .DynamicResource(Shell.TabBarTitleColorProperty, "Primary")
+            .DynamicResource(Shell.TabBarUnselectedColorProperty, "OnSurfaceVariant");
 
         FlyoutBehavior = FlyoutBehavior.Flyout;
         FlyoutWidth = 360;
@@ -234,35 +213,39 @@ public sealed partial class AppShell : Shell
                             HorizontalOptions = LayoutOptions.Fill,
                             Margin = new Thickness(8, 0, 8, 10),
                         }
-                        .DynamicResource(VisualElement.BackgroundColorProperty, "PrimaryContainer")
-                        .DynamicResource(Button.TextColorProperty, "OnPrimaryContainer")
-                        .BindCommand(nameof(OpenConversationCommand), source: this),
+                            .DynamicResource(
+                                VisualElement.BackgroundColorProperty,
+                                "PrimaryContainer"
+                            )
+                            .DynamicResource(Button.TextColorProperty, "OnPrimaryContainer")
+                            .BindCommand(nameof(OpenConversationCommand), source: this),
 #if !WINDOWS && !MACCATALYST
-                        new AccountButton
-                        {
-                            Margin = new Thickness(8, 0, 8, 4),
-                            ShowUserId = true,
-                        }
-                        .Bind(
-                            AccountButton.AvatarSourceProperty,
-                            nameof(AccountAvatarSource),
-                            source: BindingContext)
-                        .Bind(
-                            AccountButton.DisplayNameProperty,
-                            nameof(AccountDisplayName),
-                            source: BindingContext)
-                        .Bind(
-                            AccountButton.UserIdProperty,
-                            nameof(AccountUserId),
-                            source: BindingContext)
-                        .Bind(
-                            AccountButton.InitialProperty,
-                            nameof(AccountInitial),
-                            source: BindingContext)
-                        .Bind(
-                            AccountButton.OpenCommandProperty,
-                            nameof(ShowUserSettingsCommand),
-                            source: BindingContext),
+                        new AccountButton { Margin = new Thickness(8, 0, 8, 4), ShowUserId = true }
+                            .Bind(
+                                AccountButton.AvatarSourceProperty,
+                                nameof(AccountAvatarSource),
+                                source: BindingContext
+                            )
+                            .Bind(
+                                AccountButton.DisplayNameProperty,
+                                nameof(AccountDisplayName),
+                                source: BindingContext
+                            )
+                            .Bind(
+                                AccountButton.UserIdProperty,
+                                nameof(AccountUserId),
+                                source: BindingContext
+                            )
+                            .Bind(
+                                AccountButton.InitialProperty,
+                                nameof(AccountInitial),
+                                source: BindingContext
+                            )
+                            .Bind(
+                                AccountButton.OpenCommandProperty,
+                                nameof(ShowUserSettingsCommand),
+                                source: BindingContext
+                            ),
 #endif
                     },
                 }.Row(0),
@@ -271,129 +254,144 @@ public sealed partial class AppShell : Shell
                         TieredSidebar.SelectedRoomProperty,
                         nameof(ManagedSelectedRoom),
                         BindingMode.TwoWay,
-                        source: this)
+                        source: this
+                    )
                     .Row(1),
             },
-        }.DynamicResource(
-            VisualElement.BackgroundColorProperty,
-            "Surface");
+        }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface");
         FlyoutContent = sidebar;
 
-        Items.Add(new FlyoutItem
-        {
-            Title = "Fennec",
-            Route = "main",
-            FlyoutItemIsVisible = false,
-            Items =
+        Items.Add(
+            new FlyoutItem
             {
-                new ShellContent
+                Title = "Fennec",
+                Route = "main",
+                FlyoutItemIsVisible = false,
+                Items =
                 {
-                    Title = "Fennec",
-                    Route = "chat",
-                    Content = new ContentPage
+                    new ShellContent
                     {
                         Title = "Fennec",
-                        SafeAreaEdges = SafeAreaEdges.All,
-                        Content = new Grid
+                        Route = "chat",
+                        Content = new ContentPage
                         {
-                            Children =
+                            Title = "Fennec",
+                            SafeAreaEdges = SafeAreaEdges.All,
+                            Content = new Grid
                             {
-                                new VerificationPopupV2(),
-                                new Chat()
-                                    .BindService<ManagedMatrixClient, Chat>(Chat.MatrixClientProperty)
-                                    .Bind(
-                                        IsVisibleProperty,
-                                        nameof(ShowChat),
-                                        source: BindingContext)
-                                    .Bind(
-                                        Chat.SelectedRoomProperty,
-                                        nameof(SelectedRoom),
-                                        source: BindingContext)
-                                    .Bind(
-                                        Chat.RoomLoadErrorProperty,
-                                        nameof(RoomErrorMessage),
-                                        BindingMode.TwoWay,
-                                        source: BindingContext)
-                                    .Bind(Chat.IsRoomInfoOpenProperty, nameof(IsRoomInfoOpen), BindingMode.TwoWay, source: BindingContext),
-                                new VerticalStackLayout
+                                Children =
                                 {
-                                    HorizontalOptions = LayoutOptions.Center,
-                                    VerticalOptions = LayoutOptions.Center,
-                                    Spacing = 12,
-                                    Children =
+                                    new VerificationPopupV2(),
+                                    new Chat()
+                                        .BindService<ManagedMatrixClient, Chat>(
+                                            Chat.MatrixClientProperty
+                                        )
+                                        .Bind(
+                                            IsVisibleProperty,
+                                            nameof(ShowChat),
+                                            source: BindingContext
+                                        )
+                                        .Bind(
+                                            Chat.SelectedRoomProperty,
+                                            nameof(SelectedRoom),
+                                            source: BindingContext
+                                        )
+                                        .Bind(
+                                            Chat.RoomLoadErrorProperty,
+                                            nameof(RoomErrorMessage),
+                                            BindingMode.TwoWay,
+                                            source: BindingContext
+                                        )
+                                        .Bind(
+                                            Chat.IsRoomInfoOpenProperty,
+                                            nameof(IsRoomInfoOpen),
+                                            BindingMode.TwoWay,
+                                            source: BindingContext
+                                        ),
+                                    new VerticalStackLayout
                                     {
-                                        new Border
+                                        HorizontalOptions = LayoutOptions.Center,
+                                        VerticalOptions = LayoutOptions.Center,
+                                        Spacing = 12,
+                                        Children =
                                         {
-                                            WidthRequest = 64,
-                                            HeightRequest = 64,
-                                            StrokeThickness = 1,
-                                            StrokeShape = new RoundRectangle
+                                            new Border
                                             {
-                                                CornerRadius = 32,
+                                                WidthRequest = 64,
+                                                HeightRequest = 64,
+                                                StrokeThickness = 1,
+                                                StrokeShape = new RoundRectangle
+                                                {
+                                                    CornerRadius = 32,
+                                                },
+                                                Content = new Label
+                                                {
+                                                    Text = "#",
+                                                    FontSize = 28,
+                                                    FontAttributes = FontAttributes.Bold,
+                                                    HorizontalTextAlignment = TextAlignment.Center,
+                                                    VerticalTextAlignment = TextAlignment.Center,
+                                                },
                                             },
-                                            Content = new Label
+                                            new Label
                                             {
-                                                Text = "#",
-                                                FontSize = 28,
+                                                Text = "Select a room",
+                                                FontSize = 20,
                                                 FontAttributes = FontAttributes.Bold,
                                                 HorizontalTextAlignment = TextAlignment.Center,
-                                                VerticalTextAlignment = TextAlignment.Center,
+                                            },
+                                            new Label
+                                            {
+                                                Text =
+                                                    "Choose a room from the sidebar to start chatting.",
+                                                Opacity = .7,
+                                                HorizontalTextAlignment = TextAlignment.Center,
                                             },
                                         },
-                                        new Label
-                                        {
-                                            Text = "Select a room",
-                                            FontSize = 20,
-                                            FontAttributes = FontAttributes.Bold,
-                                            HorizontalTextAlignment = TextAlignment.Center,
-                                        },
-                                        new Label
-                                        {
-                                            Text = "Choose a room from the sidebar to start chatting.",
-                                            Opacity = .7,
-                                            HorizontalTextAlignment = TextAlignment.Center,
-                                        },
-                                    },
-                                }.Bind(
-                                    IsVisibleProperty,
-                                    nameof(SelectedRoom),
-                                    converter: new IsNullConverter(),
-                                    source: BindingContext),
-                                new VerticalStackLayout
-                                {
-                                    Padding = 24,
-                                    Spacing = 12,
-                                    HorizontalOptions = LayoutOptions.Center,
-                                    VerticalOptions = LayoutOptions.Center,
-                                    Children =
+                                    }.Bind(
+                                        IsVisibleProperty,
+                                        nameof(SelectedRoom),
+                                        converter: new IsNullConverter(),
+                                        source: BindingContext
+                                    ),
+                                    new VerticalStackLayout
                                     {
-                                        new Label
+                                        Padding = 24,
+                                        Spacing = 12,
+                                        HorizontalOptions = LayoutOptions.Center,
+                                        VerticalOptions = LayoutOptions.Center,
+                                        Children =
                                         {
-                                            Text = "Could not open room",
-                                            FontSize = 20,
-                                            FontAttributes = FontAttributes.Bold,
-                                            HorizontalTextAlignment = TextAlignment.Center,
+                                            new Label
+                                            {
+                                                Text = "Could not open room",
+                                                FontSize = 20,
+                                                FontAttributes = FontAttributes.Bold,
+                                                HorizontalTextAlignment = TextAlignment.Center,
+                                            },
+                                            new Label
+                                            {
+                                                TextColor = Colors.Red,
+                                                HorizontalTextAlignment = TextAlignment.Center,
+                                            }.Bind(
+                                                Label.TextProperty,
+                                                nameof(RoomErrorMessage),
+                                                source: BindingContext
+                                            ),
                                         },
-                                        new Label
-                                        {
-                                            TextColor = Colors.Red,
-                                            HorizontalTextAlignment = TextAlignment.Center,
-                                        }.Bind(
-                                            Label.TextProperty,
-                                            nameof(RoomErrorMessage),
-                                            source: BindingContext),
-                                    },
-                                }.Bind(
-                                    IsVisibleProperty,
-                                    nameof(RoomErrorMessage),
-                                    converter: new IsStringNotNullOrEmptyConverter(),
-                                    source: BindingContext),
+                                    }.Bind(
+                                        IsVisibleProperty,
+                                        nameof(RoomErrorMessage),
+                                        converter: new IsStringNotNullOrEmptyConverter(),
+                                        source: BindingContext
+                                    ),
+                                },
                             },
                         },
                     },
                 },
-            },
-        });
+            }
+        );
         CurrentItem = Items.Single();
 #if ANDROID || IOS
         ConfigureMobileTitleBar();
@@ -403,7 +401,8 @@ public sealed partial class AppShell : Shell
 #if ANDROID || IOS
     private void ConfigureMobileTitleBar()
     {
-        if (CurrentPage is not { } page) return;
+        if (CurrentPage is not { } page)
+            return;
 
         Shell.SetNavBarIsVisible(page, true);
         if (Shell.GetTitleView(page) is null)
@@ -412,44 +411,43 @@ public sealed partial class AppShell : Shell
         }
     }
 
-    private View CreateMobileTitleView() => new Grid
-    {
-        HorizontalOptions = LayoutOptions.Fill,
-        ColumnDefinitions =
+    private View CreateMobileTitleView() =>
+        new Grid
         {
-            new ColumnDefinition(GridLength.Star),
-            new ColumnDefinition(GridLength.Auto),
-        },
-        Children =
-        {
-            new Label
+            HorizontalOptions = LayoutOptions.Fill,
+            ColumnDefinitions =
             {
-                FontAttributes = FontAttributes.Bold,
-                LineBreakMode = LineBreakMode.TailTruncation,
-                VerticalTextAlignment = TextAlignment.Center,
-            }.Bind(
-                Label.TextProperty,
-                $"{nameof(ManagedSelectedRoom)}.{nameof(ManagedRoom.DisplayName)}",
-                source: this),
-            new MauiIcon
+                new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Auto),
+            },
+            Children =
             {
-                Icon = MaterialIcons.Info,
-                IconSize = 22,
-                WidthRequest = 48,
-                HeightRequest = 44,
-                HorizontalOptions = LayoutOptions.End,
-                GestureRecognizers =
+                new Label
                 {
-                    new TapGestureRecognizer { Command = new Command(ToggleRoomInfo) },
-                },
-            }
-            .Bind(
-                IsVisibleProperty,
-                nameof(HasSelectedRoom),
-                source: this)
-            .Column(1),
-        },
-    };
+                    FontAttributes = FontAttributes.Bold,
+                    LineBreakMode = LineBreakMode.TailTruncation,
+                    VerticalTextAlignment = TextAlignment.Center,
+                }.Bind(
+                    Label.TextProperty,
+                    $"{nameof(ManagedSelectedRoom)}.{nameof(ManagedRoom.DisplayName)}",
+                    source: this
+                ),
+                new MauiIcon
+                {
+                    Icon = MaterialIcons.Info,
+                    IconSize = 22,
+                    WidthRequest = 48,
+                    HeightRequest = 44,
+                    HorizontalOptions = LayoutOptions.End,
+                    GestureRecognizers =
+                    {
+                        new TapGestureRecognizer { Command = new Command(ToggleRoomInfo) },
+                    },
+                }
+                    .Bind(IsVisibleProperty, nameof(HasSelectedRoom), source: this)
+                    .Column(1),
+            },
+        };
 #endif
 
     private void ConfigureTitleBar()
@@ -463,39 +461,67 @@ public sealed partial class AppShell : Shell
         {
             Title = "Fennec",
             HeightRequest = 42,
-            TrailingContent = new HorizontalStackLayout { Children =
+            TrailingContent = new HorizontalStackLayout
             {
-                new MauiIcon { Icon = MaterialIcons.Search, IconSize = 22, WidthRequest = 40, HeightRequest = 40,
-                    GestureRecognizers = { new TapGestureRecognizer().BindCommand(nameof(SearchMessagesCommand), source: this) } },
-                new AccountButton
-            {
-                Margin = new Thickness(0, 0, 8, 0),
-                TransparentBackground = true,
-            }
-            .Bind(
-                AccountButton.AvatarSourceProperty,
-                nameof(AccountAvatarSource),
-                source: BindingContext)
-            .Bind(
-                AccountButton.DisplayNameProperty,
-                nameof(AccountDisplayName),
-                source: BindingContext)
-            .Bind(
-                AccountButton.UserIdProperty,
-                nameof(AccountUserId),
-                source: BindingContext)
-            .Bind(
-                AccountButton.InitialProperty,
-                nameof(AccountInitial),
-                source: BindingContext)
-            .Bind(
-                AccountButton.OpenCommandProperty,
-                nameof(ShowUserSettingsCommand),
-                source: BindingContext),
-                new MauiIcon { Icon = MaterialIcons.Info, IconSize = 22, WidthRequest = 40, HeightRequest = 40,
-                    GestureRecognizers = { new TapGestureRecognizer { Command = new Command(ToggleRoomInfo) } } }
-                    .Bind(IsVisibleProperty, nameof(HasSelectedRoom), source: this),
-            }},
+                Children =
+                {
+                    new MauiIcon
+                    {
+                        Icon = MaterialIcons.Search,
+                        IconSize = 22,
+                        WidthRequest = 40,
+                        HeightRequest = 40,
+                        GestureRecognizers =
+                        {
+                            new TapGestureRecognizer().BindCommand(
+                                nameof(SearchMessagesCommand),
+                                source: this
+                            ),
+                        },
+                    },
+                    new AccountButton
+                    {
+                        Margin = new Thickness(0, 0, 8, 0),
+                        TransparentBackground = true,
+                    }
+                        .Bind(
+                            AccountButton.AvatarSourceProperty,
+                            nameof(AccountAvatarSource),
+                            source: BindingContext
+                        )
+                        .Bind(
+                            AccountButton.DisplayNameProperty,
+                            nameof(AccountDisplayName),
+                            source: BindingContext
+                        )
+                        .Bind(
+                            AccountButton.UserIdProperty,
+                            nameof(AccountUserId),
+                            source: BindingContext
+                        )
+                        .Bind(
+                            AccountButton.InitialProperty,
+                            nameof(AccountInitial),
+                            source: BindingContext
+                        )
+                        .Bind(
+                            AccountButton.OpenCommandProperty,
+                            nameof(ShowUserSettingsCommand),
+                            source: BindingContext
+                        ),
+                    new MauiIcon
+                    {
+                        Icon = MaterialIcons.Info,
+                        IconSize = 22,
+                        WidthRequest = 40,
+                        HeightRequest = 40,
+                        GestureRecognizers =
+                        {
+                            new TapGestureRecognizer { Command = new Command(ToggleRoomInfo) },
+                        },
+                    }.Bind(IsVisibleProperty, nameof(HasSelectedRoom), source: this),
+                },
+            },
         };
     }
 
@@ -512,7 +538,8 @@ public sealed partial class AppShell : Shell
             _accountDisplayName = profile.DisplayName ?? profile.UserId;
             _accountUserId = profile.UserId;
             _accountInitial = string.IsNullOrWhiteSpace(profile.DisplayName)
-                ? "@" : profile.DisplayName[..1].ToUpperInvariant();
+                ? "@"
+                : profile.DisplayName[..1].ToUpperInvariant();
             if (string.IsNullOrWhiteSpace(profile.AvatarUrl))
             {
                 OnPropertyChanged(nameof(AccountDisplayName));
@@ -525,7 +552,8 @@ public sealed partial class AppShell : Shell
                 profile.AvatarUrl,
                 60,
                 60,
-                isJson: false);
+                isJson: false
+            );
             _accountAvatarSource = ImageSource.FromStream(() => new MemoryStream(bytes));
             OnPropertyChanged(nameof(AccountAvatarSource));
             OnPropertyChanged(nameof(AccountDisplayName));
@@ -544,8 +572,14 @@ public sealed partial class AppShell : Shell
     private async Task SearchMessagesAsync()
     {
         var page = CurrentPage;
-        var query = await InAppDialogs.PromptAsync(page, "Search messages", "Search joined conversations", "Search");
-        if (string.IsNullOrWhiteSpace(query)) return;
+        var query = await InAppDialogs.PromptAsync(
+            page,
+            "Search messages",
+            "Search joined conversations",
+            "Search"
+        );
+        if (string.IsNullOrWhiteSpace(query))
+            return;
 
         try
         {
@@ -556,17 +590,23 @@ public sealed partial class AppShell : Shell
                 return;
             }
 
-            var labels = results.Take(20)
+            var labels = results
+                .Take(20)
                 .Select(result => $"{result.SenderId}: {result.Body}")
                 .ToArray();
             var selected = await InAppDialogs.ChooseAsync(
-                page, $"{results.Count} result(s)", labels);
+                page,
+                $"{results.Count} result(s)",
+                labels
+            );
             var result = results.FirstOrDefault(candidate =>
-                $"{candidate.SenderId}: {candidate.Body}" == selected);
+                $"{candidate.SenderId}: {candidate.Body}" == selected
+            );
             if (result is not null)
             {
                 ManagedSelectedRoom = new ManagedRoom(
-                    _matrixClient.GetSyncService().RoomListService().Room(result.RoomId));
+                    _matrixClient.GetSyncService().RoomListService().Room(result.RoomId)
+                );
             }
         }
         catch (Exception exception)
@@ -580,7 +620,11 @@ public sealed partial class AppShell : Shell
         var page = CurrentPage;
         var name = room.DisplayName() ?? room.Id();
         var accept = await page.DisplayAlertAsync(
-            "Room invitation", $"Join {name}?", "Join", "Decline");
+            "Room invitation",
+            $"Join {name}?",
+            "Join",
+            "Decline"
+        );
         try
         {
             if (accept)
@@ -604,13 +648,26 @@ public sealed partial class AppShell : Shell
     {
         var page = CurrentPage;
         var action = await InAppDialogs.ChooseAsync(
-            page, "New conversation", ["Start direct message", "Join room"]);
+            page,
+            "New conversation",
+            ["Start direct message", "Join room"]
+        );
         var prompt = action switch
         {
             "Start direct message" => await InAppDialogs.PromptAsync(
-                page, "Start direct message", "Matrix ID", "Start", "@alice:example.org"),
+                page,
+                "Start direct message",
+                "Matrix ID",
+                "Start",
+                "@alice:example.org"
+            ),
             "Join room" => await InAppDialogs.PromptAsync(
-                page, "Join room", "Room alias, ID, or link", "Join", "#community:example.org"),
+                page,
+                "Join room",
+                "Room alias, ID, or link",
+                "Join",
+                "#community:example.org"
+            ),
             _ => null,
         };
 
@@ -621,9 +678,10 @@ public sealed partial class AppShell : Shell
 
         try
         {
-            var room = action == "Start direct message"
-                ? await _matrixClient.CreateDirectMessageAsync(prompt.Trim())
-                : await _matrixClient.JoinRoomAsync(prompt.Trim());
+            var room =
+                action == "Start direct message"
+                    ? await _matrixClient.CreateDirectMessageAsync(prompt.Trim())
+                    : await _matrixClient.JoinRoomAsync(prompt.Trim());
             ManagedSelectedRoom = room;
         }
         catch (Exception exception)
@@ -658,8 +716,7 @@ public sealed partial class AppShell : Shell
     }
 
     private void OnSessionInvalidated(object? sender, EventArgs e) =>
-        MainThread.BeginInvokeOnMainThread(
-            () => _appNavigation?.ShowLogin());
+        MainThread.BeginInvokeOnMainThread(() => _appNavigation?.ShowLogin());
 
     private void OnAvatarChanged(string? previous, string? current) =>
         MainThread.BeginInvokeOnMainThread(() => _ = LoadOwnAvatarAsync());
@@ -702,12 +759,10 @@ public sealed partial class AppShell : Shell
 
         if (_matrixClient is not null)
         {
-            _matrixClient.SessionInvalidated -=
-                OnSessionInvalidated;
+            _matrixClient.SessionInvalidated -= OnSessionInvalidated;
             _matrixClient.AvatarChanged -= OnAvatarChanged;
         }
 
         _selectedRoom = null;
     }
-
 }

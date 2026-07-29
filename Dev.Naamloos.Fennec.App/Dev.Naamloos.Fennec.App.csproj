@@ -23,24 +23,28 @@
         <WindowsPackageType>None</WindowsPackageType>
         <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
         <SupportedOSPlatformVersion
-            Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+            Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'"
+        >
             15.0</SupportedOSPlatformVersion>
         <SupportedOSPlatformVersion
-            Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">
+            Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'"
+        >
             15.0</SupportedOSPlatformVersion>
         <SupportedOSPlatformVersion
-            Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+            Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'"
+        >
             21.0</SupportedOSPlatformVersion>
         <SupportedOSPlatformVersion
-            Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+            Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'"
+        >
             10.0.17763.0</SupportedOSPlatformVersion>
         <TargetPlatformMinVersion
-            Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+            Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'"
+        >
             10.0.17763.0</TargetPlatformMinVersion>
         <DefaultLanguage>en-US</DefaultLanguage>
     </PropertyGroup>
-    <PropertyGroup
-        Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+    <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
         <RuntimeIdentifier>win-x64</RuntimeIdentifier>
         <PlatformTarget>x64</PlatformTarget>
     </PropertyGroup>
@@ -50,9 +54,16 @@
         <NoWarn>$(NoWarn);CA1416</NoWarn>
     </PropertyGroup>
     <ItemGroup>
-        <MauiIcon Include="Resources\AppIcon\appicon.svg"
-            ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#17171a" />
-        <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#17171a" BaseSize="128,128" />
+        <MauiIcon
+            Include="Resources\AppIcon\appicon.svg"
+            ForegroundFile="Resources\AppIcon\appiconfg.svg"
+            Color="#17171a"
+        />
+        <MauiSplashScreen
+            Include="Resources\Splash\splash.svg"
+            Color="#17171a"
+            BaseSize="128,128"
+        />
         <MauiImage Include="Resources\Images\*" />
         <MauiFont Include="Resources\Fonts\*" />
     </ItemGroup>
@@ -90,20 +101,23 @@
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.10" />
         <ProjectReference Include="..\Dev.Naamloos.Fennec.Sdk\Dev.Naamloos.Fennec.Sdk.csproj" />
     </ItemGroup>
-    <ItemGroup
-        Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
         <AndroidNativeLibrary
             Include="..\Dev.Naamloos.Fennec.Sdk\native\android-arm64\libmatrix_sdk_ffi.so"
-            Abi="arm64-v8a" />
+            Abi="arm64-v8a"
+        />
         <AndroidNativeLibrary
             Include="..\Dev.Naamloos.Fennec.Sdk\native\android-x64\libmatrix_sdk_ffi.so"
-            Abi="x86_64" />
+            Abi="x86_64"
+        />
     </ItemGroup>
-    <ItemGroup
-        Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
-        <Content Include="..\Dev.Naamloos.Fennec.Sdk\native\win-x64\matrix_sdk_ffi.dll"
-            Link="matrix_sdk_ffi.dll" CopyToOutputDirectory="PreserveNewest"
-            CopyToPublishDirectory="PreserveNewest" />
+    <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+        <Content
+            Include="..\Dev.Naamloos.Fennec.Sdk\native\win-x64\matrix_sdk_ffi.dll"
+            Link="matrix_sdk_ffi.dll"
+            CopyToOutputDirectory="PreserveNewest"
+            CopyToPublishDirectory="PreserveNewest"
+        />
     </ItemGroup>
     <ItemGroup>
         <None Update="Pages\LoginPage.xaml">

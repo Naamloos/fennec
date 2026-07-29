@@ -75,7 +75,8 @@ public sealed class UserProfileSheet : ContentView
         ManagedMatrixClient client,
         string userId,
         string? fallbackName = null,
-        string? fallbackAvatarUrl = null)
+        string? fallbackAvatarUrl = null
+    )
     {
         IsVisible = true;
         _profile.Children.Clear();
@@ -107,109 +108,175 @@ public sealed class UserProfileSheet : ContentView
         }
     }
 
-    private async Task LoadAsync(ManagedMatrixClient client, string userId, string? fallbackName, string? fallbackAvatarUrl)
+    private async Task LoadAsync(
+        ManagedMatrixClient client,
+        string userId,
+        string? fallbackName,
+        string? fallbackAvatarUrl
+    )
     {
         try
         {
             var loaded = await client.GetMatrixProfileAsync(userId);
             var profile = loaded with
             {
-                DisplayName = (string.IsNullOrWhiteSpace(loaded.DisplayName) || loaded.DisplayName == loaded.UserId) &&
-                              !string.IsNullOrWhiteSpace(fallbackName)
-                    ? fallbackName : loaded.DisplayName,
-                AvatarUrl = string.IsNullOrWhiteSpace(loaded.AvatarUrl) ? fallbackAvatarUrl : loaded.AvatarUrl,
+                DisplayName =
+                    (
+                        string.IsNullOrWhiteSpace(loaded.DisplayName)
+                        || loaded.DisplayName == loaded.UserId
+                    ) && !string.IsNullOrWhiteSpace(fallbackName)
+                        ? fallbackName
+                        : loaded.DisplayName,
+                AvatarUrl = string.IsNullOrWhiteSpace(loaded.AvatarUrl)
+                    ? fallbackAvatarUrl
+                    : loaded.AvatarUrl,
             };
             _profile.Children.Clear();
 
-            _profile.Children.Add(new Grid
-            {
-                HorizontalOptions = LayoutOptions.Center,
-                Children =
+            _profile.Children.Add(
+                new Grid
                 {
-                    new MatrixAvatar { Size = 104, MatrixSource = profile.AvatarUrl, DisplayName = profile.DisplayName },
-                    new Border
+                    HorizontalOptions = LayoutOptions.Center,
+                    Children =
                     {
-                        WidthRequest = 22,
-                        HeightRequest = 22,
-                        StrokeThickness = 3,
-                        StrokeShape = new RoundRectangle { CornerRadius = 11 },
-                        HorizontalOptions = LayoutOptions.End,
-                        VerticalOptions = LayoutOptions.End,
-                        BackgroundColor = profile.Presence == "online" ? Colors.Green : Colors.Gray,
-                    }.DynamicResource(Border.StrokeProperty, "Surface"),
-                },
-            });
-            _profile.Children.Add(new Label
-            {
-                Text = profile.DisplayName,
-                FontSize = 26,
-                FontAttributes = FontAttributes.Bold,
-                HorizontalTextAlignment = TextAlignment.Center,
-            });
-            _profile.Children.Add(new Label
-            {
-                Text = profile.Status ?? profile.Presence ?? "Offline",
-                Opacity = .75,
-                HorizontalTextAlignment = TextAlignment.Center,
-            });
+                        new MatrixAvatar
+                        {
+                            Size = 104,
+                            MatrixSource = profile.AvatarUrl,
+                            DisplayName = profile.DisplayName,
+                        },
+                        new Border
+                        {
+                            WidthRequest = 22,
+                            HeightRequest = 22,
+                            StrokeThickness = 3,
+                            StrokeShape = new RoundRectangle { CornerRadius = 11 },
+                            HorizontalOptions = LayoutOptions.End,
+                            VerticalOptions = LayoutOptions.End,
+                            BackgroundColor =
+                                profile.Presence == "online" ? Colors.Green : Colors.Gray,
+                        }.DynamicResource(Border.StrokeProperty, "Surface"),
+                    },
+                }
+            );
+            _profile.Children.Add(
+                new Label
+                {
+                    Text = profile.DisplayName,
+                    FontSize = 26,
+                    FontAttributes = FontAttributes.Bold,
+                    HorizontalTextAlignment = TextAlignment.Center,
+                }
+            );
+            _profile.Children.Add(
+                new Label
+                {
+                    Text = profile.Status ?? profile.Presence ?? "Offline",
+                    Opacity = .75,
+                    HorizontalTextAlignment = TextAlignment.Center,
+                }
+            );
 
             AddDetail("Matrix ID", profile.UserId);
             AddDetail("Homeserver", profile.Homeserver);
             AddDetail("Bio", profile.Bio);
-            AddDetail("Pronouns", profile.Pronouns.Count == 0 ? null : string.Join(" · ", profile.Pronouns));
+            AddDetail(
+                "Pronouns",
+                profile.Pronouns.Count == 0 ? null : string.Join(" · ", profile.Pronouns)
+            );
             AddDetail("Time zone", profile.TimeZone);
             AddMutualRooms(await client.GetMutualRoomsAsync(userId));
         }
         catch (Exception exception)
         {
             _profile.Children.Clear();
-            _profile.Children.Add(new Label
-            {
-                Text = $"Could not load profile\n{exception.Message}",
-                TextColor = Colors.Red,
-                HorizontalTextAlignment = TextAlignment.Center,
-            });
+            _profile.Children.Add(
+                new Label
+                {
+                    Text = $"Could not load profile\n{exception.Message}",
+                    TextColor = Colors.Red,
+                    HorizontalTextAlignment = TextAlignment.Center,
+                }
+            );
         }
     }
 
     private void AddDetail(string label, string? value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return;
+        if (string.IsNullOrWhiteSpace(value))
+            return;
 
-        _profile.Children.Add(new Border
-        {
-            Padding = new Thickness(16, 12),
-            StrokeThickness = 0,
-            StrokeShape = new RoundRectangle { CornerRadius = 16 },
-            Content = new VerticalStackLayout
+        _profile.Children.Add(
+            new Border
             {
-                Spacing = 3,
-                Children =
+                Padding = new Thickness(16, 12),
+                StrokeThickness = 0,
+                StrokeShape = new RoundRectangle { CornerRadius = 16 },
+                Content = new VerticalStackLayout
                 {
-                    new Label { Text = label.ToUpperInvariant(), FontSize = 10, Opacity = .6 },
-                    new Label { Text = value, FontSize = 15, LineBreakMode = LineBreakMode.WordWrap },
+                    Spacing = 3,
+                    Children =
+                    {
+                        new Label
+                        {
+                            Text = label.ToUpperInvariant(),
+                            FontSize = 10,
+                            Opacity = .6,
+                        },
+                        new Label
+                        {
+                            Text = value,
+                            FontSize = 15,
+                            LineBreakMode = LineBreakMode.WordWrap,
+                        },
+                    },
                 },
-            },
-        }.DynamicResource(VisualElement.BackgroundColorProperty, "SurfaceContainer"));
+            }.DynamicResource(VisualElement.BackgroundColorProperty, "SurfaceContainer")
+        );
     }
 
     private void AddMutualRooms(IReadOnlyList<MatrixSharedRoom> rooms)
     {
-        if (rooms.Count == 0) return;
+        if (rooms.Count == 0)
+            return;
 
-        _profile.Children.Add(new Label { Text = $"MUTUAL ROOMS · {rooms.Count}", FontSize = 11, FontAttributes = FontAttributes.Bold, Opacity = .6 });
+        _profile.Children.Add(
+            new Label
+            {
+                Text = $"MUTUAL ROOMS · {rooms.Count}",
+                FontSize = 11,
+                FontAttributes = FontAttributes.Bold,
+                Opacity = .6,
+            }
+        );
         foreach (var room in rooms)
         {
-            _profile.Children.Add(new Grid
-            {
-                ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) },
-                ColumnSpacing = 12,
-                Children =
+            _profile.Children.Add(
+                new Grid
                 {
-                    new MatrixAvatar { Size = 36, MatrixSource = room.AvatarUrl, DisplayName = room.DisplayName },
-                    new Label { Text = room.DisplayName, VerticalOptions = LayoutOptions.Center, FontAttributes = FontAttributes.Bold }.Column(1),
-                },
-            });
+                    ColumnDefinitions =
+                    {
+                        new ColumnDefinition(GridLength.Auto),
+                        new ColumnDefinition(GridLength.Star),
+                    },
+                    ColumnSpacing = 12,
+                    Children =
+                    {
+                        new MatrixAvatar
+                        {
+                            Size = 36,
+                            MatrixSource = room.AvatarUrl,
+                            DisplayName = room.DisplayName,
+                        },
+                        new Label
+                        {
+                            Text = room.DisplayName,
+                            VerticalOptions = LayoutOptions.Center,
+                            FontAttributes = FontAttributes.Bold,
+                        }.Column(1),
+                    },
+                }
+            );
         }
     }
 }

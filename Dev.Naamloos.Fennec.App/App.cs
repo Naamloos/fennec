@@ -21,16 +21,12 @@ public sealed class App : Microsoft.Maui.Controls.Application
         IMaterialColorService.Current.Initialize(Resources);
 
         On<Microsoft.Maui.Controls.PlatformConfiguration.Android>()
-            .UseWindowSoftInputModeAdjust(
-                AndroidSpecific.WindowSoftInputModeAdjust.Resize);
+            .UseWindowSoftInputModeAdjust(AndroidSpecific.WindowSoftInputModeAdjust.Resize);
     }
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        var window = new Window(_startupPage)
-        {
-            Title = "Fennec",
-        };
+        var window = new Window(_startupPage) { Title = "Fennec" };
 
         window.Stopped += async (sender, e) =>
         {
@@ -57,8 +53,7 @@ public sealed class App : Microsoft.Maui.Controls.Application
 
         if (Current?.Windows.FirstOrDefault() is not { } window)
         {
-            throw new InvalidOperationException(
-                "The application window is unavailable.");
+            throw new InvalidOperationException("The application window is unavailable.");
         }
 
         window.Page = page;

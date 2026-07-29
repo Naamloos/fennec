@@ -1,10 +1,10 @@
+using System.Windows.Input;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Converters;
 using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Plugin.Maui.Audio;
-using System.Windows.Input;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
@@ -47,9 +47,17 @@ public sealed partial class VoiceRecorder : ContentView
                         Spacing = 14,
                         Children =
                         {
-                            new Label { Text = "Voice message", FontSize = 20, FontAttributes = FontAttributes.Bold },
-                            new Label { HorizontalTextAlignment = TextAlignment.Center }
-                                .Bind(Label.TextProperty, nameof(Status), source: this),
+                            new Label
+                            {
+                                Text = "Voice message",
+                                FontSize = 20,
+                                FontAttributes = FontAttributes.Bold,
+                            },
+                            new Label { HorizontalTextAlignment = TextAlignment.Center }.Bind(
+                                Label.TextProperty,
+                                nameof(Status),
+                                source: this
+                            ),
                             new Grid
                             {
                                 ColumnSpacing = 12,
@@ -65,8 +73,12 @@ public sealed partial class VoiceRecorder : ContentView
                                         .Column(0),
                                     new Button { Text = "Record" }
                                         .BindCommand(nameof(ToggleRecordingCommand), source: this)
-                                        .Bind(IsVisibleProperty, nameof(IsRecording),
-                                            converter: new InvertedBoolConverter(), source: this)
+                                        .Bind(
+                                            IsVisibleProperty,
+                                            nameof(IsRecording),
+                                            converter: new InvertedBoolConverter(),
+                                            source: this
+                                        )
                                         .Column(1),
                                     new Button { Text = "Stop & send" }
                                         .BindCommand(nameof(ToggleRecordingCommand), source: this)
@@ -81,8 +93,11 @@ public sealed partial class VoiceRecorder : ContentView
         };
     }
 
-    private static void OnIsOpenChanged(BindableObject bindable, object oldValue, object newValue) =>
-        ((VoiceRecorder)bindable).IsVisible = (bool)newValue;
+    private static void OnIsOpenChanged(
+        BindableObject bindable,
+        object oldValue,
+        object newValue
+    ) => ((VoiceRecorder)bindable).IsVisible = (bool)newValue;
 
     [RelayCommand]
     private async Task ToggleRecordingAsync()
@@ -100,7 +115,9 @@ public sealed partial class VoiceRecorder : ContentView
             return;
         }
 
-        _recorder = AudioManager?.CreateRecorder(new AudioRecorderOptions { Encoding = Encoding.Wav });
+        _recorder = AudioManager?.CreateRecorder(
+            new AudioRecorderOptions { Encoding = Encoding.Wav }
+        );
         if (_recorder is not { CanRecordAudio: true })
         {
             Status = "Recording is not available on this device.";
@@ -115,7 +132,8 @@ public sealed partial class VoiceRecorder : ContentView
     [RelayCommand]
     private async Task CancelAsync()
     {
-        if (_recorder is { IsRecording: true }) await _recorder.StopAsync();
+        if (_recorder is { IsRecording: true })
+            await _recorder.StopAsync();
         _recorder = null;
         IsRecording = false;
         IsOpen = false;
@@ -124,16 +142,23 @@ public sealed partial class VoiceRecorder : ContentView
 
     private async Task StopAndSendAsync()
     {
-        if (_recorder is null) return;
+        if (_recorder is null)
+            return;
         var source = await _recorder.StopAsync();
         _recorder = null;
         IsRecording = false;
         await using var input = source.GetAudioStream();
         using var data = new MemoryStream();
         await input.CopyToAsync(data);
-        var attachment = await AttachmentPicker.ConfirmAsync(new PickedAttachment(
-            $"voice-{DateTime.UtcNow:yyyyMMdd-HHmmss}.wav", "audio/wav", data.ToArray()));
-        if (attachment is not null) SendCommand?.Execute(attachment);
+        var attachment = await AttachmentPicker.ConfirmAsync(
+            new PickedAttachment(
+                $"voice-{DateTime.UtcNow:yyyyMMdd-HHmmss}.wav",
+                "audio/wav",
+                data.ToArray()
+            )
+        );
+        if (attachment is not null)
+            SendCommand?.Execute(attachment);
         IsOpen = false;
         Status = "Ready to record";
     }

@@ -22,10 +22,7 @@ public sealed class SyntaxHighlighterPopup : Popup
             MaximumWidthRequest = 900,
             MaximumHeightRequest = 800,
             StrokeThickness = 0,
-            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
-            {
-                CornerRadius = 12,
-            },
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 12 },
             Content = new Grid
             {
                 RowDefinitions =
@@ -49,16 +46,10 @@ public sealed class SyntaxHighlighterPopup : Popup
                                 Command = new AsyncRelayCommand(CloseAsync),
                             },
                         },
-                    }
-                    .Row(0),
-                    new ScrollView
-                    {
-                        Content = new SyntaxHighlighter { Text = source },
-                    }
-                    .Row(1),
+                    }.Row(0),
+                    new ScrollView { Content = new SyntaxHighlighter { Text = source } }.Row(1),
                 },
             },
-        }
-        .DynamicResource(VisualElement.BackgroundColorProperty, "Surface");
+        }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface");
     }
 }

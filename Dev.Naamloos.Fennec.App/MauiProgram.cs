@@ -1,12 +1,10 @@
-using Microsoft.Extensions.Logging;
 using CommunityToolkit.Maui;
-using Plugin.Maui.Audio;
 using Dev.Naamloos.Fennec.Sdk;
+using Dev.Naamloos.Fennec.Sdk.Helpers;
 using MaterialColorUtilities.Maui;
 using MauiIcons.Material;
-using Dev.Naamloos.Fennec.Sdk.Helpers;
-
-
+using Microsoft.Extensions.Logging;
+using Plugin.Maui.Audio;
 #if ANDROID || IOS || MACCATALYST
 using Nalu;
 #endif
@@ -17,7 +15,8 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
-        var builder = MauiApp.CreateBuilder()
+        var builder = MauiApp
+            .CreateBuilder()
             .UseMaterialColors(options =>
             {
                 options.FallbackSeed = 0xE6BB8B;
@@ -29,10 +28,12 @@ public static class MauiProgram
             .UseMauiCommunityToolkit(opt =>
             {
                 opt.SetShouldEnableSnackbarOnWindows(true);
-                opt.SetPopupOptionsDefaults(new DefaultPopupOptionsSettings
-                {
-                    PageOverlayColor = Color.FromArgb("#66000000"),
-                });
+                opt.SetPopupOptionsDefaults(
+                    new DefaultPopupOptionsSettings
+                    {
+                        PageOverlayColor = Color.FromArgb("#66000000"),
+                    }
+                );
             })
             .AddAudio()
             .ConfigureFonts(fonts =>
@@ -50,7 +51,11 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp =>
         {
             var secureStore = sp.GetRequiredService<AsyncSecureStorage>();
-            return new ManagedMatrixClient(DeviceInfo.Current.Platform.ToString(), Path.Combine(FileSystem.AppDataDirectory, "fennec"), secureStore);
+            return new ManagedMatrixClient(
+                DeviceInfo.Current.Platform.ToString(),
+                Path.Combine(FileSystem.AppDataDirectory, "fennec"),
+                secureStore
+            );
         });
         builder.Services.AddSingleton<SessionVerificationService>();
         builder.Services.AddSingleton<AppNavigationService>();
@@ -61,11 +66,15 @@ public static class MauiProgram
         builder.ConfigureMauiHandlers(handlers =>
         {
 #if ANDROID
-            handlers.AddHandler<Components.AttachmentEntry,
-                Platforms.Android.AttachmentEntryHandler>();
+            handlers.AddHandler<
+                Components.AttachmentEntry,
+                Platforms.Android.AttachmentEntryHandler
+            >();
 #elif WINDOWS
-            handlers.AddHandler<Components.AttachmentEntry,
-                Platforms.Windows.AttachmentEntryHandler>();
+            handlers.AddHandler<
+                Components.AttachmentEntry,
+                Platforms.Windows.AttachmentEntryHandler
+            >();
 #endif
         });
 

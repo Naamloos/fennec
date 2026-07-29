@@ -1,5 +1,5 @@
-using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Maui.Extensions;
+using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.Sdk;
 using Dev.Naamloos.Fennec.Sdk.Entities;
@@ -12,9 +12,15 @@ namespace Dev.Naamloos.Fennec.App.Components;
 public sealed partial class SessionsSettingsView : ContentView
 {
     public static readonly BindableProperty MatrixClientProperty = BindableProperty.Create(
-        nameof(MatrixClient), typeof(ManagedMatrixClient), typeof(SessionsSettingsView));
+        nameof(MatrixClient),
+        typeof(ManagedMatrixClient),
+        typeof(SessionsSettingsView)
+    );
     public static readonly BindableProperty VerificationServiceProperty = BindableProperty.Create(
-        nameof(VerificationService), typeof(SessionVerificationService), typeof(SessionsSettingsView));
+        nameof(VerificationService),
+        typeof(SessionVerificationService),
+        typeof(SessionsSettingsView)
+    );
 
     private readonly VerticalStackLayout _sessions = new() { Spacing = 8 };
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
@@ -35,7 +41,9 @@ public sealed partial class SessionsSettingsView : ContentView
     public SessionsSettingsView()
     {
         this.BindService<ManagedMatrixClient, SessionsSettingsView>(MatrixClientProperty)
-            .BindService<SessionVerificationService, SessionsSettingsView>(VerificationServiceProperty);
+            .BindService<SessionVerificationService, SessionsSettingsView>(
+                VerificationServiceProperty
+            );
 
         _refreshTimer = Dispatcher.CreateTimer();
         _refreshTimer.Interval = TimeSpan.FromSeconds(15);
@@ -47,10 +55,11 @@ public sealed partial class SessionsSettingsView : ContentView
         };
         Unloaded += (_, _) => _refreshTimer.Stop();
 
-        Content = new SettingsSection("Sessions",
-            ActionButton("Refresh sessions")
-                .BindCommand(nameof(RefreshCommand), source: this),
-            _sessions);
+        Content = new SettingsSection(
+            "Sessions",
+            ActionButton("Refresh sessions").BindCommand(nameof(RefreshCommand), source: this),
+            _sessions
+        );
     }
 
     [RelayCommand]
@@ -61,7 +70,8 @@ public sealed partial class SessionsSettingsView : ContentView
 
     private async Task RefreshSessionsAsync()
     {
-        if (MatrixClient is null || !await _refreshLock.WaitAsync(0)) return;
+        if (MatrixClient is null || !await _refreshLock.WaitAsync(0))
+            return;
 
         try
         {
@@ -111,10 +121,19 @@ public sealed partial class SessionsSettingsView : ContentView
                     Children =
                     {
                         VerificationIcon(session),
-                        new Label { Text = session.DisplayName, FontAttributes = FontAttributes.Bold },
+                        new Label
+                        {
+                            Text = session.DisplayName,
+                            FontAttributes = FontAttributes.Bold,
+                        },
                     },
                 },
-                new Label { Text = session.DeviceId, Opacity = .7, FontSize = 12 },
+                new Label
+                {
+                    Text = session.DeviceId,
+                    Opacity = .7,
+                    FontSize = 12,
+                },
                 new HorizontalStackLayout
                 {
                     Spacing = 8,
@@ -123,7 +142,12 @@ public sealed partial class SessionsSettingsView : ContentView
                         ActionButton("Verify")
                             .BindCommand(nameof(VerifySessionCommand), source: this)
                             .Bind(Button.CommandParameterProperty, ".", source: session),
-                        new Button { Text = "Remove", TextColor = Colors.Red, BackgroundColor = Colors.Transparent }
+                        new Button
+                        {
+                            Text = "Remove",
+                            TextColor = Colors.Red,
+                            BackgroundColor = Colors.Transparent,
+                        }
                             .BindCommand(nameof(RemoveSessionCommand), source: this)
                             .Bind(Button.CommandParameterProperty, ".", source: session),
                     },
@@ -146,10 +170,17 @@ public sealed partial class SessionsSettingsView : ContentView
     [RelayCommand]
     private async Task RenameSessionAsync(MatrixSession? session)
     {
-        if (session is null || MatrixClient is null) return;
+        if (session is null || MatrixClient is null)
+            return;
         var name = await InAppDialogs.PromptAsync(
-            Shell.Current, "Device name", "Give this session a recognizable name.", "Rename", initialValue: session.DisplayName);
-        if (string.IsNullOrWhiteSpace(name)) return;
+            Shell.Current,
+            "Device name",
+            "Give this session a recognizable name.",
+            "Rename",
+            initialValue: session.DisplayName
+        );
+        if (string.IsNullOrWhiteSpace(name))
+            return;
 
         await MatrixClient.RenameSessionAsync(session.DeviceId, name.Trim());
         await RefreshSessionsAsync();
@@ -158,7 +189,8 @@ public sealed partial class SessionsSettingsView : ContentView
     [RelayCommand]
     private async Task VerifySessionAsync(MatrixSession? session)
     {
-        if (session is null || VerificationService is null) return;
+        if (session is null || VerificationService is null)
+            return;
         await VerificationService.InitializeAsync();
         await VerificationService.RequestVerificationAsync();
     }
@@ -166,32 +198,47 @@ public sealed partial class SessionsSettingsView : ContentView
     [RelayCommand]
     private async Task RemoveSessionAsync(MatrixSession? session)
     {
-        if (session is null || MatrixClient is null) return;
-        if (!await Shell.Current.DisplayAlert("Remove session", $"Remove {session.DisplayName}?", "Remove", "Cancel")) return;
+        if (session is null || MatrixClient is null)
+            return;
+        if (
+            !await Shell.Current.DisplayAlert(
+                "Remove session",
+                $"Remove {session.DisplayName}?",
+                "Remove",
+                "Cancel"
+            )
+        )
+            return;
 
-        var result = await Shell.Current.ShowPopupAsync<string?>(new PasswordConfirmationPopup(
-            "Verify password",
-            "Enter your password to remove this session.",
-            "Remove"));
-        if (string.IsNullOrWhiteSpace(result.Result)) return;
+        var result = await Shell.Current.ShowPopupAsync<string?>(
+            new PasswordConfirmationPopup(
+                "Verify password",
+                "Enter your password to remove this session.",
+                "Remove"
+            )
+        );
+        if (string.IsNullOrWhiteSpace(result.Result))
+            return;
 
         await MatrixClient.RemoveSessionAsync(session.DeviceId, result.Result);
         await RefreshSessionsAsync();
     }
 
-    private static Button ActionButton(string text) => new Button
-    {
-        Text = text,
-        BackgroundColor = Colors.Transparent,
-        Padding = new Thickness(10, 4),
-        FontSize = 12,
-    }.DynamicResource(Button.TextColorProperty, "Primary");
+    private static Button ActionButton(string text) =>
+        new Button
+        {
+            Text = text,
+            BackgroundColor = Colors.Transparent,
+            Padding = new Thickness(10, 4),
+            FontSize = 12,
+        }.DynamicResource(Button.TextColorProperty, "Primary");
 
-    private static MauiIcon VerificationIcon(MatrixSession session) => new()
-    {
-        Icon = session.IsVerified ? MaterialIcons.Lock : MaterialIcons.LockOpen,
-        IconSize = 16,
-        IconColor = session.IsVerified ? Colors.Green : Colors.Red,
-        AutomationId = session.IsVerified ? "Verified device" : "Unverified device",
-    };
+    private static MauiIcon VerificationIcon(MatrixSession session) =>
+        new()
+        {
+            Icon = session.IsVerified ? MaterialIcons.Lock : MaterialIcons.LockOpen,
+            IconSize = 16,
+            IconColor = session.IsVerified ? Colors.Green : Colors.Red,
+            AutomationId = session.IsVerified ? "Verified device" : "Unverified device",
+        };
 }

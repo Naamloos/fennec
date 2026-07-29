@@ -11,18 +11,18 @@ namespace Dev.Naamloos.Fennec.App.Converters
             object[] values,
             Type targetType,
             object? parameter,
-            CultureInfo culture)
+            CultureInfo culture
+        )
         {
-            return values[0] is string custom
-                ? custom
-                : values[1];
+            return values[0] is string custom ? custom : values[1];
         }
 
         public object[] ConvertBack(
             object? value,
             Type[] targetTypes,
             object? parameter,
-            CultureInfo culture)
+            CultureInfo culture
+        )
         {
             throw new NotSupportedException();
         }

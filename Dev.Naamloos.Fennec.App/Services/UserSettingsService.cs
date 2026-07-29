@@ -1,6 +1,6 @@
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Dev.Naamloos.Fennec.Sdk;
-using System.Text.Json;
 
 namespace Dev.Naamloos.Fennec.App.Services;
 
@@ -17,7 +17,8 @@ public sealed partial class UserSettingsService(ManagedMatrixClient matrixClient
     public async Task LoadAsync()
     {
         await RefreshAsync();
-        if (_loaded) return;
+        if (_loaded)
+            return;
 
         _loaded = true;
         _ = WatchAsync();
@@ -58,8 +59,9 @@ public sealed partial class UserSettingsService(ManagedMatrixClient matrixClient
             }
             else
             {
-                await MainThread.InvokeOnMainThreadAsync(
-                    () => ExperimentalFeatureEnabled = settings?.ExperimentalFeatureEnabled ?? false);
+                await MainThread.InvokeOnMainThreadAsync(() =>
+                    ExperimentalFeatureEnabled = settings?.ExperimentalFeatureEnabled ?? false
+                );
             }
         }
         finally
@@ -74,7 +76,8 @@ public sealed partial class UserSettingsService(ManagedMatrixClient matrixClient
         {
             _ = matrixClient.SetAccountDataAsync(
                 EventType,
-                JsonSerializer.Serialize(new UserSettings(value)));
+                JsonSerializer.Serialize(new UserSettings(value))
+            );
         }
     }
 

@@ -1,6 +1,6 @@
+using System.Collections.ObjectModel;
 using Dev.Naamloos.Fennec.Sdk.Entities;
 using Dev.Naamloos.Fennec.Sdk.Events;
-using System.Collections.ObjectModel;
 using uniffi.matrix_sdk_ffi;
 using uniffi.matrix_sdk_ui;
 
@@ -21,7 +21,8 @@ public sealed class ObservableSpaceRoomList : ObservableCollection<ManagedSpaceR
         ManagedMatrixClient client,
         SpaceService spaceService,
         SpaceRoomList roomList,
-        SpaceRoomListEntriesListenerCallback listener)
+        SpaceRoomListEntriesListenerCallback listener
+    )
     {
         _client = client;
         _spaceService = spaceService;
@@ -33,13 +34,15 @@ public sealed class ObservableSpaceRoomList : ObservableCollection<ManagedSpaceR
 
     internal static async Task<ObservableSpaceRoomList> CreateAsync(
         ManagedMatrixClient client,
-        string spaceId)
+        string spaceId
+    )
     {
         var spaceService = await client.GetSpaceServiceAsync();
         var roomList = await spaceService.SpaceRoomList(spaceId);
         ObservableSpaceRoomList? rooms = null;
-        var listener = new SpaceRoomListEntriesListenerCallback(
-            updates => rooms!.ApplyUpdates(updates));
+        var listener = new SpaceRoomListEntriesListenerCallback(updates =>
+            rooms!.ApplyUpdates(updates)
+        );
         rooms = new ObservableSpaceRoomList(client, spaceService, roomList, listener);
         rooms._subscription = await roomList.SubscribeToRoomUpdate(listener);
         await rooms.LoadAllAsync();
@@ -48,10 +51,9 @@ public sealed class ObservableSpaceRoomList : ObservableCollection<ManagedSpaceR
 
     private async Task LoadAllAsync()
     {
-        while (_roomList.PaginationState() is SpaceRoomListPaginationState.Idle
-        {
-            EndReached: false,
-        })
+        while (
+            _roomList.PaginationState() is SpaceRoomListPaginationState.Idle { EndReached: false }
+        )
         {
             await _roomList.Paginate();
         }

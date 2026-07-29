@@ -1,10 +1,10 @@
+using System.Windows.Input;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.App.Converters;
 using Dev.Naamloos.Fennec.Sdk;
 using Dev.Naamloos.Fennec.Sdk.Entities;
 using uniffi.matrix_sdk_ffi;
-using System.Windows.Input;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
@@ -47,11 +47,7 @@ public sealed partial class ChatMessageView : ContentView
     {
         Content = new Grid
         {
-            ColumnDefinitions =
-            {
-                new ColumnDefinition(36),
-                new ColumnDefinition(GridLength.Star),
-            },
+            ColumnDefinitions = { new ColumnDefinition(36), new ColumnDefinition(GridLength.Star) },
             ColumnSpacing = 8,
             Children =
             {
@@ -63,21 +59,29 @@ public sealed partial class ChatMessageView : ContentView
                     {
                         new TapGestureRecognizer()
                             .BindCommand(nameof(OpenProfileCommand), source: this)
-                            .Bind(TapGestureRecognizer.CommandParameterProperty,
-                                $"{nameof(Item)}.{nameof(ChatTimelineItem.SenderId)}", source: this),
+                            .Bind(
+                                TapGestureRecognizer.CommandParameterProperty,
+                                $"{nameof(Item)}.{nameof(ChatTimelineItem.SenderId)}",
+                                source: this
+                            ),
                     },
                 }
-                .Bind(MatrixAvatar.MatrixSourceProperty,
-                    $"{nameof(Item)}.{nameof(ChatTimelineItem.SenderAvatarUrl)}",
-                    source: this)
-                .Bind(MatrixAvatar.DisplayNameProperty,
-                    $"{nameof(Item)}.{nameof(ChatTimelineItem.Sender)}",
-                    source: this)
-                .Bind(IsVisibleProperty,
-                    $"{nameof(Item)}.{nameof(ChatTimelineItem.ShowAvatar)}",
-                    source: this)
-                .Column(0),
-
+                    .Bind(
+                        MatrixAvatar.MatrixSourceProperty,
+                        $"{nameof(Item)}.{nameof(ChatTimelineItem.SenderAvatarUrl)}",
+                        source: this
+                    )
+                    .Bind(
+                        MatrixAvatar.DisplayNameProperty,
+                        $"{nameof(Item)}.{nameof(ChatTimelineItem.Sender)}",
+                        source: this
+                    )
+                    .Bind(
+                        IsVisibleProperty,
+                        $"{nameof(Item)}.{nameof(ChatTimelineItem.ShowAvatar)}",
+                        source: this
+                    )
+                    .Column(0),
                 new VerticalStackLayout
                 {
                     Spacing = 3,
@@ -93,39 +97,70 @@ public sealed partial class ChatMessageView : ContentView
                             Children =
                             {
                                 new Label { FontAttributes = FontAttributes.Bold }
-                                    .Bind(Label.TextProperty,
+                                    .Bind(
+                                        Label.TextProperty,
                                         $"{nameof(Item)}.{nameof(ChatTimelineItem.Sender)}",
-                                        source: this)
+                                        source: this
+                                    )
                                     .Column(0),
                             },
-                        }
-                        .Bind(IsVisibleProperty,
+                        }.Bind(
+                            IsVisibleProperty,
                             $"{nameof(Item)}.{nameof(ChatTimelineItem.ShowSender)}",
-                            source: this),
-
+                            source: this
+                        ),
                         new MessageBubbleView()
                             .Bind(MessageBubbleView.ItemProperty, nameof(Item), source: this)
                             .Bind(MessageBubbleView.ClientProperty, nameof(Client), source: this)
                             .Bind(MessageBubbleView.MembersProperty, nameof(Members), source: this)
-                            .Bind(MessageBubbleView.ReplyCommandProperty, nameof(ReplyCommand), source: this)
-                            .Bind(MessageBubbleView.EditCommandProperty, nameof(EditCommand), source: this)
-                            .Bind(MessageBubbleView.LinkCommandProperty, nameof(LinkCommand), source: this)
-                            .Bind(MessageBubbleView.MenuCommandProperty, nameof(MenuCommand), source: this)
-                            .Bind(MessageBubbleView.AddReactionCommandProperty,
-                                nameof(AddReactionCommand), source: this)
-                            .Bind(MessageBubbleView.OpenMediaCommandProperty,
-                                nameof(OpenMediaCommand), source: this)
-                            .Bind(MessageBubbleView.OpenProfileCommandProperty,
-                                nameof(OpenProfileCommand), source: this)
-                            .Bind(MessageBubbleView.PollVoteCommandProperty,
-                                nameof(PollVoteCommand), source: this),
+                            .Bind(
+                                MessageBubbleView.ReplyCommandProperty,
+                                nameof(ReplyCommand),
+                                source: this
+                            )
+                            .Bind(
+                                MessageBubbleView.EditCommandProperty,
+                                nameof(EditCommand),
+                                source: this
+                            )
+                            .Bind(
+                                MessageBubbleView.LinkCommandProperty,
+                                nameof(LinkCommand),
+                                source: this
+                            )
+                            .Bind(
+                                MessageBubbleView.MenuCommandProperty,
+                                nameof(MenuCommand),
+                                source: this
+                            )
+                            .Bind(
+                                MessageBubbleView.AddReactionCommandProperty,
+                                nameof(AddReactionCommand),
+                                source: this
+                            )
+                            .Bind(
+                                MessageBubbleView.OpenMediaCommandProperty,
+                                nameof(OpenMediaCommand),
+                                source: this
+                            )
+                            .Bind(
+                                MessageBubbleView.OpenProfileCommandProperty,
+                                nameof(OpenProfileCommand),
+                                source: this
+                            )
+                            .Bind(
+                                MessageBubbleView.PollVoteCommandProperty,
+                                nameof(PollVoteCommand),
+                                source: this
+                            ),
                     },
-                }
-                .Column(1),
+                }.Column(1),
             },
-        }
-        .Bind(MarginProperty,
+        }.Bind(
+            MarginProperty,
             $"{nameof(Item)}.{nameof(ChatTimelineItem.IsGroupStart)}",
-            converter: new MessageGroupMarginConverter(), source: this);
+            converter: new MessageGroupMarginConverter(),
+            source: this
+        );
     }
 }

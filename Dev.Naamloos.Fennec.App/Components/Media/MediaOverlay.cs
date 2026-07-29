@@ -1,10 +1,10 @@
+using System.Windows.Input;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.Sdk;
 using Dev.Naamloos.Fennec.Sdk.Entities;
 using MauiIcons.Core;
 using MauiIcons.Material;
-using System.Windows.Input;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
@@ -24,13 +24,12 @@ public sealed partial class MediaOverlay : ContentView
         InputTransparent = false;
         Content = new Grid
         {
-            BackgroundColor = new Color(0,0,0, 200),
+            BackgroundColor = new Color(0, 0, 0, 200),
             Children =
             {
                 new MatrixMedia { IsFull = true }
                     .Bind(MatrixMedia.ClientProperty, nameof(Client), source: this)
                     .Bind(MatrixMedia.MediaProperty, nameof(Media), source: this),
-
                 new MauiIcon
                 {
                     Icon = MaterialIcons.Close,
@@ -43,8 +42,7 @@ public sealed partial class MediaOverlay : ContentView
                     ZIndex = 1,
                     GestureRecognizers =
                     {
-                        new TapGestureRecognizer()
-                            .BindCommand(nameof(CloseCommand), source: this),
+                        new TapGestureRecognizer().BindCommand(nameof(CloseCommand), source: this),
                     },
                 },
             },

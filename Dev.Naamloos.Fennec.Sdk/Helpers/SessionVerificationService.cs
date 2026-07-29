@@ -7,7 +7,10 @@ using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.Sdk.Helpers
 {
-    public sealed class SessionVerificationService : SessionVerificationControllerDelegate, INotifyPropertyChanged, IAsyncDisposable
+    public sealed class SessionVerificationService
+        : SessionVerificationControllerDelegate,
+            INotifyPropertyChanged,
+            IAsyncDisposable
     {
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -61,8 +64,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
         private bool _initiatedLocally;
         private bool _disposed;
 
-        public SessionVerificationService(
-            ManagedMatrixClient client)
+        public SessionVerificationService(ManagedMatrixClient client)
         {
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _client.NativeResourcesDisposing += StopAsync;
@@ -93,7 +95,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
 
             await GetController().RequestDeviceVerification();
 
-            if(State == ManagedVerificationState.RequestingVerification)
+            if (State == ManagedVerificationState.RequestingVerification)
             {
                 State = ManagedVerificationState.WaitingForOtherSession;
             }
@@ -111,7 +113,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
 
             await GetController().AcceptVerificationRequest();
 
-            if(State == ManagedVerificationState.AcceptingRequest)
+            if (State == ManagedVerificationState.AcceptingRequest)
             {
                 State = ManagedVerificationState.WaitingForVerificationData;
             }
@@ -149,7 +151,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
         // --- Delegate Implementation ---
         public void DidAcceptVerificationRequest()
         {
-            if(_initiatedLocally)
+            if (_initiatedLocally)
             {
                 State = ManagedVerificationState.StartingSas;
                 _ = startSasAsync();
@@ -205,12 +207,10 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
             State = ManagedVerificationState.Listening;
         }
 
-        private async Task acknowledgeAsync(
-            SessionVerificationRequestDetails details)
+        private async Task acknowledgeAsync(SessionVerificationRequestDetails details)
         {
-            await GetController().AcknowledgeVerificationRequest(
-                details.SenderProfile.UserId,
-                details.FlowId);
+            await GetController()
+                .AcknowledgeVerificationRequest(details.SenderProfile.UserId, details.FlowId);
 
             if (_pendingRequest?.FlowId == details.FlowId)
             {
@@ -228,9 +228,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
             }
         }
 
-        private void OnConnectionRecovered(
-            object? sender,
-            EventArgs e)
+        private void OnConnectionRecovered(object? sender, EventArgs e)
         {
             _ = ReplaceControllerAsync();
         }
@@ -246,8 +244,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
                     return;
                 }
 
-                var controller =
-                    await _client.GetSessionVerificationControllerAsync();
+                var controller = await _client.GetSessionVerificationControllerAsync();
 
                 if (_disposed)
                 {
@@ -255,8 +252,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
                     return;
                 }
 
-                var hadActiveVerification =
-                    State != ManagedVerificationState.Listening;
+                var hadActiveVerification = State != ManagedVerificationState.Listening;
                 var previousController = _controller;
 
                 _controller = controller;
@@ -272,8 +268,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
             }
             catch (Exception exception)
             {
-                Debug.WriteLine(
-                    $"Unable to restore session verification: {exception}");
+                Debug.WriteLine($"Unable to restore session verification: {exception}");
             }
             finally
             {
@@ -313,8 +308,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
                     return;
                 }
 
-                var controller =
-                    await _client.GetSessionVerificationControllerAsync();
+                var controller = await _client.GetSessionVerificationControllerAsync();
 
                 if (_disposed)
                 {
@@ -337,12 +331,12 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
         {
             var synchronizationContext = _synchronizationContext;
 
-            if (synchronizationContext is not null &&
-                SynchronizationContext.Current != synchronizationContext)
+            if (
+                synchronizationContext is not null
+                && SynchronizationContext.Current != synchronizationContext
+            )
             {
-                synchronizationContext.Post(
-                    _ => onPropertyChanged(propertyName),
-                    null);
+                synchronizationContext.Post(_ => onPropertyChanged(propertyName), null);
 
                 return;
             }
@@ -360,9 +354,8 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
 
         private SessionVerificationController GetController()
         {
-            return _controller ??
-                throw new InvalidOperationException(
-                    "Session verification is not initialized.");
+            return _controller
+                ?? throw new InvalidOperationException("Session verification is not initialized.");
         }
 
         // --- Dispose Implementation ---
@@ -395,8 +388,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
             PropertyChanged = null;
         }
 
-        private static void DestroyController(
-            SessionVerificationController controller)
+        private static void DestroyController(SessionVerificationController controller)
         {
             try
             {

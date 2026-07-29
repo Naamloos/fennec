@@ -1,3 +1,5 @@
+using System.Collections.Specialized;
+using System.Diagnostics;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Behaviors;
 using CommunityToolkit.Maui.Converters;
@@ -9,8 +11,6 @@ using Dev.Naamloos.Fennec.App.Converters;
 using Dev.Naamloos.Fennec.Sdk;
 using Dev.Naamloos.Fennec.Sdk.Entities;
 using Dev.Naamloos.Fennec.Sdk.Helpers;
-using System.Collections.Specialized;
-using System.Diagnostics;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.App.Pages;
@@ -60,7 +60,14 @@ public sealed partial class Chat : ContentView
         {
             Children =
             {
-                new MatrixImage { IsJson = false, UseFullSize = true, Aspect = Aspect.AspectFill, Opacity = .42, InputTransparent = true }
+                new MatrixImage
+                {
+                    IsJson = false,
+                    UseFullSize = true,
+                    Aspect = Aspect.AspectFill,
+                    Opacity = .42,
+                    InputTransparent = true,
+                }
                     .Bind(MatrixImage.MatrixSourceProperty, nameof(RoomWallpaperUrl), source: this)
                     .Bind(MatrixImage.ClientProperty, nameof(MatrixClient), source: this),
                 new Grid
@@ -75,100 +82,200 @@ public sealed partial class Chat : ContentView
                     Children =
                     {
                         new ChatTimeline()
-                            .Bind(ChatTimeline.ItemsProperty,
+                            .Bind(
+                                ChatTimeline.ItemsProperty,
                                 $"{nameof(Session)}.{nameof(ChatSession.Items)}",
-                                source: this)
+                                source: this
+                            )
                             .Bind(ChatTimeline.ClientProperty, nameof(MatrixClient), source: this)
-                            .Bind(ChatTimeline.MembersProperty,
-                                $"{nameof(Session)}.{nameof(ChatSession.Members)}", source: this)
-                            .Bind(ChatTimeline.HistoryCommandProperty,
-                                nameof(LoadMoreHistoryCommand), source: this)
-                            .Bind(ChatTimeline.HasMoreHistoryProperty,
+                            .Bind(
+                                ChatTimeline.MembersProperty,
+                                $"{nameof(Session)}.{nameof(ChatSession.Members)}",
+                                source: this
+                            )
+                            .Bind(
+                                ChatTimeline.HistoryCommandProperty,
+                                nameof(LoadMoreHistoryCommand),
+                                source: this
+                            )
+                            .Bind(
+                                ChatTimeline.HasMoreHistoryProperty,
                                 $"{nameof(Session)}.{nameof(ChatSession.CanLoadMoreHistory)}",
-                                source: this)
-                            .Bind(ChatTimeline.IsLoadingHistoryProperty,
+                                source: this
+                            )
+                            .Bind(
+                                ChatTimeline.IsLoadingHistoryProperty,
                                 $"{nameof(Session)}.{nameof(ChatSession.IsLoadingHistory)}",
-                                source: this)
-                            .Bind(ChatTimeline.ReplyCommandProperty,
-                                nameof(ReplyCommand), source: this)
-                            .Bind(ChatTimeline.EditCommandProperty,
-                                nameof(EditCommand), source: this)
-                            .Bind(ChatTimeline.LinkCommandProperty,
-                                nameof(OpenLinkCommand), source: this)
-                            .Bind(ChatTimeline.MenuCommandProperty,
-                                nameof(OpenItemMenuCommand), source: this)
-                            .Bind(ChatTimeline.AddReactionCommandProperty,
-                                nameof(OpenReactionPickerCommand), source: this)
-                            .Bind(ChatTimeline.OpenMediaCommandProperty,
-                                nameof(OpenMediaCommand), source: this)
-                            .Bind(ChatTimeline.OpenProfileCommandProperty,
-                                nameof(OpenProfileCommand), source: this)
-                            .Bind(ChatTimeline.PollVoteCommandProperty,
-                                nameof(VotePollCommand), source: this)
-                            .Bind(ChatTimeline.IsNearBottomProperty,
-                                nameof(TimelineIsNearBottom), BindingMode.TwoWay, source: this)
+                                source: this
+                            )
+                            .Bind(
+                                ChatTimeline.ReplyCommandProperty,
+                                nameof(ReplyCommand),
+                                source: this
+                            )
+                            .Bind(
+                                ChatTimeline.EditCommandProperty,
+                                nameof(EditCommand),
+                                source: this
+                            )
+                            .Bind(
+                                ChatTimeline.LinkCommandProperty,
+                                nameof(OpenLinkCommand),
+                                source: this
+                            )
+                            .Bind(
+                                ChatTimeline.MenuCommandProperty,
+                                nameof(OpenItemMenuCommand),
+                                source: this
+                            )
+                            .Bind(
+                                ChatTimeline.AddReactionCommandProperty,
+                                nameof(OpenReactionPickerCommand),
+                                source: this
+                            )
+                            .Bind(
+                                ChatTimeline.OpenMediaCommandProperty,
+                                nameof(OpenMediaCommand),
+                                source: this
+                            )
+                            .Bind(
+                                ChatTimeline.OpenProfileCommandProperty,
+                                nameof(OpenProfileCommand),
+                                source: this
+                            )
+                            .Bind(
+                                ChatTimeline.PollVoteCommandProperty,
+                                nameof(VotePollCommand),
+                                source: this
+                            )
+                            .Bind(
+                                ChatTimeline.IsNearBottomProperty,
+                                nameof(TimelineIsNearBottom),
+                                BindingMode.TwoWay,
+                                source: this
+                            )
                             .Row(0),
-
                         new Label
                         {
                             Margin = new Thickness(12, 2),
                             FontSize = 12,
                             Opacity = .7,
                         }
-                        .Bind(Label.TextProperty,
-                            $"{nameof(Session)}.{nameof(ChatSession.TypingText)}",
-                            source: this)
-                        .Bind(IsVisibleProperty,
-                            $"{nameof(Session)}.{nameof(ChatSession.TypingText)}",
-                            converter: new IsStringNotNullOrEmptyConverter(), source: this)
-                        .Row(1),
-
+                            .Bind(
+                                Label.TextProperty,
+                                $"{nameof(Session)}.{nameof(ChatSession.TypingText)}",
+                                source: this
+                            )
+                            .Bind(
+                                IsVisibleProperty,
+                                $"{nameof(Session)}.{nameof(ChatSession.TypingText)}",
+                                converter: new IsStringNotNullOrEmptyConverter(),
+                                source: this
+                            )
+                            .Row(1),
                         new ChatComposer()
-                            .Bind(ChatComposer.TextProperty,
+                            .Bind(
+                                ChatComposer.TextProperty,
                                 $"{nameof(Session)}.{nameof(ChatSession.DraftText)}",
-                                BindingMode.TwoWay, source: this)
-                            .Bind(ChatComposer.ReplyToProperty,
+                                BindingMode.TwoWay,
+                                source: this
+                            )
+                            .Bind(
+                                ChatComposer.ReplyToProperty,
                                 $"{nameof(Session)}.{nameof(ChatSession.ReplyTarget)}",
-                                source: this)
-                            .Bind(ChatComposer.EditTargetProperty,
+                                source: this
+                            )
+                            .Bind(
+                                ChatComposer.EditTargetProperty,
                                 $"{nameof(Session)}.{nameof(ChatSession.EditTarget)}",
-                                source: this)
-                            .Bind(ChatComposer.CancelReplyCommandProperty,
-                                nameof(CancelReplyCommand), source: this)
-                            .Bind(ChatComposer.CancelEditCommandProperty,
-                                nameof(CancelEditCommand), source: this)
-                            .Bind(ChatComposer.ErrorMessageProperty,
+                                source: this
+                            )
+                            .Bind(
+                                ChatComposer.CancelReplyCommandProperty,
+                                nameof(CancelReplyCommand),
+                                source: this
+                            )
+                            .Bind(
+                                ChatComposer.CancelEditCommandProperty,
+                                nameof(CancelEditCommand),
+                                source: this
+                            )
+                            .Bind(
+                                ChatComposer.ErrorMessageProperty,
                                 $"{nameof(Session)}.{nameof(ChatSession.ErrorMessage)}",
-                                source: this)
-                            .Bind(ChatComposer.HasErrorProperty,
+                                source: this
+                            )
+                            .Bind(
+                                ChatComposer.HasErrorProperty,
                                 $"{nameof(Session)}.{nameof(ChatSession.HasError)}",
-                                source: this)
-                            .Bind(ChatComposer.SendCommandProperty,
-                                nameof(SendMessageCommand), source: this)
-                            .Bind(ChatComposer.AttachCommandProperty,
-                                nameof(AttachFileCommand), source: this)
-                            .Bind(ChatComposer.MoreCommandProperty,
-                                nameof(OpenComposerMenuCommand), source: this)
-                            .Bind(ChatComposer.InlineAttachmentCommandProperty,
-                                nameof(ReceiveInlineAttachmentsCommand), source: this)
-                            .Bind(ChatComposer.MembersProperty,
-                                $"{nameof(Session)}.{nameof(ChatSession.Members)}", source: this)
-                            .Bind(ChatComposer.EmotesProperty,
-                                $"{nameof(Session)}.{nameof(ChatSession.Emotes)}", source: this)
-                            .Bind(ChatComposer.RoomsProperty,
-                                $"{nameof(Session)}.{nameof(ChatSession.Rooms)}", source: this)
+                                source: this
+                            )
+                            .Bind(
+                                ChatComposer.SendCommandProperty,
+                                nameof(SendMessageCommand),
+                                source: this
+                            )
+                            .Bind(
+                                ChatComposer.AttachCommandProperty,
+                                nameof(AttachFileCommand),
+                                source: this
+                            )
+                            .Bind(
+                                ChatComposer.MoreCommandProperty,
+                                nameof(OpenComposerMenuCommand),
+                                source: this
+                            )
+                            .Bind(
+                                ChatComposer.InlineAttachmentCommandProperty,
+                                nameof(ReceiveInlineAttachmentsCommand),
+                                source: this
+                            )
+                            .Bind(
+                                ChatComposer.MembersProperty,
+                                $"{nameof(Session)}.{nameof(ChatSession.Members)}",
+                                source: this
+                            )
+                            .Bind(
+                                ChatComposer.EmotesProperty,
+                                $"{nameof(Session)}.{nameof(ChatSession.Emotes)}",
+                                source: this
+                            )
+                            .Bind(
+                                ChatComposer.RoomsProperty,
+                                $"{nameof(Session)}.{nameof(ChatSession.Rooms)}",
+                                source: this
+                            )
                             .Row(2),
                     },
                 },
-
                 new RoomInfoFlyout()
                     .Bind(RoomInfoFlyout.ClientProperty, nameof(MatrixClient), source: this)
-                    .Bind(RoomInfoFlyout.RoomProperty, $"{nameof(Session)}.{nameof(ChatSession.Room)}", source: this)
-                    .Bind(RoomInfoFlyout.MembersProperty, $"{nameof(Session)}.{nameof(ChatSession.Members)}", source: this)
-                    .Bind(RoomInfoFlyout.OpenProfileCommandProperty, nameof(OpenProfileCommand), source: this)
-                    .Bind(RoomInfoFlyout.WallpaperChangedCommandProperty, nameof(WallpaperChangedCommand), source: this)
-                    .Bind(RoomInfoFlyout.IsOpenProperty, nameof(IsRoomInfoOpen), BindingMode.TwoWay, source: this),
-
+                    .Bind(
+                        RoomInfoFlyout.RoomProperty,
+                        $"{nameof(Session)}.{nameof(ChatSession.Room)}",
+                        source: this
+                    )
+                    .Bind(
+                        RoomInfoFlyout.MembersProperty,
+                        $"{nameof(Session)}.{nameof(ChatSession.Members)}",
+                        source: this
+                    )
+                    .Bind(
+                        RoomInfoFlyout.OpenProfileCommandProperty,
+                        nameof(OpenProfileCommand),
+                        source: this
+                    )
+                    .Bind(
+                        RoomInfoFlyout.WallpaperChangedCommandProperty,
+                        nameof(WallpaperChangedCommand),
+                        source: this
+                    )
+                    .Bind(
+                        RoomInfoFlyout.IsOpenProperty,
+                        nameof(IsRoomInfoOpen),
+                        BindingMode.TwoWay,
+                        source: this
+                    ),
                 new Grid
                 {
                     BackgroundColor = Color.FromArgb("#66000000"),
@@ -181,29 +288,39 @@ public sealed partial class Chat : ContentView
                             VerticalOptions = LayoutOptions.Center,
                         },
                     },
-                }
-                .Bind(IsVisibleProperty, nameof(IsLoading), source: this),
-
+                }.Bind(IsVisibleProperty, nameof(IsLoading), source: this),
                 new MediaOverlay()
                     .Bind(MediaOverlay.ClientProperty, nameof(MatrixClient), source: this)
                     .Bind(MediaOverlay.MediaProperty, nameof(FullscreenMedia), source: this)
-                    .Bind(MediaOverlay.CloseCommandProperty,
-                        nameof(CloseFullscreenMediaCommand), source: this)
-                    .Bind(IsVisibleProperty, nameof(FullscreenMedia),
-                        converter: new NotNullConverter(), source: this),
-
+                    .Bind(
+                        MediaOverlay.CloseCommandProperty,
+                        nameof(CloseFullscreenMediaCommand),
+                        source: this
+                    )
+                    .Bind(
+                        IsVisibleProperty,
+                        nameof(FullscreenMedia),
+                        converter: new NotNullConverter(),
+                        source: this
+                    ),
                 new VoiceRecorder()
-                    .Bind(VoiceRecorder.SendCommandProperty, nameof(SendVoiceRecordingCommand), source: this)
-                    .Bind(VoiceRecorder.IsOpenProperty, nameof(IsVoiceRecorderOpen), BindingMode.TwoWay, source: this),
-
+                    .Bind(
+                        VoiceRecorder.SendCommandProperty,
+                        nameof(SendVoiceRecordingCommand),
+                        source: this
+                    )
+                    .Bind(
+                        VoiceRecorder.IsOpenProperty,
+                        nameof(IsVoiceRecorderOpen),
+                        BindingMode.TwoWay,
+                        source: this
+                    ),
                 _profileSheet,
             },
         };
     }
 
-    public async Task SetRoomAsync(
-        Room room,
-        CancellationToken cancellationToken = default)
+    public async Task SetRoomAsync(Room room, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(room);
 
@@ -221,11 +338,9 @@ public sealed partial class Chat : ContentView
         {
             await DisposeSessionAsync();
 
-            var client = MatrixClient ?? throw new InvalidOperationException("Matrix client is required.");
-            var session = await ChatSession.CreateAsync(
-                client,
-                room,
-                token);
+            var client =
+                MatrixClient ?? throw new InvalidOperationException("Matrix client is required.");
+            var session = await ChatSession.CreateAsync(client, room, token);
             token.ThrowIfCancellationRequested();
             Session = session;
             _subscribedSession = session;
@@ -253,9 +368,8 @@ public sealed partial class Chat : ContentView
     }
 
     [RelayCommand]
-    private Task SendMessageAsync() => Session?.CanSend == true
-        ? Session.SendMessageAsync()
-        : Task.CompletedTask;
+    private Task SendMessageAsync() =>
+        Session?.CanSend == true ? Session.SendMessageAsync() : Task.CompletedTask;
 
     [RelayCommand]
     private async Task AttachFileAsync()
@@ -269,15 +383,16 @@ public sealed partial class Chat : ContentView
         await Session.SendAttachmentAsync(
             attachment.FileName,
             attachment.MimeType,
-            attachment.Data);
+            attachment.Data
+        );
     }
 
     [RelayCommand]
-    private async Task ReceiveInlineAttachmentsAsync(
-        IReadOnlyList<PickedAttachment>? attachments)
+    private async Task ReceiveInlineAttachmentsAsync(IReadOnlyList<PickedAttachment>? attachments)
     {
         var session = Session;
-        if (attachments is null || session is null) return;
+        if (attachments is null || session is null)
+            return;
 
         foreach (var attachment in attachments)
         {
@@ -287,23 +402,29 @@ public sealed partial class Chat : ContentView
                 await session.SendAttachmentAsync(
                     confirmed.FileName,
                     confirmed.MimeType,
-                    confirmed.Data);
+                    confirmed.Data
+                );
             }
         }
     }
 
     [RelayCommand]
-    private Task SendVoiceRecordingAsync(PickedAttachment? attachment) => attachment is not null && Session is not null
-        ? Session.SendAttachmentAsync(attachment.FileName, attachment.MimeType, attachment.Data)
-        : Task.CompletedTask;
+    private Task SendVoiceRecordingAsync(PickedAttachment? attachment) =>
+        attachment is not null && Session is not null
+            ? Session.SendAttachmentAsync(attachment.FileName, attachment.MimeType, attachment.Data)
+            : Task.CompletedTask;
 
     [RelayCommand]
     private async Task OpenComposerMenuAsync()
     {
         var session = Session;
-        if (session is null || CurrentPage() is not { } page) return;
+        if (session is null || CurrentPage() is not { } page)
+            return;
         var action = await InAppDialogs.ChooseAsync(
-            page, "Add to message", ["Record voice", "Send sticker", "Create poll", "Share location"]);
+            page,
+            "Add to message",
+            ["Record voice", "Send sticker", "Create poll", "Share location"]
+        );
         try
         {
             if (action == "Record voice")
@@ -317,7 +438,8 @@ public sealed partial class Chat : ContentView
             else if (action == "Create poll")
             {
                 var poll = await InAppDialogs.ComposePollAsync(page);
-                if (poll is not null) await session.CreatePollAsync(poll.Question, poll.Answers);
+                if (poll is not null)
+                    await session.CreatePollAsync(poll.Question, poll.Answers);
             }
             else if (action == "Share location")
             {
@@ -335,20 +457,38 @@ public sealed partial class Chat : ContentView
         var permission = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
         if (permission != PermissionStatus.Granted)
         {
-            await page.DisplayAlertAsync("Location unavailable", "Location permission is required to share your current location.", "OK");
+            await page.DisplayAlertAsync(
+                "Location unavailable",
+                "Location permission is required to share your current location.",
+                "OK"
+            );
             return;
         }
 
-        var location = await Geolocation.Default.GetLocationAsync(new GeolocationRequest(
-            GeolocationAccuracy.Medium, TimeSpan.FromSeconds(15)));
+        var location = await Geolocation.Default.GetLocationAsync(
+            new GeolocationRequest(GeolocationAccuracy.Medium, TimeSpan.FromSeconds(15))
+        );
         if (location is null)
         {
-            await page.DisplayAlertAsync("Location unavailable", "Your current location could not be determined.", "OK");
+            await page.DisplayAlertAsync(
+                "Location unavailable",
+                "Your current location could not be determined.",
+                "OK"
+            );
             return;
         }
 
-        var geoUri = FormattableString.Invariant($"geo:{location.Latitude:F6},{location.Longitude:F6}");
-        if (await page.DisplayAlertAsync("Share your location?", "This will send your current location to this room.", "Send", "Cancel"))
+        var geoUri = FormattableString.Invariant(
+            $"geo:{location.Latitude:F6},{location.Longitude:F6}"
+        );
+        if (
+            await page.DisplayAlertAsync(
+                "Share your location?",
+                "This will send your current location to this room.",
+                "Send",
+                "Cancel"
+            )
+        )
         {
             await Session!.SendLocationAsync(geoUri, "Current location");
         }
@@ -369,9 +509,11 @@ public sealed partial class Chat : ContentView
     [RelayCommand]
     private async Task OpenLinkAsync(string? value)
     {
-        if (CurrentPage() is not { } page ||
-            !Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
-            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        if (
+            CurrentPage() is not { } page
+            || !Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+        )
         {
             return;
         }
@@ -409,18 +551,21 @@ public sealed partial class Chat : ContentView
     }
 
     [RelayCommand]
-    private Task VotePollAsync(ChatPollVote? vote) => vote is not null && Session is not null
-        ? Session.VoteInPollAsync(vote.Item, vote.AnswerId)
-        : Task.CompletedTask;
+    private Task VotePollAsync(ChatPollVote? vote) =>
+        vote is not null && Session is not null
+            ? Session.VoteInPollAsync(vote.Item, vote.AnswerId)
+            : Task.CompletedTask;
 
     [RelayCommand]
     private async Task OpenProfileAsync(object? value)
     {
-        if (MatrixClient is null) return;
+        if (MatrixClient is null)
+            return;
 
         var member = value as RoomMember;
         var userId = member?.UserId ?? value as string;
-        if (string.IsNullOrWhiteSpace(userId)) return;
+        if (string.IsNullOrWhiteSpace(userId))
+            return;
 
         member ??= Session?.Members.FirstOrDefault(candidate => candidate.UserId == userId);
         IsRoomInfoOpen = false;
@@ -531,29 +676,46 @@ public sealed partial class Chat : ContentView
         {
             SuggestedFileName = Path.GetFileNameWithoutExtension(media.Filename),
         };
-        picker.FileTypeChoices.Add("File", [Path.GetExtension(media.Filename) is { Length: > 0 } extension ? extension : ".bin"]);
-        var window = Application.Current?.Windows.FirstOrDefault()?.Handler?.PlatformView as Microsoft.UI.Xaml.Window
+        picker.FileTypeChoices.Add(
+            "File",
+            [Path.GetExtension(media.Filename) is { Length: > 0 } extension ? extension : ".bin"]
+        );
+        var window =
+            Application.Current?.Windows.FirstOrDefault()?.Handler?.PlatformView
+                as Microsoft.UI.Xaml.Window
             ?? throw new InvalidOperationException("Application window unavailable.");
         WinRT.Interop.InitializeWithWindow.Initialize(
             picker,
-            WinRT.Interop.WindowNative.GetWindowHandle(window));
+            WinRT.Interop.WindowNative.GetWindowHandle(window)
+        );
         var destination = await picker.PickSaveFileAsync();
         if (destination is not null)
         {
             await Windows.Storage.FileIO.WriteBytesAsync(
                 destination,
-                await MatrixClient.GetMediaContentAsync(media.SourceJson));
+                await MatrixClient.GetMediaContentAsync(media.SourceJson)
+            );
         }
 #elif ANDROID
         var values = new Android.Content.ContentValues();
         values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, media.Filename);
-        values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, media.MimeType ?? "application/octet-stream");
-        values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, Android.OS.Environment.DirectoryDownloads);
+        values.Put(
+            Android.Provider.MediaStore.IMediaColumns.MimeType,
+            media.MimeType ?? "application/octet-stream"
+        );
+        values.Put(
+            Android.Provider.MediaStore.IMediaColumns.RelativePath,
+            Android.OS.Environment.DirectoryDownloads
+        );
         var resolver = Android.App.Application.Context!.ContentResolver!;
-        var destination = resolver.Insert(Android.Provider.MediaStore.Downloads.ExternalContentUri, values);
+        var destination = resolver.Insert(
+            Android.Provider.MediaStore.Downloads.ExternalContentUri,
+            values
+        );
         if (destination is not null)
         {
-            await using var output = resolver.OpenOutputStream(destination)
+            await using var output =
+                resolver.OpenOutputStream(destination)
                 ?? throw new IOException("Could not open download.");
             await output.WriteAsync(await MatrixClient.GetMediaContentAsync(media.SourceJson));
         }
@@ -562,14 +724,26 @@ public sealed partial class Chat : ContentView
 
     private async Task ReportMessageAsync(ChatTimelineItem item)
     {
-        if (Session?.Room is not { } room || item.EventId is null || CurrentPage() is not { } page) return;
-        var reason = await InAppDialogs.PromptAsync(page, "Report message", "Reason (optional)", "Report", multiline: true);
-        if (reason is null) return;
+        if (Session?.Room is not { } room || item.EventId is null || CurrentPage() is not { } page)
+            return;
+        var reason = await InAppDialogs.PromptAsync(
+            page,
+            "Report message",
+            "Reason (optional)",
+            "Report",
+            multiline: true
+        );
+        if (reason is null)
+            return;
 
         try
         {
             await room.ReportContent(item.EventId, reason);
-            await page.DisplayAlertAsync("Report sent", "The homeserver received your report.", "OK");
+            await page.DisplayAlertAsync(
+                "Report sent",
+                "The homeserver received your report.",
+                "OK"
+            );
         }
         catch (Exception exception)
         {
@@ -579,13 +753,23 @@ public sealed partial class Chat : ContentView
 
     private async Task BlockUserAsync(ChatTimelineItem item)
     {
-        if (MatrixClient is null || string.IsNullOrWhiteSpace(item.SenderId) || CurrentPage() is not { } page) return;
-        if (!await page.DisplayAlertAsync("Block user", $"Block {item.Sender}?", "Block", "Cancel")) return;
+        if (
+            MatrixClient is null
+            || string.IsNullOrWhiteSpace(item.SenderId)
+            || CurrentPage() is not { } page
+        )
+            return;
+        if (!await page.DisplayAlertAsync("Block user", $"Block {item.Sender}?", "Block", "Cancel"))
+            return;
 
         try
         {
             await MatrixClient.IgnoreUserAsync(item.SenderId);
-            await page.DisplayAlertAsync("User blocked", "Their future messages will be ignored by Matrix.", "OK");
+            await page.DisplayAlertAsync(
+                "User blocked",
+                "Their future messages will be ignored by Matrix.",
+                "OK"
+            );
         }
         catch (Exception exception)
         {
@@ -596,7 +780,8 @@ public sealed partial class Chat : ContentView
     private static void OnSelectedRoomChanged(
         BindableObject bindable,
         object oldValue,
-        object newValue)
+        object newValue
+    )
     {
         var chat = (Chat)bindable;
         chat._roomWallpaperUrl = null;
@@ -607,7 +792,11 @@ public sealed partial class Chat : ContentView
         }
     }
 
-    private static void OnMatrixClientChanged(BindableObject bindable, object oldValue, object newValue)
+    private static void OnMatrixClientChanged(
+        BindableObject bindable,
+        object oldValue,
+        object newValue
+    )
     {
         var chat = (Chat)bindable;
         chat._globalWallpaperCancellation?.Cancel();
@@ -623,7 +812,10 @@ public sealed partial class Chat : ContentView
         }
     }
 
-    private async Task WatchGlobalWallpaperAsync(ManagedMatrixClient client, CancellationToken cancellationToken)
+    private async Task WatchGlobalWallpaperAsync(
+        ManagedMatrixClient client,
+        CancellationToken cancellationToken
+    )
     {
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -632,7 +824,8 @@ public sealed partial class Chat : ContentView
                 if (client.IsLoggedIn)
                 {
                     var wallpaper = await client.GetGlobalWallpaperAsync();
-                    if (!ReferenceEquals(MatrixClient, client)) return;
+                    if (!ReferenceEquals(MatrixClient, client))
+                        return;
 
                     Dispatcher.Dispatch(() =>
                     {
@@ -661,7 +854,8 @@ public sealed partial class Chat : ContentView
         ManagedMatrixClient client,
         string roomId,
         ChatSession session,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         while (!cancellationToken.IsCancellationRequested && ReferenceEquals(Session, session))
         {
@@ -670,7 +864,10 @@ public sealed partial class Chat : ContentView
                 if (client.IsLoggedIn)
                 {
                     var wallpaper = await client.GetRoomWallpaperAsync(roomId);
-                    if (cancellationToken.IsCancellationRequested || !ReferenceEquals(Session, session))
+                    if (
+                        cancellationToken.IsCancellationRequested
+                        || !ReferenceEquals(Session, session)
+                    )
                     {
                         return;
                     }
@@ -700,28 +897,30 @@ public sealed partial class Chat : ContentView
 
     private async Task LoadInitialHistoryAsync(
         ChatSession session,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         await Task.Yield();
-        if (!cancellationToken.IsCancellationRequested &&
-            ReferenceEquals(Session, session))
+        if (!cancellationToken.IsCancellationRequested && ReferenceEquals(Session, session))
         {
             await session.LoadMoreHistoryAsync(100, cancellationToken);
         }
     }
 
-    private void OnGlobalWallpaperChanged(string? url) => Dispatcher.Dispatch(() =>
-    {
-        _globalWallpaperUrl = url;
-        UpdateWallpaper();
-    });
+    private void OnGlobalWallpaperChanged(string? url) =>
+        Dispatcher.Dispatch(() =>
+        {
+            _globalWallpaperUrl = url;
+            UpdateWallpaper();
+        });
 
     private void UpdateWallpaper() => RoomWallpaperUrl = _roomWallpaperUrl ?? _globalWallpaperUrl;
 
     private static void OnTimelineIsNearBottomChanged(
         BindableObject bindable,
         object oldValue,
-        object newValue)
+        object newValue
+    )
     {
         if (newValue is true)
         {
@@ -729,9 +928,7 @@ public sealed partial class Chat : ContentView
         }
     }
 
-    private void OnSessionItemsChanged(
-        object? sender,
-        NotifyCollectionChangedEventArgs eventArgs)
+    private void OnSessionItemsChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs)
     {
         if (TimelineIsNearBottom)
         {
@@ -754,8 +951,8 @@ public sealed partial class Chat : ContentView
         }
     }
 
-    private static Page? CurrentPage() => Application.Current?
-        .Windows
-        .Select(window => window.Page)
-        .FirstOrDefault(page => page is not null);
+    private static Page? CurrentPage() =>
+        Application
+            .Current?.Windows.Select(window => window.Page)
+            .FirstOrDefault(page => page is not null);
 }

@@ -33,30 +33,25 @@ public sealed partial class RoomAvatar : ContentView
                         FontAttributes = FontAttributes.Bold,
                         HorizontalTextAlignment = TextAlignment.Center,
                         VerticalTextAlignment = TextAlignment.Center,
-                    }
-                    .Bind(
+                    }.Bind(
                         Label.TextProperty,
                         nameof(DisplayName),
                         converter: new SubstringConverter(1, 0),
-                        source: this),
-                    new MatrixImage
-                    {
-                        Aspect = Aspect.AspectFill,
-                    }
-                    .Bind(
-                        MatrixImage.MatrixSourceProperty,
-                        nameof(AvatarUrl),
-                        source: this)
-                    .Bind(
-                        IsVisibleProperty,
-                        nameof(AvatarUrl),
-                        converter: new IsStringNotNullOrEmptyConverter(),
-                        source: this),
+                        source: this
+                    ),
+                    new MatrixImage { Aspect = Aspect.AspectFill }
+                        .Bind(MatrixImage.MatrixSourceProperty, nameof(AvatarUrl), source: this)
+                        .Bind(
+                            IsVisibleProperty,
+                            nameof(AvatarUrl),
+                            converter: new IsStringNotNullOrEmptyConverter(),
+                            source: this
+                        ),
                 },
             },
         }
-        .Bind(WidthRequestProperty, nameof(Size), source: this)
-        .Bind(HeightRequestProperty, nameof(Size), source: this)
-        .DynamicResource(VisualElement.BackgroundColorProperty, "PrimaryContainer");
+            .Bind(WidthRequestProperty, nameof(Size), source: this)
+            .Bind(HeightRequestProperty, nameof(Size), source: this)
+            .DynamicResource(VisualElement.BackgroundColorProperty, "PrimaryContainer");
     }
 }

@@ -1,9 +1,9 @@
+using System.Windows.Input;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.App.Converters;
 using Dev.Naamloos.Fennec.Sdk;
 using Dev.Naamloos.Fennec.Sdk.Entities;
-using System.Windows.Input;
 using MediaElement = CommunityToolkit.Maui.Views.MediaElement;
 using PlaybackMediaSource = CommunityToolkit.Maui.Views.MediaSource;
 
@@ -66,41 +66,41 @@ public sealed partial class MatrixMedia : ContentView
             {
                 new TapGestureRecognizer()
                     .BindCommand(nameof(OpenCommand), source: this)
-                    .Bind(TapGestureRecognizer.CommandParameterProperty,
-                        nameof(Media), source: this),
+                    .Bind(
+                        TapGestureRecognizer.CommandParameterProperty,
+                        nameof(Media),
+                        source: this
+                    ),
             },
         }
-        .Bind(Image.SourceProperty, nameof(ImageSource), source: this)
-        .Bind(IsVisibleProperty, nameof(IsImageVisible), source: this);
+            .Bind(Image.SourceProperty, nameof(ImageSource), source: this)
+            .Bind(IsVisibleProperty, nameof(IsImageVisible), source: this);
 
         Content = new Grid
         {
             Children =
             {
                 _image,
-
                 _videoHost,
-
-                new Button
-                {
-                    HorizontalOptions = LayoutOptions.Start,
-                }
-                .Bind(Button.TextProperty,
-                    $"{nameof(Media)}.{nameof(ChatMedia.Filename)}",
-                    source: this)
-                .Bind(IsVisibleProperty, nameof(IsFileVisible), source: this)
-                .BindCommand(nameof(OpenCommand), source: this)
-                .Bind(Button.CommandParameterProperty, nameof(Media), source: this),
-
+                new Button { HorizontalOptions = LayoutOptions.Start }
+                    .Bind(
+                        Button.TextProperty,
+                        $"{nameof(Media)}.{nameof(ChatMedia.Filename)}",
+                        source: this
+                    )
+                    .Bind(IsVisibleProperty, nameof(IsFileVisible), source: this)
+                    .BindCommand(nameof(OpenCommand), source: this)
+                    .Bind(Button.CommandParameterProperty, nameof(Media), source: this),
                 new ActivityIndicator
                 {
                     IsRunning = true,
                     HorizontalOptions = LayoutOptions.Center,
                     VerticalOptions = LayoutOptions.Center,
-                }
-                .Bind(IsVisibleProperty,
+                }.Bind(
+                    IsVisibleProperty,
                     $"{nameof(Media)}.{nameof(ChatMedia.IsLoading)}",
-                    source: this),
+                    source: this
+                ),
             },
         };
     }
@@ -123,8 +123,9 @@ public sealed partial class MatrixMedia : ContentView
     {
         IsImageVisible = false;
         IsVideoVisible = false;
-        IsFileVisible = Media?.Kind is ChatMediaKind.File or ChatMediaKind.Audio ||
-            (Media?.Kind == ChatMediaKind.Video && !IsFull && !Media.HasPreview);
+        IsFileVisible =
+            Media?.Kind is ChatMediaKind.File or ChatMediaKind.Audio
+            || (Media?.Kind == ChatMediaKind.Video && !IsFull && !Media.HasPreview);
 
         if (Client is null || Media is null || IsFileVisible)
         {
@@ -146,7 +147,9 @@ public sealed partial class MatrixMedia : ContentView
             }
             else
             {
-                imageData = await Media.LoadPreviewAsync(Client, cancellationToken).ConfigureAwait(false);
+                imageData = await Media
+                    .LoadPreviewAsync(Client, cancellationToken)
+                    .ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -157,7 +160,8 @@ public sealed partial class MatrixMedia : ContentView
         {
             System.Diagnostics.Debug.WriteLine($"Could not load media: {exception}");
             await Dispatcher.DispatchAsync(() =>
-                IsFileVisible = Media.Kind == ChatMediaKind.Video && !IsFull);
+                IsFileVisible = Media.Kind == ChatMediaKind.Video && !IsFull
+            );
             return;
         }
 
@@ -168,11 +172,11 @@ public sealed partial class MatrixMedia : ContentView
 
         var imageSource = imageData is null
             ? null
-            : Microsoft.Maui.Controls.ImageSource.FromStream(
-                () => new MemoryStream(imageData));
+            : Microsoft.Maui.Controls.ImageSource.FromStream(() => new MemoryStream(imageData));
         await Dispatcher.DispatchAsync(() =>
         {
-            if (version != _loadVersion) return;
+            if (version != _loadVersion)
+                return;
 
             if (Media.Kind == ChatMediaKind.Video && IsFull)
             {
@@ -189,10 +193,7 @@ public sealed partial class MatrixMedia : ContentView
         });
     }
 
-    private static void OnMediaChanged(
-        BindableObject bindable,
-        object oldValue,
-        object newValue)
+    private static void OnMediaChanged(BindableObject bindable, object oldValue, object newValue)
     {
         var media = (MatrixMedia)bindable;
         media.IsVisible = newValue is ChatMedia { Kind: not ChatMediaKind.Audio };
@@ -202,12 +203,10 @@ public sealed partial class MatrixMedia : ContentView
     private static void OnClientChanged(
         BindableObject bindable,
         object oldValue,
-        object newValue) => ((MatrixMedia)bindable).Load();
+        object newValue
+    ) => ((MatrixMedia)bindable).Load();
 
-    private static void OnIsFullChanged(
-        BindableObject bindable,
-        object oldValue,
-        object newValue)
+    private static void OnIsFullChanged(BindableObject bindable, object oldValue, object newValue)
     {
         var media = (MatrixMedia)bindable;
         media.HeightRequest = media.IsFull ? -1 : 160;
@@ -222,7 +221,8 @@ public sealed partial class MatrixMedia : ContentView
 
     private void EnsureVideoElement()
     {
-        if (_videoElement is not null) return;
+        if (_videoElement is not null)
+            return;
 
         _videoElement = new MediaElement
         {
@@ -230,8 +230,8 @@ public sealed partial class MatrixMedia : ContentView
             ShouldShowPlaybackControls = true,
             Aspect = Aspect.AspectFit,
         }
-        .Bind(MediaElement.SourceProperty, nameof(VideoSource), source: this)
-        .Bind(IsVisibleProperty, nameof(IsVideoVisible), source: this);
+            .Bind(MediaElement.SourceProperty, nameof(VideoSource), source: this)
+            .Bind(IsVisibleProperty, nameof(IsVideoVisible), source: this);
         _videoHost.Content = _videoElement;
     }
 }

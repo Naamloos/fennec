@@ -7,9 +7,17 @@ namespace Dev.Naamloos.Fennec.App.Components;
 public sealed class WallpaperSettingsView : ContentView
 {
     public static readonly BindableProperty MatrixClientProperty = BindableProperty.Create(
-        nameof(MatrixClient), typeof(ManagedMatrixClient), typeof(WallpaperSettingsView));
+        nameof(MatrixClient),
+        typeof(ManagedMatrixClient),
+        typeof(WallpaperSettingsView)
+    );
 
-    private readonly MatrixImage _preview = new() { IsJson = false, UseFullSize = true, Aspect = Aspect.AspectFill };
+    private readonly MatrixImage _preview = new()
+    {
+        IsJson = false,
+        UseFullSize = true,
+        Aspect = Aspect.AspectFill,
+    };
     private readonly Label _empty = new()
     {
         Text = "No global wallpaper",
@@ -41,10 +49,12 @@ public sealed class WallpaperSettingsView : ContentView
         _set.Clicked += async (_, _) => await SetAsync();
         _clear.Clicked += async (_, _) => await ClearAsync();
 
-        Content = new SettingsSection("Wallpaper",
+        Content = new SettingsSection(
+            "Wallpaper",
             new Label
             {
-                Text = "Used in rooms without their own wallpaper. Room wallpapers take precedence.",
+                Text =
+                    "Used in rooms without their own wallpaper. Room wallpapers take precedence.",
                 FontSize = 12,
                 Opacity = .7,
             },
@@ -56,12 +66,14 @@ public sealed class WallpaperSettingsView : ContentView
                 Content = new Grid { Children = { _empty, _preview } },
             }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface2"),
             new HorizontalStackLayout { Spacing = 8, Children = { _set, _clear } },
-            _status);
+            _status
+        );
     }
 
     private async Task RefreshAsync()
     {
-        if (MatrixClient is null) return;
+        if (MatrixClient is null)
+            return;
         try
         {
             SetPreview(await MatrixClient.GetGlobalWallpaperAsync());
@@ -74,13 +86,17 @@ public sealed class WallpaperSettingsView : ContentView
 
     private async Task SetAsync()
     {
-        if (MatrixClient is null) return;
-        var attachment = await AttachmentPicker.PickConfirmedAsync(new PickOptions
-        {
-            PickerTitle = "Choose global wallpaper",
-            FileTypes = FilePickerFileType.Images,
-        });
-        if (attachment is null) return;
+        if (MatrixClient is null)
+            return;
+        var attachment = await AttachmentPicker.PickConfirmedAsync(
+            new PickOptions
+            {
+                PickerTitle = "Choose global wallpaper",
+                FileTypes = FilePickerFileType.Images,
+            }
+        );
+        if (attachment is null)
+            return;
 
         try
         {
@@ -102,7 +118,8 @@ public sealed class WallpaperSettingsView : ContentView
 
     private async Task ClearAsync()
     {
-        if (MatrixClient is null) return;
+        if (MatrixClient is null)
+            return;
         try
         {
             SetBusy(true, "Clearing wallpaper…");
@@ -131,7 +148,8 @@ public sealed class WallpaperSettingsView : ContentView
     {
         _set.IsEnabled = !busy;
         _clear.IsEnabled = !busy && !string.IsNullOrWhiteSpace(_preview.MatrixSource);
-        if (message is not null) ShowStatus(message);
+        if (message is not null)
+            ShowStatus(message);
     }
 
     private void ShowStatus(string message)

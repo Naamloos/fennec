@@ -8,7 +8,10 @@ namespace Dev.Naamloos.Fennec.App.Components;
 public sealed partial class AdvancedSettingsView : ContentView
 {
     public static readonly BindableProperty MatrixClientProperty = BindableProperty.Create(
-        nameof(MatrixClient), typeof(ManagedMatrixClient), typeof(AdvancedSettingsView));
+        nameof(MatrixClient),
+        typeof(ManagedMatrixClient),
+        typeof(AdvancedSettingsView)
+    );
 
     private readonly VerticalStackLayout _namespaces = new() { Spacing = 8 };
 
@@ -23,7 +26,8 @@ public sealed partial class AdvancedSettingsView : ContentView
         this.BindService<ManagedMatrixClient, AdvancedSettingsView>(MatrixClientProperty);
         Loaded += async (_, _) => await RefreshAsync();
 
-        Content = new SettingsSection("Advanced",
+        Content = new SettingsSection(
+            "Advanced",
             new Button { Text = "Copy access token", BackgroundColor = Colors.Transparent }
                 .DynamicResource(Button.TextColorProperty, "Primary")
                 .BindCommand(nameof(CopyAccessTokenCommand), source: this),
@@ -31,20 +35,24 @@ public sealed partial class AdvancedSettingsView : ContentView
             new Button { Text = "Refresh account data", BackgroundColor = Colors.Transparent }
                 .DynamicResource(Button.TextColorProperty, "Primary")
                 .BindCommand(nameof(RefreshAccountDataCommand), source: this),
-            _namespaces);
+            _namespaces
+        );
     }
 
     private async Task RefreshAsync()
     {
-        if (MatrixClient is null) return;
+        if (MatrixClient is null)
+            return;
 
         var accountData = await MatrixClient.GetGlobalAccountDataAsync();
         _namespaces.Children.Clear();
-        foreach (var group in accountData
-            .GroupBy(item => item.Type.Contains('.')
-                ? item.Type[..item.Type.LastIndexOf('.')]
-                : item.Type)
-            .OrderBy(group => group.Key))
+        foreach (
+            var group in accountData
+                .GroupBy(item =>
+                    item.Type.Contains('.') ? item.Type[..item.Type.LastIndexOf('.')] : item.Type
+                )
+                .OrderBy(group => group.Key)
+        )
         {
             _namespaces.Children.Add(CreateNamespace(group.Key, group));
         }
@@ -54,11 +62,13 @@ public sealed partial class AdvancedSettingsView : ContentView
     private Task RefreshAccountDataAsync() => RefreshAsync();
 
     [RelayCommand]
-    private Task CopyAccessTokenAsync() => Clipboard.Default.SetTextAsync(MatrixClient?.GetAccessToken() ?? string.Empty);
+    private Task CopyAccessTokenAsync() =>
+        Clipboard.Default.SetTextAsync(MatrixClient?.GetAccessToken() ?? string.Empty);
 
     private static View CreateNamespace(
         string @namespace,
-        IEnumerable<GlobalAccountData> accountData)
+        IEnumerable<GlobalAccountData> accountData
+    )
     {
         var entries = new VerticalStackLayout
         {
@@ -68,20 +78,33 @@ public sealed partial class AdvancedSettingsView : ContentView
         };
         foreach (var item in accountData.OrderBy(item => item.Type))
         {
-            entries.Children.Add(new Border
-            {
-                Padding = 10,
-                StrokeThickness = 0,
-                Content = new VerticalStackLayout
+            entries.Children.Add(
+                new Border
                 {
-                    Spacing = 3,
-                    Children =
+                    Padding = 10,
+                    StrokeThickness = 0,
+                    Content = new VerticalStackLayout
                     {
-                        new Label { Text = item.Type, FontAttributes = FontAttributes.Bold, FontSize = 12 },
-                        new Label { Text = item.Content, FontSize = 11, LineBreakMode = LineBreakMode.WordWrap, Opacity = .75 },
+                        Spacing = 3,
+                        Children =
+                        {
+                            new Label
+                            {
+                                Text = item.Type,
+                                FontAttributes = FontAttributes.Bold,
+                                FontSize = 12,
+                            },
+                            new Label
+                            {
+                                Text = item.Content,
+                                FontSize = 11,
+                                LineBreakMode = LineBreakMode.WordWrap,
+                                Opacity = .75,
+                            },
+                        },
                     },
-                },
-            }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface"));
+                }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface")
+            );
         }
 
         var toggle = new Button
@@ -96,7 +119,8 @@ public sealed partial class AdvancedSettingsView : ContentView
         toggle.Clicked += (_, _) =>
         {
             entries.IsVisible = !entries.IsVisible;
-            toggle.Text = $"{(entries.IsVisible ? "⌄" : "›")}  {@namespace} ({entries.Children.Count})";
+            toggle.Text =
+                $"{(entries.IsVisible ? "⌄" : "›")}  {@namespace} ({entries.Children.Count})";
         };
 
         return new Border

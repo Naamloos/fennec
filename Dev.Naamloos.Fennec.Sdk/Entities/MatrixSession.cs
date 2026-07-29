@@ -6,4 +6,5 @@ public sealed record MatrixSession(
     DateTimeOffset? LastSeen,
     string? LastSeenIp,
     bool IsCurrent,
-    bool IsVerified);
+    bool IsVerified
+);

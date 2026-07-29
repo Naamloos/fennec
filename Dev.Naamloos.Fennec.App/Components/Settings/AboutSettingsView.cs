@@ -10,7 +10,8 @@ public sealed partial class AboutSettingsView : ContentView
 
     public AboutSettingsView()
     {
-        Content = new SettingsSection("About",
+        Content = new SettingsSection(
+            "About",
             new Border
             {
                 Padding = new Thickness(28, 32),
@@ -37,7 +38,10 @@ public sealed partial class AboutSettingsView : ContentView
                                 HorizontalTextAlignment = TextAlignment.Center,
                                 VerticalTextAlignment = TextAlignment.Center,
                             },
-                        }.DynamicResource(VisualElement.BackgroundColorProperty, "PrimaryContainer"),
+                        }.DynamicResource(
+                            VisualElement.BackgroundColorProperty,
+                            "PrimaryContainer"
+                        ),
                         new Label
                         {
                             Text = "Fennec",
@@ -51,13 +55,16 @@ public sealed partial class AboutSettingsView : ContentView
                             HorizontalOptions = LayoutOptions.Center,
                             StrokeThickness = 0,
                             StrokeShape = new RoundRectangle { CornerRadius = 12 },
-                            Content = new Label { FontSize = 12 }
-                                .Bind(Label.TextProperty, nameof(Version), source: this),
-                        }
-                        .DynamicResource(VisualElement.BackgroundColorProperty, "Surface"),
+                            Content = new Label { FontSize = 12 }.Bind(
+                                Label.TextProperty,
+                                nameof(Version),
+                                source: this
+                            ),
+                        }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface"),
                         new Label
                         {
-                            Text = "Cross-platform [Matrix] Client in C# / .NET MAUI using Matrix-SDK-Rust",
+                            Text =
+                                "Cross-platform [Matrix] Client in C# / .NET MAUI using Matrix-SDK-Rust",
                             Opacity = .7,
                             HorizontalTextAlignment = TextAlignment.Center,
                         },
@@ -67,54 +74,64 @@ public sealed partial class AboutSettingsView : ContentView
             CreateLinkCard(
                 "Source code",
                 "Browse issues, contribute, or build Fennec yourself.",
-                nameof(OpenSourceCodeCommand)),
+                nameof(OpenSourceCodeCommand)
+            ),
             CreateLinkCard(
                 "Support Fennec",
                 "Your support is greatly appreciated 💖",
-                nameof(OpenDonateCommand)));
+                nameof(OpenDonateCommand)
+            )
+        );
     }
 
     [RelayCommand]
-    private Task OpenSourceCodeAsync() => Launcher.Default.OpenAsync("https://github.com/Naamloos/fennec");
+    private Task OpenSourceCodeAsync() =>
+        Launcher.Default.OpenAsync("https://github.com/Naamloos/fennec");
 
     [RelayCommand]
     private Task OpenDonateAsync() => Launcher.Default.OpenAsync("https://ko-fi.com/naamloos");
 
-    private View CreateLinkCard(string title, string description, string command) => new Border
-    {
-        Padding = new Thickness(16, 12),
-        StrokeThickness = 0,
-        StrokeShape = new RoundRectangle { CornerRadius = 14 },
-        Content = new Grid
+    private View CreateLinkCard(string title, string description, string command) =>
+        new Border
         {
-            ColumnDefinitions =
+            Padding = new Thickness(16, 12),
+            StrokeThickness = 0,
+            StrokeShape = new RoundRectangle { CornerRadius = 14 },
+            Content = new Grid
             {
-                new ColumnDefinition(GridLength.Star),
-                new ColumnDefinition(GridLength.Auto),
-            },
-            ColumnSpacing = 12,
-            Children =
-            {
-                new VerticalStackLayout
+                ColumnDefinitions =
                 {
-                    Spacing = 3,
-                    Children =
-                    {
-                        new Label { Text = title, FontAttributes = FontAttributes.Bold },
-                        new Label { Text = description, FontSize = 12, Opacity = .7 },
-                    },
+                    new ColumnDefinition(GridLength.Star),
+                    new ColumnDefinition(GridLength.Auto),
                 },
-                new Button
+                ColumnSpacing = 12,
+                Children =
                 {
-                    Text = "Open",
-                    BackgroundColor = Colors.Transparent,
-                    Padding = new Thickness(8, 4),
-                    FontSize = 12,
-                }
-                .DynamicResource(Button.TextColorProperty, "Primary")
-                .BindCommand(command, source: this)
-                .Column(1),
+                    new VerticalStackLayout
+                    {
+                        Spacing = 3,
+                        Children =
+                        {
+                            new Label { Text = title, FontAttributes = FontAttributes.Bold },
+                            new Label
+                            {
+                                Text = description,
+                                FontSize = 12,
+                                Opacity = .7,
+                            },
+                        },
+                    },
+                    new Button
+                    {
+                        Text = "Open",
+                        BackgroundColor = Colors.Transparent,
+                        Padding = new Thickness(8, 4),
+                        FontSize = 12,
+                    }
+                        .DynamicResource(Button.TextColorProperty, "Primary")
+                        .BindCommand(command, source: this)
+                        .Column(1),
+                },
             },
-        },
-    }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface2");
+        }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface2");
 }

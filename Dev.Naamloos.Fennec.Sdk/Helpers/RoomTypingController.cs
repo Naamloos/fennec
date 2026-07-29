@@ -1,5 +1,5 @@
-using Dev.Naamloos.Fennec.Sdk.Entities;
 using System.Diagnostics;
+using Dev.Naamloos.Fennec.Sdk.Entities;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.Sdk.Helpers;
@@ -49,9 +49,7 @@ internal sealed class RoomTypingController : ObservableModel, IDisposable
     {
         var names = new List<string>();
 
-        foreach (var userId in userIds
-                     .Where(userId => userId != _ownUserId)
-                     .Distinct())
+        foreach (var userId in userIds.Where(userId => userId != _ownUserId).Distinct())
         {
             try
             {
@@ -75,7 +73,8 @@ internal sealed class RoomTypingController : ObservableModel, IDisposable
                 var (controller, text) = ((RoomTypingController, string))state!;
                 controller.Text = text;
             },
-            (this, Format(names)));
+            (this, Format(names))
+        );
     }
 
     private static string Format(IEnumerable<string> users)

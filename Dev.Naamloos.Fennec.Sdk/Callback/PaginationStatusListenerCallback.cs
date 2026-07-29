@@ -1,5 +1,5 @@
-using uniffi.matrix_sdk_ffi;
 using uniffi.matrix_sdk;
+using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.Sdk.Events;
 

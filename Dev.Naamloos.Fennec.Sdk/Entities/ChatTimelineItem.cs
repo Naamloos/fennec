@@ -29,9 +29,17 @@ public sealed class ChatTimelineItem : ObservableModel
 
     public string Id { get; }
 
-    public bool IsMessage { get => _isMessage; set => Set(ref _isMessage, value); }
+    public bool IsMessage
+    {
+        get => _isMessage;
+        set => Set(ref _isMessage, value);
+    }
 
-    public bool IsUnknown { get => _isUnknown; set => Set(ref _isUnknown, value); }
+    public bool IsUnknown
+    {
+        get => _isUnknown;
+        set => Set(ref _isUnknown, value);
+    }
 
     public bool IsOwn
     {
@@ -46,7 +54,11 @@ public sealed class ChatTimelineItem : ObservableModel
         }
     }
 
-    public bool CanReply { get => _canReply; set => Set(ref _canReply, value); }
+    public bool CanReply
+    {
+        get => _canReply;
+        set => Set(ref _canReply, value);
+    }
 
     public bool IsGroupStart
     {
@@ -76,27 +88,71 @@ public sealed class ChatTimelineItem : ObservableModel
 
     public bool ShowSender => !IsOwn && IsGroupStart;
 
-    public string Sender { get => _sender; set => Set(ref _sender, value); }
+    public string Sender
+    {
+        get => _sender;
+        set => Set(ref _sender, value);
+    }
 
-    public string SenderId { get => _senderId; set => Set(ref _senderId, value); }
+    public string SenderId
+    {
+        get => _senderId;
+        set => Set(ref _senderId, value);
+    }
 
-    public string? SenderAvatarUrl { get => _senderAvatarUrl; set => Set(ref _senderAvatarUrl, value); }
+    public string? SenderAvatarUrl
+    {
+        get => _senderAvatarUrl;
+        set => Set(ref _senderAvatarUrl, value);
+    }
 
-    public string Body { get => _body; set => Set(ref _body, value); }
+    public string Body
+    {
+        get => _body;
+        set => Set(ref _body, value);
+    }
 
-    public string? FormattedBody { get => _formattedBody; set => Set(ref _formattedBody, value); }
+    public string? FormattedBody
+    {
+        get => _formattedBody;
+        set => Set(ref _formattedBody, value);
+    }
 
-    public string EventType { get => _eventType; set => Set(ref _eventType, value); }
+    public string EventType
+    {
+        get => _eventType;
+        set => Set(ref _eventType, value);
+    }
 
-    public string SourceJson { get => _sourceJson; set => Set(ref _sourceJson, value); }
+    public string SourceJson
+    {
+        get => _sourceJson;
+        set => Set(ref _sourceJson, value);
+    }
 
-    public string? EventId { get => _eventId; set => Set(ref _eventId, value); }
+    public string? EventId
+    {
+        get => _eventId;
+        set => Set(ref _eventId, value);
+    }
 
-    public string? ReplyPreview { get => _replyPreview; set => Set(ref _replyPreview, value); }
+    public string? ReplyPreview
+    {
+        get => _replyPreview;
+        set => Set(ref _replyPreview, value);
+    }
 
-    public ChatMedia? Media { get => _media; set => Set(ref _media, value); }
+    public ChatMedia? Media
+    {
+        get => _media;
+        set => Set(ref _media, value);
+    }
 
-    public ChatPoll? Poll { get => _poll; set => Set(ref _poll, value); }
+    public ChatPoll? Poll
+    {
+        get => _poll;
+        set => Set(ref _poll, value);
+    }
 
     public ObservableCollection<ChatReaction> Reactions { get; } = [];
 
@@ -132,9 +188,7 @@ public sealed class ChatTimelineItem : ObservableModel
         Replace(ReadReceipts, source.ReadReceipts);
     }
 
-    private static void Replace<T>(
-        ObservableCollection<T> target,
-        IEnumerable<T> source)
+    private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> source)
     {
         target.Clear();
 

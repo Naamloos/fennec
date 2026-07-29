@@ -69,7 +69,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Entities
         public ManagedRoom(Room room)
         {
             this.Update(room);
-            if(_room is null)
+            if (_room is null)
             {
                 throw new ArgumentNullException(nameof(room), "Room cannot be null.");
             }
@@ -98,8 +98,9 @@ namespace Dev.Naamloos.Fennec.Sdk.Entities
             }
 
             using var members = await NativeRoom.Members();
-            var otherMember = members.NextChunk(100)?.FirstOrDefault(member =>
-                member.UserId != NativeRoom.OwnUserId());
+            var otherMember = members
+                .NextChunk(100)
+                ?.FirstOrDefault(member => member.UserId != NativeRoom.OwnUserId());
             AvatarUrl = otherMember?.AvatarUrl;
         }
 

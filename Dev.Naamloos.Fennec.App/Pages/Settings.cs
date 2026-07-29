@@ -10,7 +10,10 @@ namespace Dev.Naamloos.Fennec.App.Pages;
 public sealed partial class Settings : ContentPage
 {
     public static readonly BindableProperty UserSettingsProperty = BindableProperty.Create(
-        nameof(UserSettings), typeof(UserSettingsService), typeof(Settings));
+        nameof(UserSettings),
+        typeof(UserSettingsService),
+        typeof(Settings)
+    );
 
     public UserSettingsService? UserSettings
     {
@@ -26,7 +29,8 @@ public sealed partial class Settings : ContentPage
         get => _selectedTab;
         private set
         {
-            if (_selectedTab == value) return;
+            if (_selectedTab == value)
+                return;
             _selectedTab = value;
             OnPropertyChanged();
             UpdateTabButtons();
@@ -60,7 +64,8 @@ public sealed partial class Settings : ContentPage
             .Add(value => value == "About", CreateTabContent(about));
         content.SetBinding(
             TemplateSwitchView<string, string>.ValueProperty,
-            new Binding(nameof(SelectedTab), source: this));
+            new Binding(nameof(SelectedTab), source: this)
+        );
 
         Content = new Grid
         {
@@ -89,8 +94,10 @@ public sealed partial class Settings : ContentPage
                             HeightRequest = 40,
                             GestureRecognizers =
                             {
-                                new TapGestureRecognizer()
-                                    .BindCommand(nameof(BackCommand), source: this),
+                                new TapGestureRecognizer().BindCommand(
+                                    nameof(BackCommand),
+                                    source: this
+                                ),
                             },
                         },
 #endif
@@ -143,23 +150,23 @@ public sealed partial class Settings : ContentPage
                     TextColor = Colors.Red,
                     HorizontalOptions = LayoutOptions.Center,
                 }
-                .BindCommand(nameof(AppShell.LogoutCommand))
-                .Row(3),
+                    .BindCommand(nameof(AppShell.LogoutCommand))
+                    .Row(3),
             },
-        }
-        .DynamicResource(VisualElement.BackgroundColorProperty, "Surface");
+        }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface");
 
         UpdateTabButtons();
     }
 
-    private static View CreateTabContent(View view) => new ScrollView
-    {
-        Content = new VerticalStackLayout
+    private static View CreateTabContent(View view) =>
+        new ScrollView
         {
-            Padding = new Thickness(0, 4, 0, 16),
-            Children = { view },
-        },
-    };
+            Content = new VerticalStackLayout
+            {
+                Padding = new Thickness(0, 4, 0, 16),
+                Children = { view },
+            },
+        };
 
     private Button CreateTabButton(string tab)
     {

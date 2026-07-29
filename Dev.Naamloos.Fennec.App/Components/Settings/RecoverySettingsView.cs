@@ -6,9 +6,16 @@ namespace Dev.Naamloos.Fennec.App.Components;
 public sealed class RecoverySettingsView : ContentView
 {
     public static readonly BindableProperty MatrixClientProperty = BindableProperty.Create(
-        nameof(MatrixClient), typeof(ManagedMatrixClient), typeof(RecoverySettingsView));
+        nameof(MatrixClient),
+        typeof(ManagedMatrixClient),
+        typeof(RecoverySettingsView)
+    );
 
-    private readonly Label _status = new() { Opacity = .75, LineBreakMode = LineBreakMode.WordWrap };
+    private readonly Label _status = new()
+    {
+        Opacity = .75,
+        LineBreakMode = LineBreakMode.WordWrap,
+    };
     private readonly Label _recoveryKey = new()
     {
         IsVisible = false,
@@ -38,17 +45,23 @@ public sealed class RecoverySettingsView : ContentView
         enable.DynamicResource(Button.TextColorProperty, "OnPrimary");
         enable.Clicked += async (_, _) => await EnableAsync(enable);
 
-        var restore = new Button { Text = "Restore from recovery key", BackgroundColor = Colors.Transparent };
+        var restore = new Button
+        {
+            Text = "Restore from recovery key",
+            BackgroundColor = Colors.Transparent,
+        };
         restore.DynamicResource(Button.TextColorProperty, "Primary");
         restore.Clicked += async (_, _) => await RestoreAsync(restore);
 
         _copy.DynamicResource(Button.TextColorProperty, "Primary");
         _copy.Clicked += async (_, _) => await Clipboard.Default.SetTextAsync(_recoveryKey.Text);
 
-        Content = new SettingsSection("Encryption recovery",
+        Content = new SettingsSection(
+            "Encryption recovery",
             new Label
             {
-                Text = "Back up encrypted message keys so a verified new session can recover message history.",
+                Text =
+                    "Back up encrypted message keys so a verified new session can recover message history.",
                 Opacity = .7,
                 LineBreakMode = LineBreakMode.WordWrap,
             },
@@ -56,12 +69,14 @@ public sealed class RecoverySettingsView : ContentView
             enable,
             _recoveryKey,
             _copy,
-            restore);
+            restore
+        );
     }
 
     private async Task RefreshAsync()
     {
-        if (MatrixClient is null) return;
+        if (MatrixClient is null)
+            return;
         try
         {
             _status.Text = await MatrixClient.HasRecoveryBackupAsync()
@@ -77,18 +92,26 @@ public sealed class RecoverySettingsView : ContentView
 
     private async Task EnableAsync(Button button)
     {
-        if (MatrixClient is null) return;
+        if (MatrixClient is null)
+            return;
         var page = Shell.Current?.CurrentPage;
         var passphrase = await InAppDialogs.PromptAsync(
-            page, "Protect recovery key", "Optional passphrase (leave blank to skip)", "Continue", isPassword: true);
-        if (page is not null && passphrase is null) return;
+            page,
+            "Protect recovery key",
+            "Optional passphrase (leave blank to skip)",
+            "Continue",
+            isPassword: true
+        );
+        if (page is not null && passphrase is null)
+            return;
 
         try
         {
             button.IsEnabled = false;
             _status.Text = "Creating encrypted backup…";
             var key = await MatrixClient.EnableRecoveryAsync(
-                string.IsNullOrWhiteSpace(passphrase) ? null : passphrase);
+                string.IsNullOrWhiteSpace(passphrase) ? null : passphrase
+            );
             _recoveryKey.Text = key;
             _recoveryKey.IsVisible = _copy.IsVisible = true;
             _status.Text = "Copy the recovery key now. Fennec will not store or show it again.";
@@ -107,10 +130,17 @@ public sealed class RecoverySettingsView : ContentView
 
     private async Task RestoreAsync(Button button)
     {
-        if (MatrixClient is null || Shell.Current?.CurrentPage is not { } page) return;
+        if (MatrixClient is null || Shell.Current?.CurrentPage is not { } page)
+            return;
         var key = await InAppDialogs.PromptAsync(
-            page, "Restore encrypted history", "Recovery key", "Restore", isPassword: true);
-        if (string.IsNullOrWhiteSpace(key)) return;
+            page,
+            "Restore encrypted history",
+            "Recovery key",
+            "Restore",
+            isPassword: true
+        );
+        if (string.IsNullOrWhiteSpace(key))
+            return;
 
         try
         {

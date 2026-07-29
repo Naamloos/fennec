@@ -1,9 +1,9 @@
+using System.Collections.ObjectModel;
+using System.Windows.Input;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.Sdk.Entities;
-using System.Collections.ObjectModel;
-using System.Windows.Input;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
@@ -53,18 +53,15 @@ public sealed partial class EmotePicker : ContentView
                     {
                         ItemSpacing = 4,
                     },
-                    ItemTemplate = new DataTemplate(() => new Button
-                    {
-                        Padding = new Thickness(8, 0),
-                        FontSize = 20,
-                    }
-                    .Bind(Button.TextProperty, nameof(EmojiCategory.Icon))
-                    .BindCommand(nameof(SelectCategoryCommand), source: this)
-                    .Bind(Button.CommandParameterProperty, ".")),
+                    ItemTemplate = new DataTemplate(() =>
+                        new Button { Padding = new Thickness(8, 0), FontSize = 20 }
+                            .Bind(Button.TextProperty, nameof(EmojiCategory.Icon))
+                            .BindCommand(nameof(SelectCategoryCommand), source: this)
+                            .Bind(Button.CommandParameterProperty, ".")
+                    ),
                 }
-                .Bind(ItemsView.ItemsSourceProperty, nameof(EmojiCategories), source: this)
-                .Row(0),
-
+                    .Bind(ItemsView.ItemsSourceProperty, nameof(EmojiCategories), source: this)
+                    .Row(0),
                 new CollectionView
                 {
                     SelectionMode = SelectionMode.None,
@@ -73,43 +70,47 @@ public sealed partial class EmotePicker : ContentView
                         HorizontalItemSpacing = 2,
                         VerticalItemSpacing = 2,
                     },
-                    ItemTemplate = new DataTemplate(() => new Button
-                    {
-                        FontSize = 22,
-                        Padding = 0,
-                    }
-                    .Bind(Button.TextProperty, ".")
-                    .BindCommand(nameof(PickCommand), source: this)
-                    .Bind(Button.CommandParameterProperty, ".")),
+                    ItemTemplate = new DataTemplate(() =>
+                        new Button { FontSize = 22, Padding = 0 }
+                            .Bind(Button.TextProperty, ".")
+                            .BindCommand(nameof(PickCommand), source: this)
+                            .Bind(Button.CommandParameterProperty, ".")
+                    ),
                 }
-                .Bind(ItemsView.ItemsSourceProperty, nameof(VisibleEmotes), source: this)
-                .Row(1),
-
+                    .Bind(ItemsView.ItemsSourceProperty, nameof(VisibleEmotes), source: this)
+                    .Row(1),
                 new CollectionView
                 {
                     HeightRequest = 92,
                     SelectionMode = SelectionMode.None,
                     ItemsLayout = new GridItemsLayout(8, ItemsLayoutOrientation.Vertical),
-                    ItemTemplate = new DataTemplate(() => new MatrixImage
-                    {
-                        IsJson = false,
-                        Aspect = Aspect.AspectFit,
-                        WidthRequest = 38,
-                        HeightRequest = 38,
-                        GestureRecognizers =
+                    ItemTemplate = new DataTemplate(() =>
+                        new MatrixImage
                         {
-                            new TapGestureRecognizer()
-                                .BindCommand(nameof(PickCommand), source: this)
-                                .Bind(TapGestureRecognizer.CommandParameterProperty,
-                                    nameof(MatrixEmote.Body)),
-                        },
-                    }
-                    .Bind(MatrixImage.MatrixSourceProperty, nameof(MatrixEmote.Source))),
+                            IsJson = false,
+                            Aspect = Aspect.AspectFit,
+                            WidthRequest = 38,
+                            HeightRequest = 38,
+                            GestureRecognizers =
+                            {
+                                new TapGestureRecognizer()
+                                    .BindCommand(nameof(PickCommand), source: this)
+                                    .Bind(
+                                        TapGestureRecognizer.CommandParameterProperty,
+                                        nameof(MatrixEmote.Body)
+                                    ),
+                            },
+                        }.Bind(MatrixImage.MatrixSourceProperty, nameof(MatrixEmote.Source))
+                    ),
                 }
-                .Bind(ItemsView.ItemsSourceProperty, nameof(Emotes), source: this)
-                .Bind(IsVisibleProperty, nameof(Emotes),
-                    converter: new Dev.Naamloos.Fennec.App.Converters.NotNullConverter(), source: this)
-                .Row(2),
+                    .Bind(ItemsView.ItemsSourceProperty, nameof(Emotes), source: this)
+                    .Bind(
+                        IsVisibleProperty,
+                        nameof(Emotes),
+                        converter: new Dev.Naamloos.Fennec.App.Converters.NotNullConverter(),
+                        source: this
+                    )
+                    .Row(2),
             },
         };
     }
@@ -133,5 +134,6 @@ public sealed partial class EmotePicker : ContentView
     public sealed record EmojiCategory(
         string Name,
         string Icon,
-        IReadOnlyList<EmojiCatalog.UnicodeRange> Ranges);
+        IReadOnlyList<EmojiCatalog.UnicodeRange> Ranges
+    );
 }

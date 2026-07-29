@@ -13,11 +13,14 @@ namespace Dev.Naamloos.Fennec.App.Converters
             _start = start;
         }
 
-        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        public object? Convert(
+            object? value,
+            Type targetType,
+            object? parameter,
+            CultureInfo culture
+        )
         {
-            if (value is not string text ||
-                _start < 0 ||
-                _start >= text.Length)
+            if (value is not string text || _start < 0 || _start >= text.Length)
             {
                 return "?";
             }
@@ -26,7 +29,12 @@ namespace Dev.Naamloos.Fennec.App.Converters
             return text.Substring(_start, length);
         }
 
-        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        public object? ConvertBack(
+            object? value,
+            Type targetType,
+            object? parameter,
+            CultureInfo culture
+        )
         {
             return Binding.DoNothing;
         }

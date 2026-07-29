@@ -22,20 +22,38 @@ public sealed class PasswordConfirmationPopup : Popup<string?>
                 Spacing = 12,
                 Children =
                 {
-                    new Label { Text = title, FontSize = 20, FontAttributes = FontAttributes.Bold },
+                    new Label
+                    {
+                        Text = title,
+                        FontSize = 20,
+                        FontAttributes = FontAttributes.Bold,
+                    },
                     new Label { Text = message },
                     _password,
                     new Grid
                     {
-                        ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Star) },
+                        ColumnDefinitions =
+                        {
+                            new ColumnDefinition(GridLength.Star),
+                            new ColumnDefinition(GridLength.Star),
+                        },
                         ColumnSpacing = 8,
                         Children =
                         {
-                            new Button { Text = "Cancel", BackgroundColor = Colors.Transparent, Command = new Command(async () => await CloseAsync(null)) }
-                                .DynamicResource(Button.TextColorProperty, "Primary"),
-                            new Button { Text = accept, Command = new Command(async () => await CloseAsync(_password.Text)) }
+                            new Button
+                            {
+                                Text = "Cancel",
+                                BackgroundColor = Colors.Transparent,
+                                Command = new Command(async () => await CloseAsync(null)),
+                            }.DynamicResource(Button.TextColorProperty, "Primary"),
+                            new Button
+                            {
+                                Text = accept,
+                                Command = new Command(async () => await CloseAsync(_password.Text)),
+                            }
                                 .DynamicResource(VisualElement.BackgroundColorProperty, "Error")
-                                .DynamicResource(Button.TextColorProperty, "OnError").Column(1),
+                                .DynamicResource(Button.TextColorProperty, "OnError")
+                                .Column(1),
                         },
                     },
                 },

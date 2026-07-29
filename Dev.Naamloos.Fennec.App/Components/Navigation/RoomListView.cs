@@ -1,11 +1,11 @@
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.Diagnostics;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.Sdk;
 using Dev.Naamloos.Fennec.Sdk.Entities;
 using Dev.Naamloos.Fennec.Sdk.Helpers;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
-using System.Diagnostics;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.App.Components;
@@ -61,8 +61,8 @@ public sealed partial class RoomListView : ContentView, IDisposable
                     FontSize = 16,
                     LineBreakMode = LineBreakMode.TailTruncation,
                 }
-                .Bind(Label.TextProperty, nameof(SectionTitle), source: this)
-                .Row(0),
+                    .Bind(Label.TextProperty, nameof(SectionTitle), source: this)
+                    .Row(0),
                 _roomsView.Row(1),
             },
         };
@@ -95,10 +95,7 @@ public sealed partial class RoomListView : ContentView, IDisposable
         }
     }
 
-    private static void OnFilterChanged(
-        BindableObject bindable,
-        object oldValue,
-        object newValue)
+    private static void OnFilterChanged(BindableObject bindable, object oldValue, object newValue)
     {
         if (newValue is RoomListEntriesDynamicFilterKind filter)
         {
@@ -109,7 +106,8 @@ public sealed partial class RoomListView : ContentView, IDisposable
     private static void OnExcludeSpaceRoomsChanged(
         BindableObject bindable,
         object oldValue,
-        object newValue) => ((RoomListView)bindable).UpdateSpaceRoomFilter();
+        object newValue
+    ) => ((RoomListView)bindable).UpdateSpaceRoomFilter();
 
     private async void UpdateSpaceRoomFilter()
     {
@@ -148,7 +146,8 @@ public sealed partial class RoomListView : ContentView, IDisposable
         _spaceRoomIds = null;
     }
 
-    private void OnRoomsChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs) => SyncRooms();
+    private void OnRoomsChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs) =>
+        SyncRooms();
 
     private void OnSpaceRoomIdsChanged(object? sender, EventArgs eventArgs) => SyncRooms();
 
@@ -163,70 +162,83 @@ public sealed partial class RoomListView : ContentView, IDisposable
 
         foreach (var room in _rooms)
         {
-            if (!ExcludeSpaceRooms ||
-                _spaceRoomIds is null ||
-                !_spaceRoomIds.RoomIds.Contains(room.Id ?? string.Empty))
+            if (
+                !ExcludeSpaceRooms
+                || _spaceRoomIds is null
+                || !_spaceRoomIds.RoomIds.Contains(room.Id ?? string.Empty)
+            )
             {
                 _visibleRooms.Add(room);
             }
         }
     }
 
-    private static View CreateEmptyView(string message) => new VerticalStackLayout
-    {
-        HorizontalOptions = LayoutOptions.Center,
-        VerticalOptions = LayoutOptions.Center,
-        Children = { new Label { Text = message, FontSize = 16 } },
-    };
-
-    private DataTemplate CreateRoomTemplate() => new(() =>
-    {
-        var row = new Grid
+    private static View CreateEmptyView(string message) =>
+        new VerticalStackLayout
         {
-            Padding = new Thickness(0, 8, 10, 8),
-            ColumnSpacing = 8,
-            ColumnDefinitions =
-            {
-                new ColumnDefinition(6),
-                new ColumnDefinition(GridLength.Auto),
-                new ColumnDefinition(GridLength.Star),
-            },
+            HorizontalOptions = LayoutOptions.Center,
+            VerticalOptions = LayoutOptions.Center,
             Children =
             {
-                new Border
-                {
-                    WidthRequest = 6,
-                    HeightRequest = 6,
-                    StrokeThickness = 0,
-                    StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 3 },
-                    VerticalOptions = LayoutOptions.Center,
-                }
-                .Bind<Border, ManagedRoom?, string?, bool>(
-                    IsVisibleProperty,
-                    new Binding(nameof(SelectedRoom), source: this),
-                    new Binding(nameof(ManagedRoom.Id)),
-                    convert: static values => values.Item1?.Id == values.Item2)
-                .DynamicResource(BackgroundColorProperty, "Primary")
-                .Column(0),
-                new RoomAvatar { Size = 40 }
-                    .Bind(RoomAvatar.AvatarUrlProperty, nameof(ManagedRoom.AvatarUrl))
-                    .Bind(RoomAvatar.DisplayNameProperty, nameof(ManagedRoom.DisplayName))
-                    .Column(1),
-                new Label
-                {
-                    FontSize = 16,
-                    VerticalOptions = LayoutOptions.Center,
-                    HorizontalOptions = LayoutOptions.Fill,
-                    LineBreakMode = LineBreakMode.TailTruncation,
-                }.Bind(Label.TextProperty, nameof(ManagedRoom.DisplayName)).Column(2),
+                new Label { Text = message, FontSize = 16 },
             },
         };
 
-        var tap = new TapGestureRecognizer();
-        tap.Tapped += (_, _) => SelectedRoom = row.BindingContext as ManagedRoom;
-        row.GestureRecognizers.Add(tap);
-        return row;
-    });
+    private DataTemplate CreateRoomTemplate() =>
+        new(() =>
+        {
+            var row = new Grid
+            {
+                Padding = new Thickness(0, 8, 10, 8),
+                ColumnSpacing = 8,
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(6),
+                    new ColumnDefinition(GridLength.Auto),
+                    new ColumnDefinition(GridLength.Star),
+                },
+                Children =
+                {
+                    new Border
+                    {
+                        WidthRequest = 6,
+                        HeightRequest = 6,
+                        StrokeThickness = 0,
+                        StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
+                        {
+                            CornerRadius = 3,
+                        },
+                        VerticalOptions = LayoutOptions.Center,
+                    }
+                        .Bind<Border, ManagedRoom?, string?, bool>(
+                            IsVisibleProperty,
+                            new Binding(nameof(SelectedRoom), source: this),
+                            new Binding(nameof(ManagedRoom.Id)),
+                            convert: static values => values.Item1?.Id == values.Item2
+                        )
+                        .DynamicResource(BackgroundColorProperty, "Primary")
+                        .Column(0),
+                    new RoomAvatar { Size = 40 }
+                        .Bind(RoomAvatar.AvatarUrlProperty, nameof(ManagedRoom.AvatarUrl))
+                        .Bind(RoomAvatar.DisplayNameProperty, nameof(ManagedRoom.DisplayName))
+                        .Column(1),
+                    new Label
+                    {
+                        FontSize = 16,
+                        VerticalOptions = LayoutOptions.Center,
+                        HorizontalOptions = LayoutOptions.Fill,
+                        LineBreakMode = LineBreakMode.TailTruncation,
+                    }
+                        .Bind(Label.TextProperty, nameof(ManagedRoom.DisplayName))
+                        .Column(2),
+                },
+            };
+
+            var tap = new TapGestureRecognizer();
+            tap.Tapped += (_, _) => SelectedRoom = row.BindingContext as ManagedRoom;
+            row.GestureRecognizers.Add(tap);
+            return row;
+        });
 
     private void OnUnloaded(object? sender, EventArgs eventArgs) => Dispose();
 

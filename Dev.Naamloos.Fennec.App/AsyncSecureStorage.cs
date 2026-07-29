@@ -1,7 +1,7 @@
-﻿using Dev.Naamloos.Fennec.Sdk.Interfaces;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Dev.Naamloos.Fennec.Sdk.Interfaces;
 
 namespace Dev.Naamloos.Fennec.App
 {

@@ -21,5 +21,4 @@ namespace Dev.Naamloos.Fennec.App.WinUI
 
         protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
     }
-
 }

@@ -1,6 +1,3 @@
-using Dev.Naamloos.Fennec.Sdk.Helpers;
-using Dev.Naamloos.Fennec.Sdk.Interfaces;
-using Dev.Naamloos.Fennec.Sdk.Entities;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
@@ -10,6 +7,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Dev.Naamloos.Fennec.Sdk.Entities;
+using Dev.Naamloos.Fennec.Sdk.Helpers;
+using Dev.Naamloos.Fennec.Sdk.Interfaces;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.Sdk;
@@ -36,16 +36,16 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
     private readonly SemaphoreSlim _thumbnailLoadGate = new(3, 3);
 
-    private readonly ConcurrentDictionary<string, Lazy<Task<string>>>
-        _videoCache = [];
-    private readonly ConcurrentDictionary<AvatarCacheKey, Lazy<Task<byte[]>>>
-        _avatarCache = [];
-    private readonly ConcurrentQueue<KeyValuePair<AvatarCacheKey, Lazy<Task<byte[]>>>>
-        _avatarCacheOrder = [];
-    private readonly ConcurrentDictionary<ThumbnailCacheKey, Lazy<Task<byte[]>>>
-        _roomImageCache = [];
-    private readonly ConcurrentQueue<KeyValuePair<ThumbnailCacheKey, Lazy<Task<byte[]>>>>
-        _roomImageCacheOrder = [];
+    private readonly ConcurrentDictionary<string, Lazy<Task<string>>> _videoCache = [];
+    private readonly ConcurrentDictionary<AvatarCacheKey, Lazy<Task<byte[]>>> _avatarCache = [];
+    private readonly ConcurrentQueue<
+        KeyValuePair<AvatarCacheKey, Lazy<Task<byte[]>>>
+    > _avatarCacheOrder = [];
+    private readonly ConcurrentDictionary<ThumbnailCacheKey, Lazy<Task<byte[]>>> _roomImageCache =
+    [];
+    private readonly ConcurrentQueue<
+        KeyValuePair<ThumbnailCacheKey, Lazy<Task<byte[]>>>
+    > _roomImageCacheOrder = [];
 
     private HttpClient? _httpClient;
 
@@ -75,7 +75,8 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     public ManagedMatrixClient(
         string platformName,
         string accountPath,
-        IAsyncSecureStorage secureStore)
+        IAsyncSecureStorage secureStore
+    )
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(platformName);
         ArgumentException.ThrowIfNullOrWhiteSpace(accountPath);
@@ -101,9 +102,11 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
             value = $"https://{value}";
         }
 
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
-            uri.Scheme is not ("http" or "https") ||
-            string.IsNullOrWhiteSpace(uri.Host))
+        if (
+            !Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("http" or "https")
+            || string.IsNullOrWhiteSpace(uri.Host)
+        )
         {
             throw new ArgumentException("Enter a valid homeserver.", nameof(homeserver));
         }
@@ -112,21 +115,22 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         try
         {
             using var response = await client.GetAsync(
-                $"https://{uri.Host}/.well-known/matrix/client");
+                $"https://{uri.Host}/.well-known/matrix/client"
+            );
             if (!response.IsSuccessStatusCode)
             {
                 return uri.GetLeftPart(UriPartial.Authority);
             }
 
-            using var document = JsonDocument.Parse(
-                await response.Content.ReadAsStringAsync());
-            var baseUrl = document.RootElement
-                .GetProperty("m.homeserver")
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var baseUrl = document
+                .RootElement.GetProperty("m.homeserver")
                 .GetProperty("base_url")
                 .GetString();
 
-            return Uri.TryCreate(baseUrl, UriKind.Absolute, out var discovered) &&
-                   discovered.Scheme is "http" or "https"
+            return
+                Uri.TryCreate(baseUrl, UriKind.Absolute, out var discovered)
+                && discovered.Scheme is "http" or "https"
                 ? discovered.GetLeftPart(UriPartial.Authority)
                 : uri.GetLeftPart(UriPartial.Authority);
         }
@@ -177,10 +181,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// <see langword="true"/> when login succeeds; otherwise,
     /// <see langword="false"/>.
     /// </returns>
-    public async Task<bool> LoginAsync(
-        string homeserver,
-        string username,
-        string password)
+    public async Task<bool> LoginAsync(string homeserver, string username, string password)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(homeserver);
         ArgumentException.ThrowIfNullOrWhiteSpace(username);
@@ -197,31 +198,24 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         {
             ThrowIfDisposed();
 
-            var (dataPath, cachePath) =
-                EnsureAccountDirectoriesExist();
+            var (dataPath, cachePath) = EnsureAccountDirectoriesExist();
 
-            var storeBuilder = new SqliteStoreBuilder(
-                    dataPath,
-                    cachePath)
-                .Key(await GetOrGenerateStoreKeyAsync());
+            var storeBuilder = new SqliteStoreBuilder(dataPath, cachePath).Key(
+                await GetOrGenerateStoreKeyAsync()
+            );
 
             var client = await new ClientBuilder()
                 .Username(username)
                 .SqliteStore(storeBuilder)
                 .AutoEnableBackups(true)
                 .AutoEnableCrossSigning(true)
-                .SlidingSyncVersionBuilder(
-                    SlidingSyncVersionBuilder.DiscoverNative)
+                .SlidingSyncVersionBuilder(SlidingSyncVersionBuilder.DiscoverNative)
                 .HomeserverUrl(homeserver)
                 .Build();
 
             try
             {
-                await client.Login(
-                    username,
-                    password,
-                    $"Fennec ({_platformName})",
-                    null);
+                await client.Login(username, password, $"Fennec ({_platformName})", null);
             }
             catch
             {
@@ -233,12 +227,9 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
             try
             {
-                var serializedSession =
-                    JsonSerializer.Serialize(client.Session());
+                var serializedSession = JsonSerializer.Serialize(client.Session());
 
-                await _secureStore.SetAsync(
-                    SessionStorageKey,
-                    serializedSession);
+                await _secureStore.SetAsync(SessionStorageKey, serializedSession);
 
                 await StartSyncingAsync();
 
@@ -321,8 +312,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
             await NativeCleanupAsync();
 
-            var serializedSession =
-                await _secureStore.GetAsync(SessionStorageKey);
+            var serializedSession = await _secureStore.GetAsync(SessionStorageKey);
 
             if (string.IsNullOrWhiteSpace(serializedSession))
             {
@@ -333,8 +323,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
             try
             {
-                session = JsonSerializer.Deserialize<Session>(
-                    serializedSession);
+                session = JsonSerializer.Deserialize<Session>(serializedSession);
             }
             catch (JsonException)
             {
@@ -348,20 +337,18 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
                 return false;
             }
 
-            var (dataPath, cachePath) =
-                EnsureAccountDirectoriesExist();
+            var (dataPath, cachePath) = EnsureAccountDirectoriesExist();
 
             var client = await new ClientBuilder()
                 .Username(session.UserId)
                 .SqliteStore(
-                    new SqliteStoreBuilder(
-                            dataPath,
-                            cachePath)
-                        .Key(await GetOrGenerateStoreKeyAsync()))
+                    new SqliteStoreBuilder(dataPath, cachePath).Key(
+                        await GetOrGenerateStoreKeyAsync()
+                    )
+                )
                 .AutoEnableBackups(true)
                 .AutoEnableCrossSigning(true)
-                .SlidingSyncVersionBuilder(
-                    SlidingSyncVersionBuilder.DiscoverNative)
+                .SlidingSyncVersionBuilder(SlidingSyncVersionBuilder.DiscoverNative)
                 .HomeserverUrl(session.HomeserverUrl)
                 .Build();
 
@@ -374,7 +361,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
                 return true;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Debug.WriteLine(ex);
                 await NativeCleanupAsync();
@@ -399,29 +386,29 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// is not offline, terminated, or in an error state; otherwise,
     /// <see langword="false"/>.
     /// </returns>
-    public async Task<bool> IsConnectedAsync(
-        CancellationToken cancellationToken = default)
+    public async Task<bool> IsConnectedAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (_client is null ||
-            !IsLoggedIn ||
-            _syncService is null)
+        if (_client is null || !IsLoggedIn || _syncService is null)
         {
             return false;
         }
 
-        if (_state is not (
-            SyncServiceState.Offline or
-            SyncServiceState.Error or
-            SyncServiceState.Terminated))
+        if (
+            _state
+            is not (
+                SyncServiceState.Offline
+                or SyncServiceState.Error
+                or SyncServiceState.Terminated
+            )
+        )
         {
             return true;
         }
 
-        var validity =
-            await GetSessionValidityAsync(cancellationToken);
+        var validity = await GetSessionValidityAsync(cancellationToken);
 
         if (validity == SessionValidity.Invalid)
         {
@@ -442,8 +429,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// service. If that native object can no longer be reused, the sync service
     /// and state observer are destroyed and rebuilt from the existing client.
     /// </remarks>
-    public async Task ReconnectAsync(
-        CancellationToken cancellationToken = default)
+    public async Task ReconnectAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
 
@@ -457,31 +443,29 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
             if (_client is null || !IsLoggedIn)
             {
                 throw new InvalidOperationException(
-                    "Cannot reconnect because the client is not logged in.");
+                    "Cannot reconnect because the client is not logged in."
+                );
             }
 
-            var validity =
-                await GetSessionValidityAsync(cancellationToken);
+            var validity = await GetSessionValidityAsync(cancellationToken);
 
             if (validity == SessionValidity.Invalid)
             {
                 await InvalidateSessionAsync();
 
                 throw new InvalidOperationException(
-                    "Cannot reconnect because the Matrix session is invalid.");
+                    "Cannot reconnect because the Matrix session is invalid."
+                );
             }
 
-            var restarted =
-                await TryRestartSyncServiceAsync(cancellationToken);
+            var restarted = await TryRestartSyncServiceAsync(cancellationToken);
 
             if (!restarted)
             {
                 await StartSyncingAsync();
             }
 
-            ConnectionRecovered?.Invoke(
-                this,
-                EventArgs.Empty);
+            ConnectionRecovered?.Invoke(this, EventArgs.Empty);
         }
         finally
         {
@@ -493,8 +477,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// Stops synchronization and releases native store resources while the app
     /// is in the background.
     /// </summary>
-    public async Task PauseAsync(
-        CancellationToken cancellationToken = default)
+    public async Task PauseAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
 
@@ -526,8 +509,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// <see langword="true"/> when the client was resumed; otherwise,
     /// <see langword="false"/> when it was not paused.
     /// </returns>
-    public async Task<bool> ResumeAsync(
-        CancellationToken cancellationToken = default)
+    public async Task<bool> ResumeAsync(CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
 
@@ -552,9 +534,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
             _isPaused = false;
             await StartSyncingAsync();
 
-            ConnectionRecovered?.Invoke(
-                this,
-                EventArgs.Empty);
+            ConnectionRecovered?.Invoke(this, EventArgs.Empty);
 
             return true;
         }
@@ -582,9 +562,8 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     {
         ThrowIfDisposed();
 
-        return _syncService ??
-            throw new InvalidOperationException(
-                "Sync service is not initialized.");
+        return _syncService
+            ?? throw new InvalidOperationException("Sync service is not initialized.");
     }
 
     /// <summary>
@@ -592,24 +571,19 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// </summary>
     /// <param name="initialFilter">The initial room-list filter.</param>
     public async Task<ObservableRoomList> GetObservableRoomListAsync(
-        RoomListEntriesDynamicFilterKind initialFilter)
+        RoomListEntriesDynamicFilterKind initialFilter
+    )
     {
-        var roomList = await GetSyncService()
-            .RoomListService()
-            .AllRooms();
+        var roomList = await GetSyncService().RoomListService().AllRooms();
 
-        return new ObservableRoomList(
-            this,
-            roomList,
-            initialFilter);
+        return new ObservableRoomList(this, roomList, initialFilter);
     }
 
     /// <summary>
     /// Creates a live list of all rooms exposed by a space, including rooms
     /// the user has not joined.
     /// </summary>
-    public Task<ObservableSpaceRoomList> GetObservableSpaceRoomListAsync(
-        string spaceId)
+    public Task<ObservableSpaceRoomList> GetObservableSpaceRoomListAsync(string spaceId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(spaceId);
         ThrowIfDisposed();
@@ -623,9 +597,10 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     {
         ThrowIfDisposed();
 
-        return await (_client?.SpaceService()
-            ?? throw new InvalidOperationException(
-                "Matrix client is not initialized."));
+        return await (
+            _client?.SpaceService()
+            ?? throw new InvalidOperationException("Matrix client is not initialized.")
+        );
     }
 
     /// <summary>
@@ -647,9 +622,10 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
         var nativeRoom = room.IsJoined
             ? GetSyncService().RoomListService().Room(room.Id)
-            : await (_client?.JoinRoomByIdOrAlias(room.CanonicalAlias ?? room.Id, room.Via)
-                ?? throw new InvalidOperationException(
-                    "Matrix client is not initialized."));
+            : await (
+                _client?.JoinRoomByIdOrAlias(room.CanonicalAlias ?? room.Id, room.Via)
+                ?? throw new InvalidOperationException("Matrix client is not initialized.")
+            );
 
         return new ManagedRoom(nativeRoom);
     }
@@ -662,31 +638,37 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         var ownUserId = GetRequiredClient().UserId();
         if (string.Equals(userId, ownUserId, StringComparison.Ordinal))
         {
-            throw new ArgumentException("You cannot start a direct message with yourself.", nameof(userId));
+            throw new ArgumentException(
+                "You cannot start a direct message with yourself.",
+                nameof(userId)
+            );
         }
 
-        using var body = JsonContent.Create(new
-        {
-            invite = new[] { userId },
-            is_direct = true,
-            preset = "trusted_private_chat",
-            initial_state = new[]
+        using var body = JsonContent.Create(
+            new
             {
-                new
+                invite = new[] { userId },
+                is_direct = true,
+                preset = "trusted_private_chat",
+                initial_state = new[]
                 {
-                    type = "m.room.encryption",
-                    state_key = string.Empty,
-                    content = new { algorithm = "m.megolm.v1.aes-sha2" },
+                    new
+                    {
+                        type = "m.room.encryption",
+                        state_key = string.Empty,
+                        content = new { algorithm = "m.megolm.v1.aes-sha2" },
+                    },
                 },
-            },
-        });
+            }
+        );
         using var response = await SendHttpRequestAsync(
             HttpMethod.Post,
             "/_matrix/client/v3/createRoom",
-            body);
-        using var document = JsonDocument.Parse(
-            await response.Content.ReadAsStringAsync());
-        var roomId = document.RootElement.GetProperty("room_id").GetString()
+            body
+        );
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var roomId =
+            document.RootElement.GetProperty("room_id").GetString()
             ?? throw new InvalidOperationException("The homeserver did not return a room ID.");
 
         await AddDirectRoomAsync(userId, roomId);
@@ -702,12 +684,10 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     }
 
     /// <summary>Accepts a pending invitation.</summary>
-    public async Task AcceptInviteAsync(string roomId) =>
-        await GetRoomAsync(roomId).Join();
+    public async Task AcceptInviteAsync(string roomId) => await GetRoomAsync(roomId).Join();
 
     /// <summary>Declines a pending invitation without joining.</summary>
-    public async Task DeclineInviteAsync(string roomId) =>
-        await GetRoomAsync(roomId).Leave();
+    public async Task DeclineInviteAsync(string roomId) => await GetRoomAsync(roomId).Leave();
 
     /// <summary>Leaves a room and optionally removes it from the local list.</summary>
     public async Task LeaveRoomAsync(string roomId, bool forget = false)
@@ -743,17 +723,15 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
     public async Task SetRoomHistoryVisibilityAsync(
         string roomId,
-        RoomHistoryVisibility visibility) =>
-        await GetRoomAsync(roomId).UpdateHistoryVisibility(visibility);
+        RoomHistoryVisibility visibility
+    ) => await GetRoomAsync(roomId).UpdateHistoryVisibility(visibility);
 
     public async Task SetRoomMutedAsync(string roomId, bool muted)
     {
         var settings = await GetRequiredClient().GetNotificationSettings();
         if (muted)
         {
-            await settings.SetRoomNotificationMode(
-                roomId,
-                RoomNotificationMode.Mute);
+            await settings.SetRoomNotificationMode(roomId, RoomNotificationMode.Mute);
         }
         else
         {
@@ -761,31 +739,32 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         }
     }
 
-    public Task IgnoreUserAsync(string userId) =>
-        GetRequiredClient().IgnoreUser(userId);
+    public Task IgnoreUserAsync(string userId) => GetRequiredClient().IgnoreUser(userId);
 
-    public Task UnignoreUserAsync(string userId) =>
-        GetRequiredClient().UnignoreUser(userId);
+    public Task UnignoreUserAsync(string userId) => GetRequiredClient().UnignoreUser(userId);
 
-    public Task<string[]> GetIgnoredUsersAsync() =>
-        GetRequiredClient().IgnoredUsers();
+    public Task<string[]> GetIgnoredUsersAsync() => GetRequiredClient().IgnoredUsers();
 
     public async Task<IReadOnlyList<MatrixSearchResult>> SearchMessagesAsync(
         string query,
         SearchRoomFilter filter = SearchRoomFilter.Rooms,
-        uint limit = 50)
+        uint limit = 50
+    )
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
         var iterator = await GetRequiredClient().SearchMessages(query, filter, limit);
         using (iterator)
         {
             var results = await iterator.NextEvents() ?? [];
-            return results.Select(result => new MatrixSearchResult(
-                result.RoomId,
-                result.Result.EventId,
-                result.Result.Sender,
-                SearchResultBody(result.Result.Content),
-                result.Result.Timestamp.ToString())).ToArray();
+            return results
+                .Select(result => new MatrixSearchResult(
+                    result.RoomId,
+                    result.Result.EventId,
+                    result.Result.Sender,
+                    SearchResultBody(result.Result.Content),
+                    result.Result.Timestamp.ToString()
+                ))
+                .ToArray();
         }
     }
 
@@ -796,7 +775,8 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         return await encryption.EnableRecovery(
             waitForBackupsToUpload: true,
             passphrase,
-            new RecoveryProgressListener());
+            new RecoveryProgressListener()
+        );
     }
 
     public async Task RecoverEncryptionAsync(string recoveryKey)
@@ -821,7 +801,8 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// </param>
     public async Task<ObservableTimeline> GetObservableTimelineAsync(
         Room room,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         ArgumentNullException.ThrowIfNull(room);
 
@@ -836,7 +817,8 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         return await ObservableTimeline.CreateAsync(
             this,
             timeline,
-            cancellationToken: cancellationToken);
+            cancellationToken: cancellationToken
+        );
     }
 
     public async Task<SessionVerificationService> GetSessionVerificationServiceAsync()
@@ -847,11 +829,9 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// <summary>
     /// Gets a Matrix session-verification controller.
     /// </summary>
-    internal Task<SessionVerificationController>
-        GetSessionVerificationControllerAsync()
+    internal Task<SessionVerificationController> GetSessionVerificationControllerAsync()
     {
-        return GetRequiredClient()
-            .GetSessionVerificationController();
+        return GetRequiredClient().GetSessionVerificationController();
     }
 
     /// <summary>
@@ -859,18 +839,12 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// </summary>
     /// <param name="mimeType">The media MIME type.</param>
     /// <param name="data">The media data.</param>
-    public Task<string> UploadMediaAsync(
-        string mimeType,
-        byte[] data)
+    public Task<string> UploadMediaAsync(string mimeType, byte[] data)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(mimeType);
         ArgumentNullException.ThrowIfNull(data);
 
-        return GetRequiredClient()
-            .UploadMedia(
-                mimeType,
-                data,
-                null);
+        return GetRequiredClient().UploadMedia(mimeType, data, null);
     }
 
     /// <summary>
@@ -880,8 +854,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     {
         var client = GetRequiredClient();
 
-        return client.GetProfile(
-            client.UserId());
+        return client.GetProfile(client.UserId());
     }
 
     public Task<MatrixProfile> GetOwnMatrixProfileAsync() =>
@@ -891,14 +864,23 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
         var shared = new List<MatrixSharedRoom>();
-        foreach (var room in GetRequiredClient().Rooms().Where(room =>
-                     room.Membership() == Membership.Joined && !room.IsSpace()))
+        foreach (
+            var room in GetRequiredClient()
+                .Rooms()
+                .Where(room => room.Membership() == Membership.Joined && !room.IsSpace())
+        )
         {
             try
             {
                 if ((await room.Member(userId)).Membership is MembershipState.Join)
                 {
-                    shared.Add(new MatrixSharedRoom(room.Id(), room.DisplayName() ?? room.Id(), room.AvatarUrl()));
+                    shared.Add(
+                        new MatrixSharedRoom(
+                            room.Id(),
+                            room.DisplayName() ?? room.Id(),
+                            room.AvatarUrl()
+                        )
+                    );
                 }
             }
             catch
@@ -914,7 +896,9 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
         var displayName = userId;
-        string? avatarUrl = null, bio = null, timeZone = null;
+        string? avatarUrl = null,
+            bio = null,
+            timeZone = null;
         IReadOnlyList<string> pronouns = [];
 
         try
@@ -927,49 +911,84 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
         try
         {
-            using var response = await SendHttpRequestAsync(HttpMethod.Get,
-                $"/_matrix/client/v3/profile/{Uri.EscapeDataString(userId)}");
+            using var response = await SendHttpRequestAsync(
+                HttpMethod.Get,
+                $"/_matrix/client/v3/profile/{Uri.EscapeDataString(userId)}"
+            );
             using var profile = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
             var root = profile.RootElement;
-            if (root.TryGetProperty("displayname", out var value) && !string.IsNullOrWhiteSpace(value.GetString()))
+            if (
+                root.TryGetProperty("displayname", out var value)
+                && !string.IsNullOrWhiteSpace(value.GetString())
+            )
                 displayName = value.GetString()!;
-            if (root.TryGetProperty("avatar_url", out value) && !string.IsNullOrWhiteSpace(value.GetString()))
+            if (
+                root.TryGetProperty("avatar_url", out value)
+                && !string.IsNullOrWhiteSpace(value.GetString())
+            )
                 avatarUrl = value.GetString();
             bio = root.TryGetProperty("m.bio", out value) ? value.GetString() : null;
-            timeZone = root.TryGetProperty("m.tz", out value) || root.TryGetProperty("us.cloke.msc4175.tz", out value)
-                ? value.GetString() : null;
-            if (!(root.TryGetProperty("m.pronouns", out var pronounValue) ||
-                  root.TryGetProperty("io.fsky.nyx.pronouns", out pronounValue)) ||
-                pronounValue.ValueKind != JsonValueKind.Array)
+            timeZone =
+                root.TryGetProperty("m.tz", out value)
+                || root.TryGetProperty("us.cloke.msc4175.tz", out value)
+                    ? value.GetString()
+                    : null;
+            if (
+                !(
+                    root.TryGetProperty("m.pronouns", out var pronounValue)
+                    || root.TryGetProperty("io.fsky.nyx.pronouns", out pronounValue)
+                )
+                || pronounValue.ValueKind != JsonValueKind.Array
+            )
             {
                 pronounValue = default;
             }
-            pronouns = pronounValue.ValueKind == JsonValueKind.Array
-                ? pronounValue.EnumerateArray().Where(pronoun => pronoun.TryGetProperty("summary", out _))
-                    .Select(pronoun => pronoun.GetProperty("summary").GetString()).OfType<string>().ToArray()
-                : [];
+            pronouns =
+                pronounValue.ValueKind == JsonValueKind.Array
+                    ? pronounValue
+                        .EnumerateArray()
+                        .Where(pronoun => pronoun.TryGetProperty("summary", out _))
+                        .Select(pronoun => pronoun.GetProperty("summary").GetString())
+                        .OfType<string>()
+                        .ToArray()
+                    : [];
         }
         catch { }
 
-        string? presence = null, status = null;
+        string? presence = null,
+            status = null;
         try
         {
-            using var presenceResponse = await SendHttpRequestAsync(HttpMethod.Get,
-                $"/_matrix/client/v3/presence/{Uri.EscapeDataString(userId)}/status");
-            using var presenceDocument = JsonDocument.Parse(await presenceResponse.Content.ReadAsStringAsync());
-            presence = presenceDocument.RootElement.TryGetProperty("presence", out var presenceValue) ? presenceValue.GetString() : null;
-            status = presenceDocument.RootElement.TryGetProperty("status_msg", out presenceValue) ? presenceValue.GetString() : null;
+            using var presenceResponse = await SendHttpRequestAsync(
+                HttpMethod.Get,
+                $"/_matrix/client/v3/presence/{Uri.EscapeDataString(userId)}/status"
+            );
+            using var presenceDocument = JsonDocument.Parse(
+                await presenceResponse.Content.ReadAsStringAsync()
+            );
+            presence = presenceDocument.RootElement.TryGetProperty(
+                "presence",
+                out var presenceValue
+            )
+                ? presenceValue.GetString()
+                : null;
+            status = presenceDocument.RootElement.TryGetProperty("status_msg", out presenceValue)
+                ? presenceValue.GetString()
+                : null;
         }
         catch { }
 
-        return new MatrixProfile(userId,
+        return new MatrixProfile(
+            userId,
             displayName,
             avatarUrl,
             bio,
-            status, presence,
+            status,
+            presence,
             timeZone,
             pronouns,
-            userId[(userId.IndexOf(':') + 1)..]);
+            userId[(userId.IndexOf(':') + 1)..]
+        );
     }
 
     public async Task SetOwnMatrixProfileAsync(MatrixProfile profile)
@@ -978,17 +997,28 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         await SetOwnDisplayNameAsync(profile.DisplayName);
         await SetProfileFieldAsync("m.bio", profile.Bio);
         await SetProfileFieldAsync("m.tz", profile.TimeZone);
-        await SetProfileFieldAsync("m.pronouns", profile.Pronouns.Select(summary => new { language = "en", summary }).ToArray());
-        using var body = JsonContent.Create(new { presence = profile.Presence ?? "online", status_msg = profile.Status });
-        using var response = await SendHttpRequestAsync(HttpMethod.Put,
-            $"/_matrix/client/v3/presence/{Uri.EscapeDataString(GetRequiredClient().UserId())}/status", body);
+        await SetProfileFieldAsync(
+            "m.pronouns",
+            profile.Pronouns.Select(summary => new { language = "en", summary }).ToArray()
+        );
+        using var body = JsonContent.Create(
+            new { presence = profile.Presence ?? "online", status_msg = profile.Status }
+        );
+        using var response = await SendHttpRequestAsync(
+            HttpMethod.Put,
+            $"/_matrix/client/v3/presence/{Uri.EscapeDataString(GetRequiredClient().UserId())}/status",
+            body
+        );
     }
 
     private async Task SetProfileFieldAsync(string field, object? value)
     {
         using var body = JsonContent.Create(new Dictionary<string, object?> { [field] = value });
-        using var response = await SendHttpRequestAsync(HttpMethod.Put,
-            $"/_matrix/client/v3/profile/{Uri.EscapeDataString(GetRequiredClient().UserId())}/{Uri.EscapeDataString(field)}", body);
+        using var response = await SendHttpRequestAsync(
+            HttpMethod.Put,
+            $"/_matrix/client/v3/profile/{Uri.EscapeDataString(GetRequiredClient().UserId())}/{Uri.EscapeDataString(field)}",
+            body
+        );
     }
 
     /// <summary>Updates the authenticated user's display name.</summary>
@@ -1006,13 +1036,19 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
         var client = GetRequiredClient();
         string? previous = null;
-        try { previous = (await client.GetProfile(client.UserId())).AvatarUrl; }
+        try
+        {
+            previous = (await client.GetProfile(client.UserId())).AvatarUrl;
+        }
         catch { }
 
         await client.UploadAvatar(mimeType, data);
 
         string? current = null;
-        try { current = (await client.GetProfile(client.UserId())).AvatarUrl; }
+        try
+        {
+            current = (await client.GetProfile(client.UserId())).AvatarUrl;
+        }
         catch { }
         RefreshAvatar(previous, current);
     }
@@ -1022,21 +1058,25 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     {
         using var response = await SendHttpRequestAsync(
             HttpMethod.Get,
-            "/_matrix/client/v3/devices");
+            "/_matrix/client/v3/devices"
+        );
         var content = await response.Content.ReadAsStringAsync();
         var devices = JsonSerializer.Deserialize<DeviceListResponse>(content) ?? new([]);
         var session = GetRequiredClient().Session();
         var verifiedDeviceIds = await GetVerifiedDeviceIdsAsync(session.UserId);
 
-        return devices.Devices.Select(device => new MatrixSession(
-            device.DeviceId,
-            device.DisplayName ?? device.DeviceId,
-            device.LastSeenTimestamp is { } timestamp
-                ? DateTimeOffset.FromUnixTimeMilliseconds(timestamp)
-                : null,
-            device.LastSeenIp,
-            device.DeviceId == session.DeviceId,
-            verifiedDeviceIds.Contains(device.DeviceId))).ToArray();
+        return devices
+            .Devices.Select(device => new MatrixSession(
+                device.DeviceId,
+                device.DisplayName ?? device.DeviceId,
+                device.LastSeenTimestamp is { } timestamp
+                    ? DateTimeOffset.FromUnixTimeMilliseconds(timestamp)
+                    : null,
+                device.LastSeenIp,
+                device.DeviceId == session.DeviceId,
+                verifiedDeviceIds.Contains(device.DeviceId)
+            ))
+            .ToArray();
     }
 
     /// <summary>Renames a Matrix session.</summary>
@@ -1049,7 +1089,8 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         using var response = await SendHttpRequestAsync(
             HttpMethod.Put,
             $"/_matrix/client/v3/devices/{Uri.EscapeDataString(deviceId)}",
-            body);
+            body
+        );
     }
 
     /// <summary>Removes a Matrix session after password-based UI authentication.</summary>
@@ -1059,20 +1100,23 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
 
         var session = GetRequiredClient().Session();
-        using var body = JsonContent.Create(new
-        {
-            auth = new
+        using var body = JsonContent.Create(
+            new
             {
-                type = "m.login.password",
-                identifier = new { type = "m.id.user", user = session.UserId },
-                password,
-            },
-        });
+                auth = new
+                {
+                    type = "m.login.password",
+                    identifier = new { type = "m.id.user", user = session.UserId },
+                    password,
+                },
+            }
+        );
 
         using var response = await SendHttpRequestAsync(
             HttpMethod.Delete,
             $"/_matrix/client/v3/devices/{Uri.EscapeDataString(deviceId)}",
-            body);
+            body
+        );
     }
 
     /// <summary>Reads a global account-data event.</summary>
@@ -1099,11 +1143,13 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     public async Task<string?> GetGlobalWallpaperAsync()
     {
         var content = await GetAccountDataAsync(GlobalWallpaperEventType);
-        if (string.IsNullOrWhiteSpace(content)) return null;
+        if (string.IsNullOrWhiteSpace(content))
+            return null;
 
         using var document = JsonDocument.Parse(content);
-        return document.RootElement.TryGetProperty("url", out var url) &&
-               !string.IsNullOrWhiteSpace(url.GetString())
+        return
+            document.RootElement.TryGetProperty("url", out var url)
+            && !string.IsNullOrWhiteSpace(url.GetString())
             ? url.GetString()
             : null;
     }
@@ -1111,7 +1157,10 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     public async Task SetGlobalWallpaperAsync(string mxcUrl)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(mxcUrl);
-        await SetAccountDataAsync(GlobalWallpaperEventType, JsonSerializer.Serialize(new { url = mxcUrl }));
+        await SetAccountDataAsync(
+            GlobalWallpaperEventType,
+            JsonSerializer.Serialize(new { url = mxcUrl })
+        );
         GlobalWallpaperChanged?.Invoke(mxcUrl);
     }
 
@@ -1123,21 +1172,33 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
     public async Task<string?> GetRoomWallpaperAsync(string roomId)
     {
-        using var response = await SendHttpRequestAsync(HttpMethod.Get,
-            RoomTagsPath(roomId));
+        using var response = await SendHttpRequestAsync(HttpMethod.Get, RoomTagsPath(roomId));
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        if (!document.RootElement.TryGetProperty("tags", out var tags)) return null;
-        if (tags.TryGetProperty(WallpaperTag, out var wallpaperTag) &&
-            wallpaperTag.TryGetProperty("url", out var url) &&
-            !string.IsNullOrWhiteSpace(url.GetString()))
+        if (!document.RootElement.TryGetProperty("tags", out var tags))
+            return null;
+        if (
+            tags.TryGetProperty(WallpaperTag, out var wallpaperTag)
+            && wallpaperTag.TryGetProperty("url", out var url)
+            && !string.IsNullOrWhiteSpace(url.GetString())
+        )
         {
             return url.GetString();
         }
 
-        var tag = tags.EnumerateObject().FirstOrDefault(tag => tag.Name.StartsWith(LegacyWallpaperTagPrefix, StringComparison.Ordinal));
-        if (tag.Name is null) return null;
-        var encoded = tag.Name[LegacyWallpaperTagPrefix.Length..].Replace('-', '+').Replace('_', '/');
-        return Encoding.UTF8.GetString(Convert.FromBase64String(encoded.PadRight(encoded.Length + (4 - encoded.Length % 4) % 4, '=')));
+        var tag = tags.EnumerateObject()
+            .FirstOrDefault(tag =>
+                tag.Name.StartsWith(LegacyWallpaperTagPrefix, StringComparison.Ordinal)
+            );
+        if (tag.Name is null)
+            return null;
+        var encoded = tag.Name[LegacyWallpaperTagPrefix.Length..]
+            .Replace('-', '+')
+            .Replace('_', '/');
+        return Encoding.UTF8.GetString(
+            Convert.FromBase64String(
+                encoded.PadRight(encoded.Length + (4 - encoded.Length % 4) % 4, '=')
+            )
+        );
     }
 
     public async Task SetRoomWallpaperAsync(string roomId, string mxcUrl)
@@ -1147,13 +1208,18 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
         await ClearRoomWallpaperAsync(roomId);
         var tagsPath = RoomTagsPath(roomId);
-        var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(mxcUrl))
-            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        var encoded = Convert
+            .ToBase64String(Encoding.UTF8.GetBytes(mxcUrl))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
         var tag = LegacyWallpaperTagPrefix + encoded;
         using var body = JsonContent.Create(new { });
-        using var response = await SendHttpRequestAsync(HttpMethod.Put,
-            $"{tagsPath}/{Uri.EscapeDataString(tag)}", body);
-
+        using var response = await SendHttpRequestAsync(
+            HttpMethod.Put,
+            $"{tagsPath}/{Uri.EscapeDataString(tag)}",
+            body
+        );
     }
 
     public async Task ClearRoomWallpaperAsync(string roomId)
@@ -1161,22 +1227,32 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(roomId);
         var tagsPath = RoomTagsPath(roomId);
         using (var existingResponse = await SendHttpRequestAsync(HttpMethod.Get, tagsPath))
-        using (var document = JsonDocument.Parse(await existingResponse.Content.ReadAsStringAsync()))
+        using (
+            var document = JsonDocument.Parse(await existingResponse.Content.ReadAsStringAsync())
+        )
         {
             if (document.RootElement.TryGetProperty("tags", out var tags))
             {
-                foreach (var existing in tags.EnumerateObject()
-                             .Where(tag => tag.Name == WallpaperTag || tag.Name.StartsWith(LegacyWallpaperTagPrefix, StringComparison.Ordinal))
-                             .Select(tag => tag.Name)
-                             .ToArray())
+                foreach (
+                    var existing in tags.EnumerateObject()
+                        .Where(tag =>
+                            tag.Name == WallpaperTag
+                            || tag.Name.StartsWith(
+                                LegacyWallpaperTagPrefix,
+                                StringComparison.Ordinal
+                            )
+                        )
+                        .Select(tag => tag.Name)
+                        .ToArray()
+                )
                 {
                     using var deleteResponse = await SendHttpRequestAsync(
                         HttpMethod.Delete,
-                        $"{tagsPath}/{Uri.EscapeDataString(existing)}");
+                        $"{tagsPath}/{Uri.EscapeDataString(existing)}"
+                    );
                 }
             }
         }
-
     }
 
     private string RoomTagsPath(string roomId) =>
@@ -1186,22 +1262,29 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     public async Task<IReadOnlyList<MatrixEmote>> GetUserEmotesAsync()
     {
         var content = await GetAccountDataAsync("im.ponies.user_emotes");
-        if (string.IsNullOrWhiteSpace(content)) return [];
+        if (string.IsNullOrWhiteSpace(content))
+            return [];
 
         using var document = JsonDocument.Parse(content);
         var images = document.RootElement.TryGetProperty("images", out var pack)
-            ? pack : document.RootElement;
-        if (images.ValueKind != JsonValueKind.Object) return [];
+            ? pack
+            : document.RootElement;
+        if (images.ValueKind != JsonValueKind.Object)
+            return [];
 
-        return images.EnumerateObject()
-            .Where(image => image.Value.TryGetProperty("url", out var url) &&
-                !string.IsNullOrWhiteSpace(url.GetString()))
+        return images
+            .EnumerateObject()
+            .Where(image =>
+                image.Value.TryGetProperty("url", out var url)
+                && !string.IsNullOrWhiteSpace(url.GetString())
+            )
             .Select(image => new MatrixEmote(
                 image.Name,
                 image.Value.TryGetProperty("body", out var body)
                     ? body.GetString() ?? image.Name
                     : image.Name,
-                image.Value.GetProperty("url").GetString()!))
+                image.Value.GetProperty("url").GetString()!
+            ))
             .ToArray();
     }
 
@@ -1209,49 +1292,64 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     public Task SetUserEmotesAsync(IEnumerable<MatrixEmote> emotes) =>
         SetAccountDataAsync(
             "im.ponies.user_emotes",
-            JsonSerializer.Serialize(new
-            {
-                images = emotes.ToDictionary(
-                    emote => emote.Name,
-                    emote => new { url = emote.Source, body = emote.Body, usage = new[] { "emoticon", "sticker" } }),
-            }));
+            JsonSerializer.Serialize(
+                new
+                {
+                    images = emotes.ToDictionary(
+                        emote => emote.Name,
+                        emote => new
+                        {
+                            url = emote.Source,
+                            body = emote.Body,
+                            usage = new[] { "emoticon", "sticker" },
+                        }
+                    ),
+                }
+            )
+        );
 
     /// <summary>Returns the global account-data events currently visible to this client.</summary>
     public async Task<IReadOnlyList<GlobalAccountData>> GetGlobalAccountDataAsync()
     {
-        var filter = JsonSerializer.Serialize(new
-        {
-            presence = new { limit = 0 },
-            room = new
+        var filter = JsonSerializer.Serialize(
+            new
             {
-                timeline = new { limit = 0 },
-                state = new { lazy_load_members = true },
-                ephemeral = new { limit = 0 },
-                account_data = new { limit = 0 },
-            },
-            account_data = new { limit = 1000 },
-        });
+                presence = new { limit = 0 },
+                room = new
+                {
+                    timeline = new { limit = 0 },
+                    state = new { lazy_load_members = true },
+                    ephemeral = new { limit = 0 },
+                    account_data = new { limit = 0 },
+                },
+                account_data = new { limit = 1000 },
+            }
+        );
 
         using var response = await SendHttpRequestAsync(
             HttpMethod.Get,
-            $"/_matrix/client/v3/sync?timeout=0&filter={Uri.EscapeDataString(filter)}");
-        using var document = JsonDocument.Parse(
-            await response.Content.ReadAsStringAsync());
+            $"/_matrix/client/v3/sync?timeout=0&filter={Uri.EscapeDataString(filter)}"
+        );
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var result = new List<GlobalAccountData>();
-        if (!document.RootElement.TryGetProperty("account_data", out var accountData) ||
-            !accountData.TryGetProperty("events", out var events))
+        if (
+            !document.RootElement.TryGetProperty("account_data", out var accountData)
+            || !accountData.TryGetProperty("events", out var events)
+        )
         {
             return result;
         }
 
         foreach (var @event in events.EnumerateArray())
         {
-            if (@event.TryGetProperty("type", out var type) &&
-                @event.TryGetProperty("content", out var content))
+            if (
+                @event.TryGetProperty("type", out var type)
+                && @event.TryGetProperty("content", out var content)
+            )
             {
-                result.Add(new GlobalAccountData(
-                    type.GetString() ?? string.Empty,
-                    content.GetRawText()));
+                result.Add(
+                    new GlobalAccountData(type.GetString() ?? string.Empty, content.GetRawText())
+                );
             }
         }
 
@@ -1265,22 +1363,23 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     {
         try
         {
-            using var body = JsonContent.Create(new
-            {
-                device_keys = new Dictionary<string, string[]> { [userId] = [] },
-            });
+            using var body = JsonContent.Create(
+                new { device_keys = new Dictionary<string, string[]> { [userId] = [] } }
+            );
             using var response = await SendHttpRequestAsync(
                 HttpMethod.Post,
                 "/_matrix/client/v3/keys/query",
-                body);
-            using var document = JsonDocument.Parse(
-                await response.Content.ReadAsStringAsync());
+                body
+            );
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
 
-            if (!document.RootElement.TryGetProperty("self_signing_keys", out var selfSigningKeys) ||
-                !selfSigningKeys.TryGetProperty(userId, out var selfSigningKey) ||
-                !selfSigningKey.TryGetProperty("keys", out var keys) ||
-                !document.RootElement.TryGetProperty("device_keys", out var deviceKeys) ||
-                !deviceKeys.TryGetProperty(userId, out var userDevices))
+            if (
+                !document.RootElement.TryGetProperty("self_signing_keys", out var selfSigningKeys)
+                || !selfSigningKeys.TryGetProperty(userId, out var selfSigningKey)
+                || !selfSigningKey.TryGetProperty("keys", out var keys)
+                || !document.RootElement.TryGetProperty("device_keys", out var deviceKeys)
+                || !deviceKeys.TryGetProperty(userId, out var userDevices)
+            )
             {
                 return [];
             }
@@ -1291,10 +1390,13 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
             var verified = new HashSet<string>(StringComparer.Ordinal);
             foreach (var device in userDevices.EnumerateObject())
             {
-                if (device.Value.TryGetProperty("signatures", out var signatures) &&
-                    signatures.TryGetProperty(userId, out var userSignatures) &&
-                    userSignatures.EnumerateObject().Any(signature =>
-                        signingKeyIds.Contains(signature.Name)))
+                if (
+                    device.Value.TryGetProperty("signatures", out var signatures)
+                    && signatures.TryGetProperty(userId, out var userSignatures)
+                    && userSignatures
+                        .EnumerateObject()
+                        .Any(signature => signingKeyIds.Contains(signature.Name))
+                )
                 {
                     verified.Add(device.Name);
                 }
@@ -1323,18 +1425,15 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         ulong width,
         ulong height,
         bool isJson = true,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
 
         await _thumbnailLoadGate.WaitAsync(cancellationToken);
         try
         {
-            return await DownloadThumbnailAsync(
-                source,
-                width,
-                height,
-                isJson);
+            return await DownloadThumbnailAsync(source, width, height, isJson);
         }
         finally
         {
@@ -1351,14 +1450,16 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         ulong width,
         ulong height,
         bool isJson = false,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
 
         var key = new AvatarCacheKey(source, width, height, isJson);
         var created = new Lazy<Task<byte[]>>(
             () => GetThumbnailAsync(source, width, height, isJson),
-            LazyThreadSafetyMode.ExecutionAndPublication);
+            LazyThreadSafetyMode.ExecutionAndPublication
+        );
         var cached = _avatarCache.GetOrAdd(key, created);
 
         if (ReferenceEquals(cached, created))
@@ -1395,14 +1496,16 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         ulong width,
         ulong height,
         bool isJson = true,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
 
         var key = new ThumbnailCacheKey(source, width, height, isJson);
         var created = new Lazy<Task<byte[]>>(
             () => GetThumbnailAsync(source, width, height, isJson),
-            LazyThreadSafetyMode.ExecutionAndPublication);
+            LazyThreadSafetyMode.ExecutionAndPublication
+        );
         var cached = _roomImageCache.GetOrAdd(key, created);
 
         if (ReferenceEquals(cached, created))
@@ -1448,9 +1551,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     public Task<byte[]> GetMediaContentAsync(string sourceJson) =>
         GetMediaContentAsync(sourceJson, isJson: true);
 
-    public async Task<byte[]> GetMediaContentAsync(
-        string sourceValue,
-        bool isJson)
+    public async Task<byte[]> GetMediaContentAsync(string sourceValue, bool isJson)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceValue);
 
@@ -1458,8 +1559,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
             ? MediaSource.FromJson(sourceValue)
             : MediaSource.FromUrl(sourceValue);
 
-        return await GetRequiredClient()
-            .GetMediaContent(source);
+        return await GetRequiredClient().GetMediaContent(source);
     }
 
     /// <summary>
@@ -1470,42 +1570,33 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// </param>
     /// <param name="filename">The original video filename.</param>
     /// <param name="mimeType">The video MIME type.</param>
-    public Task<string> GetVideoFileAsync(
-        string sourceJson,
-        string filename,
-        string mimeType)
+    public Task<string> GetVideoFileAsync(string sourceJson, string filename, string mimeType)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceJson);
         ArgumentException.ThrowIfNullOrWhiteSpace(filename);
         ArgumentException.ThrowIfNullOrWhiteSpace(mimeType);
 
-        var cacheKey =
-            $"{mimeType}:{filename}:{sourceJson}";
+        var cacheKey = $"{mimeType}:{filename}:{sourceJson}";
 
         return GetCachedValueAsync(
             _videoCache,
             cacheKey,
-            () => DownloadVideoAsync(
-                sourceJson,
-                filename,
-                mimeType));
+            () => DownloadVideoAsync(sourceJson, filename, mimeType)
+        );
     }
 
     private Client GetRequiredClient()
     {
         ThrowIfDisposed();
 
-        return _client ??
-            throw new InvalidOperationException(
-                "The client is not logged in.");
+        return _client ?? throw new InvalidOperationException("The client is not logged in.");
     }
 
     private Room GetRoomAsync(string roomId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(roomId);
 
-        return GetRequiredClient().Rooms()
-            .FirstOrDefault(room => room.Id() == roomId)
+        return GetRequiredClient().Rooms().FirstOrDefault(room => room.Id() == roomId)
             ?? GetSyncService().RoomListService().Room(roomId);
     }
 
@@ -1514,7 +1605,8 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         // Let Sliding Sync materialize a just-created room before resolving it.
         for (var attempt = 0; attempt < 10; attempt++)
         {
-            var room = GetRequiredClient().Rooms()
+            var room = GetRequiredClient()
+                .Rooms()
                 .FirstOrDefault(candidate => candidate.Id() == roomId);
             if (room is not null)
             {
@@ -1529,8 +1621,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
     private async Task AddDirectRoomAsync(string userId, string roomId)
     {
-        var directRooms = new Dictionary<string, HashSet<string>>(
-            StringComparer.Ordinal);
+        var directRooms = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         var existing = await GetAccountDataAsync("m.direct");
 
         if (!string.IsNullOrWhiteSpace(existing))
@@ -1540,12 +1631,14 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
                 using var document = JsonDocument.Parse(existing);
                 foreach (var entry in document.RootElement.EnumerateObject())
                 {
-                    directRooms[entry.Name] = entry.Value.ValueKind == JsonValueKind.Array
-                        ? entry.Value.EnumerateArray()
-                            .Select(value => value.GetString())
-                            .OfType<string>()
-                            .ToHashSet(StringComparer.Ordinal)
-                        : [];
+                    directRooms[entry.Name] =
+                        entry.Value.ValueKind == JsonValueKind.Array
+                            ? entry
+                                .Value.EnumerateArray()
+                                .Select(value => value.GetString())
+                                .OfType<string>()
+                                .ToHashSet(StringComparer.Ordinal)
+                            : [];
                 }
             }
             catch (JsonException)
@@ -1564,25 +1657,26 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         await SetAccountDataAsync("m.direct", JsonSerializer.Serialize(directRooms));
     }
 
-    private static (string RoomIdOrAlias, string[] Via) ParseRoomReference(
-        string roomReference)
+    private static (string RoomIdOrAlias, string[] Via) ParseRoomReference(string roomReference)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(roomReference);
         var value = roomReference.Trim();
         var via = Array.Empty<string>();
 
-        if (Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
-            (uri.Host.Equals("matrix.to", StringComparison.OrdinalIgnoreCase) ||
-             uri.Scheme.Equals("matrix", StringComparison.OrdinalIgnoreCase)))
+        if (
+            Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            && (
+                uri.Host.Equals("matrix.to", StringComparison.OrdinalIgnoreCase)
+                || uri.Scheme.Equals("matrix", StringComparison.OrdinalIgnoreCase)
+            )
+        )
         {
             var fragment = Uri.UnescapeDataString(uri.Fragment.TrimStart('#'));
             var target = string.IsNullOrWhiteSpace(fragment)
                 ? Uri.UnescapeDataString(uri.AbsolutePath.Trim('/'))
                 : fragment.TrimStart('/');
             var queryIndex = target.IndexOf('?');
-            var query = queryIndex >= 0
-                ? target[(queryIndex + 1)..]
-                : uri.Query.TrimStart('?');
+            var query = queryIndex >= 0 ? target[(queryIndex + 1)..] : uri.Query.TrimStart('?');
             value = queryIndex >= 0 ? target[..queryIndex] : target;
 
             via = query
@@ -1598,22 +1692,24 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         {
             throw new ArgumentException(
                 "Enter a Matrix room ID, room alias, matrix.to link, or matrix URI.",
-                nameof(roomReference));
+                nameof(roomReference)
+            );
         }
 
         return (value, via);
     }
 
-    private static string SearchResultBody(TimelineItemContent content) => content switch
-    {
-        TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Message message } =>
-            message.Content.Body,
-        TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Sticker sticker } =>
-            sticker.Body,
-        TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Poll poll } =>
-            poll.Question,
-        _ => content.GetType().Name,
-    };
+    private static string SearchResultBody(TimelineItemContent content) =>
+        content switch
+        {
+            TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Message message } => message
+                .Content
+                .Body,
+            TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Sticker sticker } =>
+                sticker.Body,
+            TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Poll poll } => poll.Question,
+            _ => content.GetType().Name,
+        };
 
     private sealed class RecoveryProgressListener : EnableRecoveryProgressListener
     {
@@ -1629,11 +1725,9 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
         await StopAndDisposeSyncServiceAsync();
 
-        var syncService =
-            await client.SyncService().Finish();
+        var syncService = await client.SyncService().Finish();
 
-        var stateObserver =
-            new SyncStateObserver(OnSyncStateChanged);
+        var stateObserver = new SyncStateObserver(OnSyncStateChanged);
 
         TaskHandle? stateHandle = null;
 
@@ -1641,8 +1735,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         {
             // Register the observer before starting so that no initial state
             // transitions are missed.
-            stateHandle =
-                syncService.State(stateObserver);
+            stateHandle = syncService.State(stateObserver);
 
             _state = SyncServiceState.Offline;
             _syncService = syncService;
@@ -1677,8 +1770,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         }
     }
 
-    private async Task<bool> TryRestartSyncServiceAsync(
-        CancellationToken cancellationToken)
+    private async Task<bool> TryRestartSyncServiceAsync(CancellationToken cancellationToken)
     {
         var syncService = _syncService;
 
@@ -1707,8 +1799,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
             return true;
         }
-        catch (OperationCanceledException)
-            when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
@@ -1722,42 +1813,35 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         }
     }
 
-    private void OnSyncStateChanged(
-        SyncServiceState state)
+    private void OnSyncStateChanged(SyncServiceState state)
     {
         _state = state;
 
-        if (state is
-            SyncServiceState.Error or
-            SyncServiceState.Terminated)
+        if (state is SyncServiceState.Error or SyncServiceState.Terminated)
         {
             _ = CheckSessionAfterSyncFailureAsync();
         }
     }
 
     private async Task CheckSessionAfterSyncFailureAsync(
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
-        if (Interlocked.Exchange(
-                ref _isCheckingSession,
-                1) != 0)
+        if (Interlocked.Exchange(ref _isCheckingSession, 1) != 0)
         {
             return;
         }
 
         try
         {
-            var validity =
-                await GetSessionValidityAsync(
-                    cancellationToken);
+            var validity = await GetSessionValidityAsync(cancellationToken);
 
             if (validity == SessionValidity.Invalid)
             {
                 await InvalidateSessionAsync();
             }
         }
-        catch (OperationCanceledException)
-            when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
@@ -1768,9 +1852,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         }
         finally
         {
-            Interlocked.Exchange(
-                ref _isCheckingSession,
-                0);
+            Interlocked.Exchange(ref _isCheckingSession, 0);
         }
     }
 
@@ -1778,13 +1860,12 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     {
         await LogoutAsync();
 
-        SessionInvalidated?.Invoke(
-            this,
-            EventArgs.Empty);
+        SessionInvalidated?.Invoke(this, EventArgs.Empty);
     }
 
     private async Task<SessionValidity> GetSessionValidityAsync(
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         if (_client is null || !IsLoggedIn)
         {
@@ -1795,36 +1876,29 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
-            BuildMatrixUrl(
-                session.HomeserverUrl,
-                "/_matrix/client/v3/account/whoami"));
+            BuildMatrixUrl(session.HomeserverUrl, "/_matrix/client/v3/account/whoami")
+        );
 
-        request.Headers.Authorization =
-            new AuthenticationHeaderValue(
-                "Bearer",
-                session.AccessToken);
+        request.Headers.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            session.AccessToken
+        );
 
         try
         {
-            using var response =
-                await GetHttpClient().SendAsync(
-                    request,
-                    HttpCompletionOption.ResponseHeadersRead,
-                    cancellationToken);
+            using var response = await GetHttpClient()
+                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
                 return SessionValidity.Valid;
             }
 
-            return response.StatusCode is
-                HttpStatusCode.Unauthorized or
-                HttpStatusCode.Forbidden
-                    ? SessionValidity.Invalid
-                    : SessionValidity.Unknown;
+            return response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
+                ? SessionValidity.Invalid
+                : SessionValidity.Unknown;
         }
-        catch (OperationCanceledException)
-            when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
@@ -1838,70 +1912,51 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         string sourceValue,
         ulong width,
         ulong height,
-        bool isJson)
+        bool isJson
+    )
     {
         using var source = isJson
             ? MediaSource.FromJson(sourceValue)
             : MediaSource.FromUrl(sourceValue);
 
-        return await GetRequiredClient()
-            .GetMediaThumbnail(
-                source,
-                width,
-                height);
+        return await GetRequiredClient().GetMediaThumbnail(source, width, height);
     }
 
     private async Task<string> DownloadVideoAsync(
         string sourceJson,
         string filename,
-        string mimeType)
+        string mimeType
+    )
     {
-        var directory = Path.Combine(
-            _accountPath,
-            "cache",
-            "media");
+        var directory = Path.Combine(_accountPath, "cache", "media");
 
         Directory.CreateDirectory(directory);
 
-        var extension =
-            GetVideoExtension(mimeType);
+        var extension = GetVideoExtension(mimeType);
 
-        var hash = Convert.ToHexString(
-            SHA256.HashData(
-                Encoding.UTF8.GetBytes(sourceJson)));
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sourceJson)));
 
-        var path =
-            Path.Combine(
-                directory,
-                hash + extension);
+        var path = Path.Combine(directory, hash + extension);
 
         if (File.Exists(path))
         {
             return path;
         }
 
-        using var source =
-            MediaSource.FromJson(sourceJson);
+        using var source = MediaSource.FromJson(sourceJson);
 
-        using var handle =
-            await GetRequiredClient().GetMediaFile(
-                source,
-                filename,
-                mimeType,
-                true,
-                directory);
+        using var handle = await GetRequiredClient()
+            .GetMediaFile(source, filename, mimeType, true, directory);
 
         if (!handle.Persist(path))
         {
-            throw new IOException(
-                "Could not persist the downloaded video.");
+            throw new IOException("Could not persist the downloaded video.");
         }
 
         return path;
     }
 
-    private static string GetVideoExtension(
-        string mimeType)
+    private static string GetVideoExtension(string mimeType)
     {
         return mimeType.ToLowerInvariant() switch
         {
@@ -1915,30 +1970,28 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     private async Task<HttpResponseMessage> SendHttpRequestAsync(
         HttpMethod method,
         string path,
-        HttpContent? content = null)
+        HttpContent? content = null
+    )
     {
         ArgumentNullException.ThrowIfNull(method);
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
-        var session =
-            GetRequiredClient().Session();
+        var session = GetRequiredClient().Session();
 
         using var request = new HttpRequestMessage(
             method,
-            BuildMatrixUrl(
-                session.HomeserverUrl,
-                path))
+            BuildMatrixUrl(session.HomeserverUrl, path)
+        )
         {
             Content = content,
         };
 
-        request.Headers.Authorization =
-            new AuthenticationHeaderValue(
-                "Bearer",
-                session.AccessToken);
+        request.Headers.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            session.AccessToken
+        );
 
-        var response =
-            await GetHttpClient().SendAsync(request);
+        var response = await GetHttpClient().SendAsync(request);
 
         if (response.IsSuccessStatusCode)
         {
@@ -1947,14 +2000,11 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
         try
         {
-            var status =
-                (int)response.StatusCode;
+            var status = (int)response.StatusCode;
 
-            var detail =
-                await response.Content.ReadAsStringAsync();
+            var detail = await response.Content.ReadAsStringAsync();
 
-            throw new InvalidOperationException(
-                $"Matrix request failed ({status}): {detail}");
+            throw new InvalidOperationException($"Matrix request failed ({status}): {detail}");
         }
         finally
         {
@@ -1963,27 +2013,22 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     }
 
     private sealed record DeviceListResponse(
-        [property: JsonPropertyName("devices")]
-        DeviceResponse[] Devices);
+        [property: JsonPropertyName("devices")] DeviceResponse[] Devices
+    );
 
     private sealed record DeviceResponse(
-        [property: JsonPropertyName("device_id")]
-        string DeviceId,
-        [property: JsonPropertyName("display_name")]
-        string? DisplayName,
-        [property: JsonPropertyName("last_seen_ip")]
-        string? LastSeenIp,
-        [property: JsonPropertyName("last_seen_ts")]
-        long? LastSeenTimestamp);
+        [property: JsonPropertyName("device_id")] string DeviceId,
+        [property: JsonPropertyName("display_name")] string? DisplayName,
+        [property: JsonPropertyName("last_seen_ip")] string? LastSeenIp,
+        [property: JsonPropertyName("last_seen_ts")] long? LastSeenTimestamp
+    );
 
     private HttpClient GetHttpClient()
     {
         return _httpClient ??= new HttpClient();
     }
 
-    private static string BuildMatrixUrl(
-        string homeserver,
-        string path)
+    private static string BuildMatrixUrl(string homeserver, string path)
     {
         return $"{homeserver.TrimEnd('/')}/{path.TrimStart('/')}";
     }
@@ -1994,27 +2039,15 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         await NativeCleanupAsync();
     }
 
-    private (
-        string DataPath,
-        string CachePath)
-        EnsureAccountDirectoriesExist(
-            bool reset = false)
+    private (string DataPath, string CachePath) EnsureAccountDirectoriesExist(bool reset = false)
     {
-        var dataPath =
-            Path.Combine(
-                _accountPath,
-                "data");
+        var dataPath = Path.Combine(_accountPath, "data");
 
-        var cachePath =
-            Path.Combine(
-                _accountPath,
-                "cache");
+        var cachePath = Path.Combine(_accountPath, "cache");
 
         if (reset && Directory.Exists(_accountPath))
         {
-            Directory.Delete(
-                _accountPath,
-                recursive: true);
+            Directory.Delete(_accountPath, recursive: true);
         }
 
         Directory.CreateDirectory(_accountPath);
@@ -2026,9 +2059,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
     private async Task<byte[]> GetOrGenerateStoreKeyAsync()
     {
-        var storedKey =
-            await _secureStore.GetAsync(
-                StoreKeyStorageKey);
+        var storedKey = await _secureStore.GetAsync(StoreKeyStorageKey);
 
         if (!string.IsNullOrWhiteSpace(storedKey))
         {
@@ -2036,33 +2067,29 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
             try
             {
-                key =
-                    Convert.FromBase64String(storedKey);
+                key = Convert.FromBase64String(storedKey);
             }
             catch (FormatException exception)
             {
                 throw new InvalidOperationException(
                     "The Matrix store key in secure storage is invalid.",
-                    exception);
+                    exception
+                );
             }
 
             if (key.Length != StoreKeyLength)
             {
                 throw new InvalidOperationException(
-                    $"The Matrix store key must be " +
-                    $"{StoreKeyLength} bytes.");
+                    $"The Matrix store key must be " + $"{StoreKeyLength} bytes."
+                );
             }
 
             return key;
         }
 
-        var newKey =
-            RandomNumberGenerator.GetBytes(
-                StoreKeyLength);
+        var newKey = RandomNumberGenerator.GetBytes(StoreKeyLength);
 
-        await _secureStore.SetAsync(
-            StoreKeyStorageKey,
-            Convert.ToBase64String(newKey));
+        await _secureStore.SetAsync(StoreKeyStorageKey, Convert.ToBase64String(newKey));
 
         return newKey;
     }
@@ -2159,54 +2186,45 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
     private async Task ResetAccountDirectoryAsync()
     {
-        for (var attempt = 0;
-             attempt <= DirectoryDeleteRetryCount;
-             attempt++)
+        for (var attempt = 0; attempt <= DirectoryDeleteRetryCount; attempt++)
         {
             try
             {
                 if (Directory.Exists(_accountPath))
                 {
-                    Directory.Delete(
-                        _accountPath,
-                        recursive: true);
+                    Directory.Delete(_accountPath, recursive: true);
                 }
 
                 EnsureAccountDirectoriesExist();
 
                 return;
             }
-            catch (IOException)
-                when (attempt < DirectoryDeleteRetryCount)
+            catch (IOException) when (attempt < DirectoryDeleteRetryCount)
             {
                 await DelayDirectoryRetryAsync(attempt);
             }
-            catch (UnauthorizedAccessException)
-                when (attempt < DirectoryDeleteRetryCount)
+            catch (UnauthorizedAccessException) when (attempt < DirectoryDeleteRetryCount)
             {
                 await DelayDirectoryRetryAsync(attempt);
             }
         }
     }
 
-    private static Task DelayDirectoryRetryAsync(
-        int attempt)
+    private static Task DelayDirectoryRetryAsync(int attempt)
     {
-        return Task.Delay(
-            TimeSpan.FromMilliseconds(
-                100 * (attempt + 1)));
+        return Task.Delay(TimeSpan.FromMilliseconds(100 * (attempt + 1)));
     }
 
     private static async Task<T> GetCachedValueAsync<T>(
         ConcurrentDictionary<string, Lazy<Task<T>>> cache,
         string key,
-        Func<Task<T>> factory)
+        Func<Task<T>> factory
+    )
     {
         var lazy = cache.GetOrAdd(
             key,
-            _ => new Lazy<Task<T>>(
-                factory,
-                LazyThreadSafetyMode.ExecutionAndPublication));
+            _ => new Lazy<Task<T>>(factory, LazyThreadSafetyMode.ExecutionAndPublication)
+        );
 
         try
         {
@@ -2214,10 +2232,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         }
         catch
         {
-            cache.TryRemove(
-                new KeyValuePair<string, Lazy<Task<T>>>(
-                    key,
-                    lazy));
+            cache.TryRemove(new KeyValuePair<string, Lazy<Task<T>>>(key, lazy));
 
             throw;
         }
@@ -2225,8 +2240,9 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
     private void TrimAvatarCache()
     {
-        while (_avatarCache.Count > AvatarCacheLimit &&
-               _avatarCacheOrder.TryDequeue(out var oldest))
+        while (
+            _avatarCache.Count > AvatarCacheLimit && _avatarCacheOrder.TryDequeue(out var oldest)
+        )
         {
             _avatarCache.TryRemove(oldest);
         }
@@ -2234,8 +2250,10 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
     private void TrimRoomImageCache()
     {
-        while (_roomImageCache.Count > RoomImageCacheLimit &&
-               _roomImageCacheOrder.TryDequeue(out var oldest))
+        while (
+            _roomImageCache.Count > RoomImageCacheLimit
+            && _roomImageCacheOrder.TryDequeue(out var oldest)
+        )
         {
             _roomImageCache.TryRemove(oldest);
         }
@@ -2245,16 +2263,17 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         string Source,
         ulong Width,
         ulong Height,
-        bool IsJson);
+        bool IsJson
+    );
 
     private readonly record struct ThumbnailCacheKey(
         string Source,
         ulong Width,
         ulong Height,
-        bool IsJson);
+        bool IsJson
+    );
 
-    private static void DestroyClient(
-        Client client)
+    private static void DestroyClient(Client client)
     {
         try
         {
@@ -2266,8 +2285,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         }
     }
 
-    private static void DestroySyncService(
-        SyncService syncService)
+    private static void DestroySyncService(SyncService syncService)
     {
         try
         {
@@ -2281,9 +2299,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
     private void ThrowIfDisposed()
     {
-        ObjectDisposedException.ThrowIf(
-            _isDisposed,
-            this);
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
     }
 
     /// <summary>
@@ -2334,12 +2350,10 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         Unknown,
     }
 
-    private sealed class SyncStateObserver(
-        Action<SyncServiceState> onUpdate)
+    private sealed class SyncStateObserver(Action<SyncServiceState> onUpdate)
         : uniffi.matrix_sdk_ffi.SyncServiceStateObserver
     {
-        public void OnUpdate(
-            SyncServiceState state)
+        public void OnUpdate(SyncServiceState state)
         {
             onUpdate(state);
         }

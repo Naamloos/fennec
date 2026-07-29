@@ -1,9 +1,9 @@
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.Windows.Input;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.Sdk.Entities;
-using System.Collections.Specialized;
-using System.Collections.ObjectModel;
-using System.Windows.Input;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.App.Components;
@@ -69,7 +69,14 @@ public sealed partial class ComposerAutocomplete : ContentView
                 Subscribe(ref _roomsSource, Rooms as INotifyCollectionChanged);
             }
 
-            if (args.PropertyName is nameof(Members) or nameof(Emotes) or nameof(Rooms) or nameof(Query) or nameof(Mode))
+            if (
+                args.PropertyName
+                is nameof(Members)
+                    or nameof(Emotes)
+                    or nameof(Rooms)
+                    or nameof(Query)
+                    or nameof(Mode)
+            )
             {
                 Refresh();
             }
@@ -99,9 +106,11 @@ public sealed partial class ComposerAutocomplete : ContentView
 
     private void OnSourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs args)
     {
-        if ((ReferenceEquals(sender, _membersSource) && Mode == ComposerAutocompleteMode.Mentions) ||
-            (ReferenceEquals(sender, _emotesSource) && Mode == ComposerAutocompleteMode.Emotes) ||
-            (ReferenceEquals(sender, _roomsSource) && Mode == ComposerAutocompleteMode.Rooms))
+        if (
+            (ReferenceEquals(sender, _membersSource) && Mode == ComposerAutocompleteMode.Mentions)
+            || (ReferenceEquals(sender, _emotesSource) && Mode == ComposerAutocompleteMode.Emotes)
+            || (ReferenceEquals(sender, _roomsSource) && Mode == ComposerAutocompleteMode.Rooms)
+        )
         {
             Refresh();
         }
@@ -116,31 +125,59 @@ public sealed partial class ComposerAutocomplete : ContentView
 
         if (Mode == ComposerAutocompleteMode.Mentions)
         {
-            foreach (var member in Members?.Where(member =>
-                         member.UserId.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                         (member.DisplayName?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false))
-                     .Take(8) ?? [])
+            foreach (
+                var member in Members
+                    ?.Where(member =>
+                        member.UserId.Contains(query, StringComparison.OrdinalIgnoreCase)
+                        || (
+                            member.DisplayName?.Contains(query, StringComparison.OrdinalIgnoreCase)
+                            ?? false
+                        )
+                    )
+                    .Take(8)
+                    ?? []
+            )
             {
                 VisibleMembers.Add(member);
             }
         }
         else if (Mode == ComposerAutocompleteMode.Emotes)
         {
-            foreach (var emote in Emotes?.Where(emote =>
-                         emote.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                         emote.Body.Contains(query, StringComparison.OrdinalIgnoreCase))
-                     .Take(8) ?? [])
+            foreach (
+                var emote in Emotes
+                    ?.Where(emote =>
+                        emote.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
+                        || emote.Body.Contains(query, StringComparison.OrdinalIgnoreCase)
+                    )
+                    .Take(8)
+                    ?? []
+            )
             {
                 VisibleEmotes.Add(emote);
             }
         }
         else if (Mode == ComposerAutocompleteMode.Rooms)
         {
-            foreach (var room in Rooms?.Where(room =>
-                         !room.IsSpace &&
-                         ((room.DisplayName?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                          (room.Id?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)))
-                     .Take(8) ?? [])
+            foreach (
+                var room in Rooms
+                    ?.Where(room =>
+                        !room.IsSpace
+                        && (
+                            (
+                                room.DisplayName?.Contains(
+                                    query,
+                                    StringComparison.OrdinalIgnoreCase
+                                ) ?? false
+                            )
+                            || (
+                                room.Id?.Contains(query, StringComparison.OrdinalIgnoreCase)
+                                ?? false
+                            )
+                        )
+                    )
+                    .Take(8)
+                    ?? []
+            )
             {
                 VisibleRooms.Add(room);
             }
@@ -179,75 +216,102 @@ public sealed partial class ComposerAutocomplete : ContentView
         }.DynamicResource(BackgroundColorProperty, "SurfaceContainer");
     }
 
-    private DataTemplate CreateMemberTemplate() => new(() => CreateRow(
-        new MatrixAvatar { Size = 34 }
-            .Bind(MatrixAvatar.MatrixSourceProperty, nameof(RoomMember.AvatarUrl))
-            .Bind(MatrixAvatar.DisplayNameProperty, nameof(RoomMember.DisplayName)),
-        new VerticalStackLayout
-        {
-            Spacing = 0,
-            Children =
-            {
-                new Label { FontAttributes = FontAttributes.Bold }
-                    .Bind(Label.TextProperty, nameof(RoomMember.DisplayName)),
-                new Label { FontSize = 11, Opacity = .68 }
-                    .Bind(Label.TextProperty, nameof(RoomMember.UserId)),
-            },
-        },
-        nameof(PickMemberCommand)));
+    private DataTemplate CreateMemberTemplate() =>
+        new(() =>
+            CreateRow(
+                new MatrixAvatar { Size = 34 }
+                    .Bind(MatrixAvatar.MatrixSourceProperty, nameof(RoomMember.AvatarUrl))
+                    .Bind(MatrixAvatar.DisplayNameProperty, nameof(RoomMember.DisplayName)),
+                new VerticalStackLayout
+                {
+                    Spacing = 0,
+                    Children =
+                    {
+                        new Label { FontAttributes = FontAttributes.Bold }.Bind(
+                            Label.TextProperty,
+                            nameof(RoomMember.DisplayName)
+                        ),
+                        new Label { FontSize = 11, Opacity = .68 }.Bind(
+                            Label.TextProperty,
+                            nameof(RoomMember.UserId)
+                        ),
+                    },
+                },
+                nameof(PickMemberCommand)
+            )
+        );
 
-    private DataTemplate CreateEmoteTemplate() => new(() => CreateRow(
-        new MatrixImage { IsJson = false, WidthRequest = 34, HeightRequest = 34, Aspect = Aspect.AspectFit }
-            .Bind(MatrixImage.MatrixSourceProperty, nameof(MatrixEmote.Source)),
-        new VerticalStackLayout
-        {
-            Spacing = 0,
-            Children =
-            {
-                new Label { FontAttributes = FontAttributes.Bold }
-                    .Bind(Label.TextProperty, nameof(MatrixEmote.Name), stringFormat: ":{0}:"),
-                new Label { FontSize = 11, Opacity = .68 }
-                    .Bind(Label.TextProperty, nameof(MatrixEmote.Body)),
-            },
-        },
-        nameof(PickEmoteCommand)));
+    private DataTemplate CreateEmoteTemplate() =>
+        new(() =>
+            CreateRow(
+                new MatrixImage
+                {
+                    IsJson = false,
+                    WidthRequest = 34,
+                    HeightRequest = 34,
+                    Aspect = Aspect.AspectFit,
+                }.Bind(MatrixImage.MatrixSourceProperty, nameof(MatrixEmote.Source)),
+                new VerticalStackLayout
+                {
+                    Spacing = 0,
+                    Children =
+                    {
+                        new Label { FontAttributes = FontAttributes.Bold }.Bind(
+                            Label.TextProperty,
+                            nameof(MatrixEmote.Name),
+                            stringFormat: ":{0}:"
+                        ),
+                        new Label { FontSize = 11, Opacity = .68 }.Bind(
+                            Label.TextProperty,
+                            nameof(MatrixEmote.Body)
+                        ),
+                    },
+                },
+                nameof(PickEmoteCommand)
+            )
+        );
 
-    private DataTemplate CreateRoomTemplate() => new(() => CreateRow(
-        new MatrixAvatar { Size = 34 }
-            .Bind(MatrixAvatar.MatrixSourceProperty, nameof(ManagedRoom.AvatarUrl))
-            .Bind(MatrixAvatar.DisplayNameProperty, nameof(ManagedRoom.DisplayName)),
-        new VerticalStackLayout
-        {
-            Spacing = 0,
-            Children =
-            {
-                new Label { FontAttributes = FontAttributes.Bold }
-                    .Bind(Label.TextProperty, nameof(ManagedRoom.DisplayName)),
-                new Label { FontSize = 11, Opacity = .68 }
-                    .Bind(Label.TextProperty, nameof(ManagedRoom.Id)),
-            },
-        },
-        nameof(PickRoomCommand)));
+    private DataTemplate CreateRoomTemplate() =>
+        new(() =>
+            CreateRow(
+                new MatrixAvatar { Size = 34 }
+                    .Bind(MatrixAvatar.MatrixSourceProperty, nameof(ManagedRoom.AvatarUrl))
+                    .Bind(MatrixAvatar.DisplayNameProperty, nameof(ManagedRoom.DisplayName)),
+                new VerticalStackLayout
+                {
+                    Spacing = 0,
+                    Children =
+                    {
+                        new Label { FontAttributes = FontAttributes.Bold }.Bind(
+                            Label.TextProperty,
+                            nameof(ManagedRoom.DisplayName)
+                        ),
+                        new Label { FontSize = 11, Opacity = .68 }.Bind(
+                            Label.TextProperty,
+                            nameof(ManagedRoom.Id)
+                        ),
+                    },
+                },
+                nameof(PickRoomCommand)
+            )
+        );
 
-    private View CreateRow(View icon, View text, string commandName) => new Grid
-    {
-        Padding = new Thickness(8, 6),
-        ColumnSpacing = 10,
-        ColumnDefinitions =
+    private View CreateRow(View icon, View text, string commandName) =>
+        new Grid
         {
-            new ColumnDefinition(GridLength.Auto),
-            new ColumnDefinition(GridLength.Star),
-        },
-        Children =
-        {
-            icon.Column(0),
-            text.Column(1),
-        },
-        GestureRecognizers =
-        {
-            new TapGestureRecognizer()
-                .BindCommand(commandName, source: this)
-                .Bind(TapGestureRecognizer.CommandParameterProperty, "."),
-        },
-    };
+            Padding = new Thickness(8, 6),
+            ColumnSpacing = 10,
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(GridLength.Auto),
+                new ColumnDefinition(GridLength.Star),
+            },
+            Children = { icon.Column(0), text.Column(1) },
+            GestureRecognizers =
+            {
+                new TapGestureRecognizer()
+                    .BindCommand(commandName, source: this)
+                    .Bind(TapGestureRecognizer.CommandParameterProperty, "."),
+            },
+        };
 }

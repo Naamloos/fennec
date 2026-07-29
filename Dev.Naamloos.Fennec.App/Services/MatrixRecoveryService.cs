@@ -1,8 +1,8 @@
-using Dev.Naamloos.Fennec.Sdk;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using Dev.Naamloos.Fennec.Sdk;
 
 namespace Dev.Naamloos.Fennec.App.Services
 {
@@ -26,8 +26,7 @@ namespace Dev.Naamloos.Fennec.App.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine(
-                    $"Unable to pause Matrix client: {ex}");
+                Debug.WriteLine($"Unable to pause Matrix client: {ex}");
             }
             finally
             {
@@ -51,10 +50,9 @@ namespace Dev.Naamloos.Fennec.App.Services
                     await _client.ReconnectAsync(cancellationToken);
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                Debug.WriteLine(
-                    $"Unable to reconnect Matrix client: {ex}");
+                Debug.WriteLine($"Unable to reconnect Matrix client: {ex}");
             }
             finally
             {

@@ -17,7 +17,6 @@ public sealed partial class SyntaxHighlighter : ContentView
             FontFamily = "Consolas",
             FontSize = 12,
             BackgroundColor = Colors.Transparent,
-        }
-        .Bind(Editor.TextProperty, nameof(Text), source: this);
+        }.Bind(Editor.TextProperty, nameof(Text), source: this);
     }
 }

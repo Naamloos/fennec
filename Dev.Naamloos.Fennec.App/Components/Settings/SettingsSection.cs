@@ -8,12 +8,14 @@ public sealed class SettingsSection : VerticalStackLayout
     {
         Spacing = 8;
         Margin = new Thickness(0, 0, 0, 20);
-        Children.Add(new Label
-        {
-            Text = title,
-            FontSize = 14,
-            FontAttributes = FontAttributes.Bold,
-        }.DynamicResource(Label.TextColorProperty, "Primary"));
+        Children.Add(
+            new Label
+            {
+                Text = title,
+                FontSize = 14,
+                FontAttributes = FontAttributes.Bold,
+            }.DynamicResource(Label.TextColorProperty, "Primary")
+        );
 
         foreach (var child in children)
         {

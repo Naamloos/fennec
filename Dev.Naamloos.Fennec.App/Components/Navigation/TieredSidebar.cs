@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.Sdk;
@@ -5,7 +6,6 @@ using Dev.Naamloos.Fennec.Sdk.Entities;
 using Dev.Naamloos.Fennec.Sdk.Helpers;
 using MauiIcons.Core;
 using MauiIcons.Material;
-using System.Diagnostics;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.App.Components;
@@ -18,24 +18,31 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
     private readonly SpaceRoomListView _spaceRoomListView;
     private readonly SidebarSection[] _sections =
     [
-        new("Favorites", MaterialIcons.Star, new RoomListEntriesDynamicFilterKind.All(
-        [
-            new RoomListEntriesDynamicFilterKind.Favourite(),
-            new RoomListEntriesDynamicFilterKind.NonSpace(),
-        ])),
-        new("DMs", MaterialIcons.Person, new RoomListEntriesDynamicFilterKind.All(
-        [
-            new RoomListEntriesDynamicFilterKind.NonSpace(),
-            new RoomListEntriesDynamicFilterKind.Category(
-                RoomListFilterCategory.People),
-        ])),
+        new(
+            "Favorites",
+            MaterialIcons.Star,
+            new RoomListEntriesDynamicFilterKind.All([
+                new RoomListEntriesDynamicFilterKind.Favourite(),
+                new RoomListEntriesDynamicFilterKind.NonSpace(),
+            ])
+        ),
+        new(
+            "DMs",
+            MaterialIcons.Person,
+            new RoomListEntriesDynamicFilterKind.All([
+                new RoomListEntriesDynamicFilterKind.NonSpace(),
+                new RoomListEntriesDynamicFilterKind.Category(RoomListFilterCategory.People),
+            ])
+        ),
         new("Invites", MaterialIcons.Mail, new RoomListEntriesDynamicFilterKind.Invite()),
-        new("Rooms", MaterialIcons.Tag, new RoomListEntriesDynamicFilterKind.All(
-        [
-            new RoomListEntriesDynamicFilterKind.NonSpace(),
-            new RoomListEntriesDynamicFilterKind.Category(
-                RoomListFilterCategory.Group),
-        ])),
+        new(
+            "Rooms",
+            MaterialIcons.Tag,
+            new RoomListEntriesDynamicFilterKind.All([
+                new RoomListEntriesDynamicFilterKind.NonSpace(),
+                new RoomListEntriesDynamicFilterKind.Category(RoomListFilterCategory.Group),
+            ])
+        ),
     ];
 
     private ObservableRoomList? _spaces;
@@ -61,18 +68,18 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
             Filter = _sections[3].Filter,
             ExcludeSpaceRooms = true,
             SectionTitle = _sections[3].Title,
-        }
-        .Bind(
+        }.Bind(
             RoomListView.SelectedRoomProperty,
             nameof(SelectedRoom),
             BindingMode.TwoWay,
-            source: this);
-        _spaceRoomListView = new SpaceRoomListView { IsVisible = false }
-            .Bind(
-                SpaceRoomListView.SelectedRoomProperty,
-                nameof(SelectedRoom),
-                BindingMode.TwoWay,
-                source: this);
+            source: this
+        );
+        _spaceRoomListView = new SpaceRoomListView { IsVisible = false }.Bind(
+            SpaceRoomListView.SelectedRoomProperty,
+            nameof(SelectedRoom),
+            BindingMode.TwoWay,
+            source: this
+        );
 
         Build();
         Loaded += OnLoaded;
@@ -89,11 +96,11 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
         try
         {
             _spaces = await MatrixClient.GetObservableRoomListAsync(
-                new RoomListEntriesDynamicFilterKind.All(
-                [
+                new RoomListEntriesDynamicFilterKind.All([
                     new RoomListEntriesDynamicFilterKind.Space(),
                     new RoomListEntriesDynamicFilterKind.Joined(),
-                ]));
+                ])
+            );
             _spaces.CaptureCurrentContext();
             _spacesView.ItemsSource = _spaces;
             ShowSection(_sections[3]);
@@ -104,112 +111,113 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
         }
     }
 
-    private CollectionView CreateSectionsView() => new()
-    {
-        ItemsSource = _sections,
-        SelectionMode = SelectionMode.None,
-        ItemSizingStrategy = ItemSizingStrategy.MeasureFirstItem,
-        ItemTemplate = new DataTemplate(() =>
+    private CollectionView CreateSectionsView() =>
+        new()
         {
-            var icon = new MauiIcon
+            ItemsSource = _sections,
+            SelectionMode = SelectionMode.None,
+            ItemSizingStrategy = ItemSizingStrategy.MeasureFirstItem,
+            ItemTemplate = new DataTemplate(() =>
             {
-                IconSize = 20,
-                HorizontalOptions = LayoutOptions.Center,
-            };
-            var row = new Grid
-            {
-                Padding = new Thickness(0, 8, 4, 8),
-                ColumnDefinitions =
+                var icon = new MauiIcon { IconSize = 20, HorizontalOptions = LayoutOptions.Center };
+                var row = new Grid
                 {
-                    new ColumnDefinition(4),
-                    new ColumnDefinition(GridLength.Star),
-                },
-                Children =
-                {
-                    new Border
+                    Padding = new Thickness(0, 8, 4, 8),
+                    ColumnDefinitions =
                     {
-                        WidthRequest = 3,
-                        HeightRequest = 24,
-                        StrokeThickness = 0,
-                        StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 2 },
-                        VerticalOptions = LayoutOptions.Center,
-                    }
-                    .Bind(IsVisibleProperty, nameof(SidebarSection.IsSelected))
-                    .DynamicResource(BackgroundColorProperty, "Primary")
-                    .Column(0),
-                    icon.Column(1),
-                },
-            };
+                        new ColumnDefinition(4),
+                        new ColumnDefinition(GridLength.Star),
+                    },
+                    Children =
+                    {
+                        new Border
+                        {
+                            WidthRequest = 3,
+                            HeightRequest = 24,
+                            StrokeThickness = 0,
+                            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
+                            {
+                                CornerRadius = 2,
+                            },
+                            VerticalOptions = LayoutOptions.Center,
+                        }
+                            .Bind(IsVisibleProperty, nameof(SidebarSection.IsSelected))
+                            .DynamicResource(BackgroundColorProperty, "Primary")
+                            .Column(0),
+                        icon.Column(1),
+                    },
+                };
 
-            row.BindingContextChanged += (_, _) =>
-            {
-                if (row.BindingContext is SidebarSection section)
+                row.BindingContextChanged += (_, _) =>
                 {
-                    icon.Icon = section.Icon;
-                }
-            };
-            var tap = new TapGestureRecognizer();
-            tap.Tapped += (_, _) => ShowSection(row.BindingContext as SidebarSection);
-            row.GestureRecognizers.Add(tap);
-            return row;
-        }),
-    };
+                    if (row.BindingContext is SidebarSection section)
+                    {
+                        icon.Icon = section.Icon;
+                    }
+                };
+                var tap = new TapGestureRecognizer();
+                tap.Tapped += (_, _) => ShowSection(row.BindingContext as SidebarSection);
+                row.GestureRecognizers.Add(tap);
+                return row;
+            }),
+        };
 
-    private CollectionView CreateSpacesView() => new()
-    {
-        SelectionMode = SelectionMode.None,
-        ItemSizingStrategy = ItemSizingStrategy.MeasureFirstItem,
-        ItemTemplate = new DataTemplate(() =>
+    private CollectionView CreateSpacesView() =>
+        new()
         {
-            var row = new Grid
+            SelectionMode = SelectionMode.None,
+            ItemSizingStrategy = ItemSizingStrategy.MeasureFirstItem,
+            ItemTemplate = new DataTemplate(() =>
             {
-                Padding = new Thickness(0, 8, 4, 8),
-                ColumnDefinitions =
+                var row = new Grid
                 {
-                    new ColumnDefinition(4),
-                    new ColumnDefinition(GridLength.Star),
-                },
-                Children =
-                {
-                    new Border
+                    Padding = new Thickness(0, 8, 4, 8),
+                    ColumnDefinitions =
                     {
-                        WidthRequest = 3,
-                        HeightRequest = 26,
-                        StrokeThickness = 0,
-                        StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 2 },
-                        VerticalOptions = LayoutOptions.Center,
-                    }
-                    .Bind<Border, string?, string?, bool>(
-                        IsVisibleProperty,
-                        new Binding(nameof(SelectedSpaceId), source: this),
-                        new Binding(nameof(ManagedRoom.Id)),
-                        convert: static values => values.Item1 == values.Item2)
-                    .DynamicResource(BackgroundColorProperty, "Primary")
-                    .Column(0),
-                    new RoomAvatar { Size = 32 }
-                        .Bind(RoomAvatar.AvatarUrlProperty, nameof(ManagedRoom.AvatarUrl))
-                        .Bind(RoomAvatar.DisplayNameProperty, nameof(ManagedRoom.DisplayName))
-                        .Column(1),
-                },
-            };
+                        new ColumnDefinition(4),
+                        new ColumnDefinition(GridLength.Star),
+                    },
+                    Children =
+                    {
+                        new Border
+                        {
+                            WidthRequest = 3,
+                            HeightRequest = 26,
+                            StrokeThickness = 0,
+                            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
+                            {
+                                CornerRadius = 2,
+                            },
+                            VerticalOptions = LayoutOptions.Center,
+                        }
+                            .Bind<Border, string?, string?, bool>(
+                                IsVisibleProperty,
+                                new Binding(nameof(SelectedSpaceId), source: this),
+                                new Binding(nameof(ManagedRoom.Id)),
+                                convert: static values => values.Item1 == values.Item2
+                            )
+                            .DynamicResource(BackgroundColorProperty, "Primary")
+                            .Column(0),
+                        new RoomAvatar { Size = 32 }
+                            .Bind(RoomAvatar.AvatarUrlProperty, nameof(ManagedRoom.AvatarUrl))
+                            .Bind(RoomAvatar.DisplayNameProperty, nameof(ManagedRoom.DisplayName))
+                            .Column(1),
+                    },
+                };
 
-            var tap = new TapGestureRecognizer();
-            tap.Tapped += (_, _) => ShowSpace(row.BindingContext as ManagedRoom);
-            row.GestureRecognizers.Add(tap);
-            return row;
-        }),
-    };
+                var tap = new TapGestureRecognizer();
+                tap.Tapped += (_, _) => ShowSpace(row.BindingContext as ManagedRoom);
+                row.GestureRecognizers.Add(tap);
+                return row;
+            }),
+        };
 
     private void Build()
     {
         Content = new Grid
         {
             ColumnSpacing = 8,
-            ColumnDefinitions =
-            {
-                new ColumnDefinition(68),
-                new ColumnDefinition(GridLength.Star),
-            },
+            ColumnDefinitions = { new ColumnDefinition(68), new ColumnDefinition(GridLength.Star) },
             Children =
             {
                 new Grid
@@ -219,20 +227,9 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
                         new RowDefinition(GridLength.Auto),
                         new RowDefinition(GridLength.Star),
                     },
-                    Children =
-                    {
-                        _sectionsView.Row(0),
-                        _spacesView.Row(1),
-                    },
+                    Children = { _sectionsView.Row(0), _spacesView.Row(1) },
                 }.Column(0),
-                new Grid
-                {
-                    Children =
-                    {
-                        _roomListView,
-                        _spaceRoomListView,
-                    },
-                }.Column(1),
+                new Grid { Children = { _roomListView, _spaceRoomListView } }.Column(1),
             },
         };
     }
@@ -295,8 +292,8 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
     private sealed class SidebarSection(
         string title,
         MaterialIcons icon,
-        RoomListEntriesDynamicFilterKind filter)
-        : ObservableModel
+        RoomListEntriesDynamicFilterKind filter
+    ) : ObservableModel
     {
         private bool _isSelected;
 

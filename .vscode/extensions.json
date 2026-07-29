@@ -1,5 +1,14 @@
 {
   "recommendations": [
-    "ms-dotnettools.dotnet-maui"
+    "ms-dotnettools.dotnet-maui",
+    "csharpier.csharpier-vscode",
+    "ms-dotnettools.csharp",
+    "ms-dotnettools.csdevkit",
+    "redhat.vscode-xml",
+    "github.vscode-github-actions",
+    "github.vscode-pull-request-github",
+    "github.remotehub",
+    "editorconfig.editorconfig",
+    "aaron-bond.better-comments"
   ]
 }

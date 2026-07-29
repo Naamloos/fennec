@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Extensions;
 using CommunityToolkit.Maui.Markup;
@@ -6,24 +8,16 @@ using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.Sdk.Helpers;
 using Microsoft.Maui.Controls.Shapes;
 using Microsoft.Maui.Layouts;
-using System.ComponentModel;
-using System.Diagnostics;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
 public partial class VerificationPopupV2 : ContentView
 {
-    public sealed record VerificationEmojiItem(
-        string Symbol,
-        string Description);
+    public sealed record VerificationEmojiItem(string Symbol, string Description);
 
     [BindableProperty]
-    public partial SessionVerificationService? SessionVerificationService
-    {
-        get;
-        set;
-    }
+    public partial SessionVerificationService? SessionVerificationService { get; set; }
 
     private Popup? _popup;
     private Task? _initializationTask;
@@ -38,7 +32,8 @@ public partial class VerificationPopupV2 : ContentView
         InputTransparent = true;
 
         this.BindService<SessionVerificationService, VerificationPopupV2>(
-            SessionVerificationServiceProperty);
+            SessionVerificationServiceProperty
+        );
 
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
@@ -57,9 +52,7 @@ public partial class VerificationPopupV2 : ContentView
         }
     }
 
-    private async void OnLoaded(
-        object? sender,
-        EventArgs e)
+    private async void OnLoaded(object? sender, EventArgs e)
     {
         try
         {
@@ -67,14 +60,11 @@ public partial class VerificationPopupV2 : ContentView
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(
-                $"Unable to initialize session verification: {exception}");
+            Debug.WriteLine($"Unable to initialize session verification: {exception}");
         }
     }
 
-    private async void OnUnloaded(
-        object? sender,
-        EventArgs e)
+    private async void OnUnloaded(object? sender, EventArgs e)
     {
         var service = SessionVerificationService;
 
@@ -115,26 +105,24 @@ public partial class VerificationPopupV2 : ContentView
         }
     }
 
-    private async void OnServicePropertyChanged(
-        object? sender,
-        PropertyChangedEventArgs e)
+    private async void OnServicePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(SessionVerificationService.State) ||
-            sender is not SessionVerificationService service ||
-            service.State == ManagedVerificationState.Listening)
+        if (
+            e.PropertyName != nameof(SessionVerificationService.State)
+            || sender is not SessionVerificationService service
+            || service.State == ManagedVerificationState.Listening
+        )
         {
             return;
         }
 
         try
         {
-            await MainThread.InvokeOnMainThreadAsync(
-                EnsurePopupShownAsync);
+            await MainThread.InvokeOnMainThreadAsync(EnsurePopupShownAsync);
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(
-                $"Unable to show verification popup: {exception}");
+            Debug.WriteLine($"Unable to show verification popup: {exception}");
         }
     }
 
@@ -151,8 +139,7 @@ public partial class VerificationPopupV2 : ContentView
 
         if (page is null)
         {
-            Debug.WriteLine(
-                "Verification popup: no active page found.");
+            Debug.WriteLine("Verification popup: no active page found.");
 
             return;
         }
@@ -174,8 +161,7 @@ public partial class VerificationPopupV2 : ContentView
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(
-                $"Unable to display verification popup: {exception}");
+            Debug.WriteLine($"Unable to display verification popup: {exception}");
         }
         finally
         {
@@ -191,8 +177,7 @@ public partial class VerificationPopupV2 : ContentView
         }
     }
 
-    private Border CreatePopupContent(
-        SessionVerificationService service)
+    private Border CreatePopupContent(SessionVerificationService service)
     {
         return new Border
         {
@@ -204,10 +189,7 @@ public partial class VerificationPopupV2 : ContentView
             VerticalOptions = LayoutOptions.Center,
             StrokeThickness = 0,
 
-            StrokeShape = new RoundRectangle
-            {
-                CornerRadius = 18,
-            },
+            StrokeShape = new RoundRectangle { CornerRadius = 18 },
 
             Content = new ScrollView
             {
@@ -226,93 +208,63 @@ public partial class VerificationPopupV2 : ContentView
                             HorizontalOptions = LayoutOptions.Fill,
                             HorizontalTextAlignment = TextAlignment.Center,
                         },
-
                         CreateDeviceNameLabel(),
-
                         new Label
                         {
                             FontSize = 17,
                             HorizontalOptions = LayoutOptions.Fill,
                             HorizontalTextAlignment = TextAlignment.Center,
-                        }
-                        .Bind<
-                            Label,
-                            ManagedVerificationState,
-                            string>(
+                        }.Bind<Label, ManagedVerificationState, string>(
                             Label.TextProperty,
                             nameof(SessionVerificationService.State),
-                            convert: static (value) => GetStatusText(value)),
-
-                        new ActivityIndicator
-                        {
-                            HorizontalOptions = LayoutOptions.Center,
-                        }
-                        .Bind<
-                            ActivityIndicator,
-                            ManagedVerificationState,
-                            bool>(
-                            IsVisibleProperty,
-                            nameof(SessionVerificationService.State),
-                            convert: static (value) => IsBusy(value))
-                        .Bind<
-                            ActivityIndicator,
-                            ManagedVerificationState,
-                            bool>(
-                            ActivityIndicator.IsRunningProperty,
-                            nameof(SessionVerificationService.State),
-                            convert: static (value) => IsBusy(value)),
-
+                            convert: static (value) => GetStatusText(value)
+                        ),
+                        new ActivityIndicator { HorizontalOptions = LayoutOptions.Center }
+                            .Bind<ActivityIndicator, ManagedVerificationState, bool>(
+                                IsVisibleProperty,
+                                nameof(SessionVerificationService.State),
+                                convert: static (value) => IsBusy(value)
+                            )
+                            .Bind<ActivityIndicator, ManagedVerificationState, bool>(
+                                ActivityIndicator.IsRunningProperty,
+                                nameof(SessionVerificationService.State),
+                                convert: static (value) => IsBusy(value)
+                            ),
                         CreateEmojiVerificationDisplay(),
-
                         CreateDecimalVerificationDisplay(),
-
                         CreateRequestButtons(service),
-
                         CreateComparisonButtons(service),
-
                         new Button
                         {
                             Text = "Cancel",
                             HorizontalOptions = LayoutOptions.Center,
-                            Command = new AsyncRelayCommand(
-                                service.CancelOrRejectAsync),
-                        }
-                        .Bind<
-                            Button,
-                            ManagedVerificationState,
-                            bool>(
+                            Command = new AsyncRelayCommand(service.CancelOrRejectAsync),
+                        }.Bind<Button, ManagedVerificationState, bool>(
                             IsVisibleProperty,
                             nameof(SessionVerificationService.State),
-                            convert: static (value) => CanCancel(value)),
-
+                            convert: static (value) => CanCancel(value)
+                        ),
                         new Button
                         {
                             Text = "Close",
                             HorizontalOptions = LayoutOptions.Center,
-                            Command = new AsyncRelayCommand(
-                                ClosePopupAsync),
-                        }
-                        .Bind<
-                            Button,
-                            ManagedVerificationState,
-                            bool>(
+                            Command = new AsyncRelayCommand(ClosePopupAsync),
+                        }.Bind<Button, ManagedVerificationState, bool>(
                             IsVisibleProperty,
                             nameof(SessionVerificationService.State),
-                            convert: static (value) => IsTerminal(value)),
+                            convert: static (value) => IsTerminal(value)
+                        ),
                     },
                 },
             },
-        }
-        .DynamicResource(
-            VisualElement.BackgroundColorProperty,
-            "Surface");
+        }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface");
     }
 
     private static Label CreateDeviceNameLabel()
     {
         const string path =
-            $"{nameof(SessionVerificationService.PendingRequest)}." +
-            $"{nameof(SessionVerificationRequestDetails.DeviceDisplayName)}";
+            $"{nameof(SessionVerificationService.PendingRequest)}."
+            + $"{nameof(SessionVerificationRequestDetails.DeviceDisplayName)}";
 
         return new Label
         {
@@ -321,24 +273,15 @@ public partial class VerificationPopupV2 : ContentView
             HorizontalOptions = LayoutOptions.Fill,
             HorizontalTextAlignment = TextAlignment.Center,
         }
-        .Bind<
-            Label,
-            string?,
-            string?>(
-            Label.TextProperty,
-            path)
-        .Bind<
-            Label,
-            string?,
-            bool>(
-            IsVisibleProperty,
-            path,
-            convert: static value =>
-                !string.IsNullOrWhiteSpace(value));
+            .Bind<Label, string?, string?>(Label.TextProperty, path)
+            .Bind<Label, string?, bool>(
+                IsVisibleProperty,
+                path,
+                convert: static value => !string.IsNullOrWhiteSpace(value)
+            );
     }
 
-    private static HorizontalStackLayout CreateRequestButtons(
-        SessionVerificationService service)
+    private static HorizontalStackLayout CreateRequestButtons(SessionVerificationService service)
     {
         return new HorizontalStackLayout
         {
@@ -350,30 +293,22 @@ public partial class VerificationPopupV2 : ContentView
                 new Button
                 {
                     Text = "Accept",
-                    Command = new AsyncRelayCommand(
-                        service.AcceptAsync),
+                    Command = new AsyncRelayCommand(service.AcceptAsync),
                 },
-
                 new Button
                 {
                     Text = "Reject",
-                    Command = new AsyncRelayCommand(
-                        service.CancelOrRejectAsync),
+                    Command = new AsyncRelayCommand(service.CancelOrRejectAsync),
                 },
             },
-        }
-        .Bind<
-            HorizontalStackLayout,
-            ManagedVerificationState,
-            bool>(
+        }.Bind<HorizontalStackLayout, ManagedVerificationState, bool>(
             IsVisibleProperty,
             nameof(SessionVerificationService.State),
-            convert: static state =>
-                state == ManagedVerificationState.AwaitingUserAcceptance);
+            convert: static state => state == ManagedVerificationState.AwaitingUserAcceptance
+        );
     }
 
-    private static HorizontalStackLayout CreateComparisonButtons(
-        SessionVerificationService service)
+    private static HorizontalStackLayout CreateComparisonButtons(SessionVerificationService service)
     {
         return new HorizontalStackLayout
         {
@@ -385,30 +320,22 @@ public partial class VerificationPopupV2 : ContentView
                 new Button
                 {
                     Text = "They Match",
-                    Command = new AsyncRelayCommand(
-                        service.ApproveAsync),
+                    Command = new AsyncRelayCommand(service.ApproveAsync),
                 },
-
                 new Button
                 {
                     Text = "They Don't Match",
-                    Command = new AsyncRelayCommand(
-                        service.DeclineAsync),
+                    Command = new AsyncRelayCommand(service.DeclineAsync),
                 },
             },
-        }
-        .Bind<
-            HorizontalStackLayout,
-            ManagedVerificationState,
-            bool>(
+        }.Bind<HorizontalStackLayout, ManagedVerificationState, bool>(
             IsVisibleProperty,
             nameof(SessionVerificationService.State),
-            convert: static state =>
-                state == ManagedVerificationState.Comparing);
+            convert: static state => state == ManagedVerificationState.Comparing
+        );
     }
 
-    private static bool IsAndroid =>
-        DeviceInfo.Current.Platform == DevicePlatform.Android;
+    private static bool IsAndroid => DeviceInfo.Current.Platform == DevicePlatform.Android;
 
     private static double EmojiCardWidth => IsAndroid ? 68 : 112;
 
@@ -435,26 +362,19 @@ public partial class VerificationPopupV2 : ContentView
                 // Four cards and three gaps.
                 MaximumWidthRequest = (4 * EmojiCardWidth) + (3 * 8),
             }
-            .Bind<
-                FlexLayout,
-                SessionVerificationData?,
-                IReadOnlyList<VerificationEmojiItem>>(
-                BindableLayout.ItemsSourceProperty,
-                nameof(SessionVerificationService.VerificationData),
-                convert: GetEmojis)
-            .Invoke(layout =>
-                BindableLayout.SetItemTemplate(
-                    layout,
-                    new DataTemplate(CreateEmojiCard))),
-        }
-        .Bind<
-            ContentView,
-            SessionVerificationData?,
-            bool>(
+                .Bind<FlexLayout, SessionVerificationData?, IReadOnlyList<VerificationEmojiItem>>(
+                    BindableLayout.ItemsSourceProperty,
+                    nameof(SessionVerificationService.VerificationData),
+                    convert: GetEmojis
+                )
+                .Invoke(layout =>
+                    BindableLayout.SetItemTemplate(layout, new DataTemplate(CreateEmojiCard))
+                ),
+        }.Bind<ContentView, SessionVerificationData?, bool>(
             IsVisibleProperty,
             nameof(SessionVerificationService.VerificationData),
-            convert: static data =>
-                data is SessionVerificationData.Emojis);
+            convert: static data => data is SessionVerificationData.Emojis
+        );
     }
 
     private static Border CreateEmojiCard()
@@ -479,11 +399,7 @@ public partial class VerificationPopupV2 : ContentView
                         HorizontalOptions = LayoutOptions.Fill,
                         HorizontalTextAlignment = TextAlignment.Center,
                         VerticalTextAlignment = TextAlignment.Center,
-                    }
-                    .Bind(
-                        Label.TextProperty,
-                        nameof(VerificationEmojiItem.Symbol)),
-
+                    }.Bind(Label.TextProperty, nameof(VerificationEmojiItem.Symbol)),
                     new Label
                     {
                         FontSize = EmojiDescriptionFontSize,
@@ -492,10 +408,7 @@ public partial class VerificationPopupV2 : ContentView
                         HorizontalOptions = LayoutOptions.Fill,
                         HorizontalTextAlignment = TextAlignment.Center,
                         VerticalTextAlignment = TextAlignment.Start,
-                    }
-                    .Bind(
-                        Label.TextProperty,
-                        nameof(VerificationEmojiItem.Description)),
+                    }.Bind(Label.TextProperty, nameof(VerificationEmojiItem.Description)),
                 },
             },
         };
@@ -512,8 +425,7 @@ public partial class VerificationPopupV2 : ContentView
                 SelectionMode = SelectionMode.None,
                 HorizontalOptions = LayoutOptions.Center,
 
-                ItemsLayout = new LinearItemsLayout(
-                    ItemsLayoutOrientation.Horizontal)
+                ItemsLayout = new LinearItemsLayout(ItemsLayoutOrientation.Horizontal)
                 {
                     ItemSpacing = 8,
                 },
@@ -525,42 +437,28 @@ public partial class VerificationPopupV2 : ContentView
                         Padding = new Thickness(16, 12),
                         StrokeThickness = 1,
 
-                        StrokeShape = new RoundRectangle
-                        {
-                            CornerRadius = 12,
-                        },
+                        StrokeShape = new RoundRectangle { CornerRadius = 12 },
 
                         Content = new Label
                         {
                             FontSize = 24,
                             FontAttributes = FontAttributes.Bold,
                             HorizontalTextAlignment = TextAlignment.Center,
-                        }
-                        .Bind(Label.TextProperty, "."),
+                        }.Bind(Label.TextProperty, "."),
                     }
-                    .DynamicResource(
-                        VisualElement.BackgroundColorProperty,
-                        "SurfaceContainer")
-                    .DynamicResource(
-                        Border.StrokeProperty,
-                        "OutlineVariant")),
-            }
-            .Bind<
-                CollectionView,
-                SessionVerificationData?,
-                IReadOnlyList<ushort>>(
+                        .DynamicResource(VisualElement.BackgroundColorProperty, "SurfaceContainer")
+                        .DynamicResource(Border.StrokeProperty, "OutlineVariant")
+                ),
+            }.Bind<CollectionView, SessionVerificationData?, IReadOnlyList<ushort>>(
                 CollectionView.ItemsSourceProperty,
                 nameof(SessionVerificationService.VerificationData),
-                convert: GetDecimals),
-        }
-        .Bind<
-            ContentView,
-            SessionVerificationData?,
-            bool>(
+                convert: GetDecimals
+            ),
+        }.Bind<ContentView, SessionVerificationData?, bool>(
             IsVisibleProperty,
             nameof(SessionVerificationService.VerificationData),
-            convert: static data =>
-                data is SessionVerificationData.Decimals);
+            convert: static data => data is SessionVerificationData.Decimals
+        );
     }
 
     private async Task ClosePopupAsync()
@@ -578,8 +476,7 @@ public partial class VerificationPopupV2 : ContentView
         }
         catch (Exception exception)
         {
-            Debug.WriteLine(
-                $"Unable to close verification popup: {exception}");
+            Debug.WriteLine($"Unable to close verification popup: {exception}");
 
             if (ReferenceEquals(_popup, popup))
             {
@@ -600,120 +497,100 @@ public partial class VerificationPopupV2 : ContentView
             return shellPage;
         }
 
-        return Application.Current?
-            .Windows
-            .Select(window => window.Page)
+        return Application
+            .Current?.Windows.Select(window => window.Page)
             .FirstOrDefault(page => page is not null);
     }
 
-    private static IReadOnlyList<VerificationEmojiItem> GetEmojis(
-        SessionVerificationData? data)
+    private static IReadOnlyList<VerificationEmojiItem> GetEmojis(SessionVerificationData? data)
     {
         return data is SessionVerificationData.Emojis emojis
-            ? emojis.EmojisValue
-                .Select(emoji => new VerificationEmojiItem(
+            ? emojis
+                .EmojisValue.Select(emoji => new VerificationEmojiItem(
                     emoji.Symbol(),
-                    emoji.Description()))
+                    emoji.Description()
+                ))
                 .ToArray()
             : [];
     }
 
-    private static IReadOnlyList<ushort> GetDecimals(
-        SessionVerificationData? data)
+    private static IReadOnlyList<ushort> GetDecimals(SessionVerificationData? data)
     {
-        return data is SessionVerificationData.Decimals decimals
-            ? decimals.Values.ToArray()
-            : [];
+        return data is SessionVerificationData.Decimals decimals ? decimals.Values.ToArray() : [];
     }
 
-    private static string GetStatusText(
-        ManagedVerificationState? state)
+    private static string GetStatusText(ManagedVerificationState? state)
     {
         return state switch
         {
-            ManagedVerificationState.Listening =>
-                "Waiting for verification requests...",
+            ManagedVerificationState.Listening => "Waiting for verification requests...",
 
-            ManagedVerificationState.AcknowledgingRequest =>
-                "Opening verification request...",
+            ManagedVerificationState.AcknowledgingRequest => "Opening verification request...",
 
             ManagedVerificationState.AwaitingUserAcceptance =>
                 "Do you want to accept this verification request?",
 
-            ManagedVerificationState.AcceptingRequest =>
-                "Accepting verification request...",
+            ManagedVerificationState.AcceptingRequest => "Accepting verification request...",
 
-            ManagedVerificationState.RequestingVerification =>
-                "Sending a verification request...",
+            ManagedVerificationState.RequestingVerification => "Sending a verification request...",
 
             ManagedVerificationState.WaitingForOtherSession =>
                 "Waiting for another signed-in session to accept...",
 
-            ManagedVerificationState.StartingSas =>
-                "Starting secure emoji verification...",
+            ManagedVerificationState.StartingSas => "Starting secure emoji verification...",
 
             ManagedVerificationState.WaitingForVerificationData =>
                 "Preparing verification values...",
 
-            ManagedVerificationState.Comparing =>
-                "Compare these values with the other session.",
+            ManagedVerificationState.Comparing => "Compare these values with the other session.",
 
-            ManagedVerificationState.Approving =>
-                "Confirming that the values match...",
+            ManagedVerificationState.Approving => "Confirming that the values match...",
 
-            ManagedVerificationState.Declining =>
-                "Reporting that the values do not match...",
+            ManagedVerificationState.Declining => "Reporting that the values do not match...",
 
-            ManagedVerificationState.Cancelling =>
-                "Cancelling verification...",
+            ManagedVerificationState.Cancelling => "Cancelling verification...",
 
-            ManagedVerificationState.Completed =>
-                "This session was successfully verified.",
+            ManagedVerificationState.Completed => "This session was successfully verified.",
 
-            ManagedVerificationState.Cancelled =>
-                "Verification was cancelled.",
+            ManagedVerificationState.Cancelled => "Verification was cancelled.",
 
-            ManagedVerificationState.Failed =>
-                "Verification failed.",
+            ManagedVerificationState.Failed => "Verification failed.",
 
             _ => string.Empty,
         };
     }
 
-    private static bool IsBusy(
-        ManagedVerificationState? state)
+    private static bool IsBusy(ManagedVerificationState? state)
     {
-        return state is
-            ManagedVerificationState.AcknowledgingRequest or
-            ManagedVerificationState.AcceptingRequest or
-            ManagedVerificationState.RequestingVerification or
-            ManagedVerificationState.WaitingForOtherSession or
-            ManagedVerificationState.StartingSas or
-            ManagedVerificationState.WaitingForVerificationData or
-            ManagedVerificationState.Approving or
-            ManagedVerificationState.Declining or
-            ManagedVerificationState.Cancelling;
+        return state
+            is ManagedVerificationState.AcknowledgingRequest
+                or ManagedVerificationState.AcceptingRequest
+                or ManagedVerificationState.RequestingVerification
+                or ManagedVerificationState.WaitingForOtherSession
+                or ManagedVerificationState.StartingSas
+                or ManagedVerificationState.WaitingForVerificationData
+                or ManagedVerificationState.Approving
+                or ManagedVerificationState.Declining
+                or ManagedVerificationState.Cancelling;
     }
 
-    private static bool CanCancel(
-        ManagedVerificationState? state)
+    private static bool CanCancel(ManagedVerificationState? state)
     {
-        return state is
-            ManagedVerificationState.AwaitingUserAcceptance or
-            ManagedVerificationState.AcceptingRequest or
-            ManagedVerificationState.RequestingVerification or
-            ManagedVerificationState.WaitingForOtherSession or
-            ManagedVerificationState.StartingSas or
-            ManagedVerificationState.WaitingForVerificationData or
-            ManagedVerificationState.Comparing;
+        return state
+            is ManagedVerificationState.AwaitingUserAcceptance
+                or ManagedVerificationState.AcceptingRequest
+                or ManagedVerificationState.RequestingVerification
+                or ManagedVerificationState.WaitingForOtherSession
+                or ManagedVerificationState.StartingSas
+                or ManagedVerificationState.WaitingForVerificationData
+                or ManagedVerificationState.Comparing;
     }
 
-    private static bool IsTerminal(
-        ManagedVerificationState? state)
+    private static bool IsTerminal(ManagedVerificationState? state)
     {
-        return state is
-            ManagedVerificationState.Completed or
-            ManagedVerificationState.Cancelled or
-            ManagedVerificationState.Failed;
+        return state
+            is ManagedVerificationState.Completed
+                or ManagedVerificationState.Cancelled
+                or ManagedVerificationState.Failed;
     }
 }

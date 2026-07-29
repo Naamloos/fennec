@@ -44,26 +44,50 @@ public sealed partial class InlineAudioPlayer : ContentView
             ColumnSpacing = 8,
             Children =
             {
-                new Button { Text = "Play", WidthRequest = 76, Command = TogglePlaybackCommand }
-                    .Bind(IsVisibleProperty, nameof(IsPlaying), converter: new CommunityToolkit.Maui.Converters.InvertedBoolConverter(), source: this)
+                new Button
+                {
+                    Text = "Play",
+                    WidthRequest = 76,
+                    Command = TogglePlaybackCommand,
+                }
+                    .Bind(
+                        IsVisibleProperty,
+                        nameof(IsPlaying),
+                        converter: new CommunityToolkit.Maui.Converters.InvertedBoolConverter(),
+                        source: this
+                    )
                     .DynamicResource(VisualElement.BackgroundColorProperty, "Primary")
-                    .DynamicResource(Button.TextColorProperty, "OnPrimary").Column(0),
-                new Button { Text = "Stop", WidthRequest = 76, Command = TogglePlaybackCommand }
+                    .DynamicResource(Button.TextColorProperty, "OnPrimary")
+                    .Column(0),
+                new Button
+                {
+                    Text = "Stop",
+                    WidthRequest = 76,
+                    Command = TogglePlaybackCommand,
+                }
                     .Bind(IsVisibleProperty, nameof(IsPlaying), source: this)
                     .DynamicResource(VisualElement.BackgroundColorProperty, "Primary")
-                    .DynamicResource(Button.TextColorProperty, "OnPrimary").Column(0),
+                    .DynamicResource(Button.TextColorProperty, "OnPrimary")
+                    .Column(0),
                 new VerticalStackLayout
                 {
                     Spacing = 2,
                     Children =
                     {
                         new Label { Text = "Audio message", FontAttributes = FontAttributes.Bold },
-                        new Label { FontSize = 12, Opacity = .7 }
-                            .Bind(Label.TextProperty, $"{nameof(Media)}.{nameof(ChatMedia.Filename)}", source: this),
+                        new Label { FontSize = 12, Opacity = .7 }.Bind(
+                            Label.TextProperty,
+                            $"{nameof(Media)}.{nameof(ChatMedia.Filename)}",
+                            source: this
+                        ),
                     },
                 }.Column(1),
-                new ActivityIndicator { IsRunning = true, HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center }
-                    .Bind(IsVisibleProperty, nameof(IsLoading), source: this),
+                new ActivityIndicator
+                {
+                    IsRunning = true,
+                    HorizontalOptions = LayoutOptions.Center,
+                    VerticalOptions = LayoutOptions.Center,
+                }.Bind(IsVisibleProperty, nameof(IsLoading), source: this),
             },
         };
     }
@@ -79,11 +103,15 @@ public sealed partial class InlineAudioPlayer : ContentView
 
         if (_player is null)
         {
-            if (Client is null || Media is null || AudioManager is null) return;
+            if (Client is null || Media is null || AudioManager is null)
+                return;
             IsLoading = true;
             try
             {
-                _stream = new MemoryStream(await Client.GetMediaContentAsync(Media.SourceJson), writable: false);
+                _stream = new MemoryStream(
+                    await Client.GetMediaContentAsync(Media.SourceJson),
+                    writable: false
+                );
                 _player = AudioManager.CreateAsyncPlayer(_stream);
             }
             finally
@@ -103,12 +131,13 @@ public sealed partial class InlineAudioPlayer : ContentView
         {
             await player.PlayAsync(cancellation.Token);
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
-        {
-        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         finally
         {
-            if (ReferenceEquals(_player, player) && ReferenceEquals(_playbackCancellation, cancellation))
+            if (
+                ReferenceEquals(_player, player)
+                && ReferenceEquals(_playbackCancellation, cancellation)
+            )
             {
                 Dispatcher.Dispatch(() => IsPlaying = false);
             }
@@ -133,10 +162,7 @@ public sealed partial class InlineAudioPlayer : ContentView
         _stream = null;
     }
 
-    private static void OnMediaChanged(
-        BindableObject bindable,
-        object oldValue,
-        object newValue)
+    private static void OnMediaChanged(BindableObject bindable, object oldValue, object newValue)
     {
         var player = (InlineAudioPlayer)bindable;
         player.ReleasePlayer();

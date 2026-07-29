@@ -1,7 +1,7 @@
+using System.Windows.Input;
 using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.Sdk;
 using Microsoft.Maui.Controls.Shapes;
-using System.Windows.Input;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.App.Components;
@@ -13,27 +13,83 @@ public sealed class RoomInfoFlyout : ContentView
     private readonly BoxView _scrim;
     private readonly Label _title = new() { FontSize = 22, FontAttributes = FontAttributes.Bold };
     private readonly Label _topic = new() { Opacity = .75, LineBreakMode = LineBreakMode.WordWrap };
-    private readonly Label _roomId = new() { FontSize = 11, Opacity = .6, LineBreakMode = LineBreakMode.TailTruncation };
+    private readonly Label _roomId = new()
+    {
+        FontSize = 11,
+        Opacity = .6,
+        LineBreakMode = LineBreakMode.TailTruncation,
+    };
     private readonly Label _wallpaperStatus = new() { FontSize = 11, IsVisible = false };
     private readonly MatrixAvatar _avatar = new() { Size = 80 };
     private TaskHandle? _roomInfoSubscription;
     private RoomInfoListener? _roomInfoListener;
 
-    public static readonly BindableProperty ClientProperty = BindableProperty.Create(nameof(Client), typeof(ManagedMatrixClient), typeof(RoomInfoFlyout));
-    public static readonly BindableProperty RoomProperty = BindableProperty.Create(nameof(Room), typeof(Room), typeof(RoomInfoFlyout), propertyChanged: OnRoomChanged);
-    public static readonly BindableProperty MembersProperty = BindableProperty.Create(nameof(Members), typeof(IEnumerable<RoomMember>), typeof(RoomInfoFlyout));
-    public static readonly BindableProperty OpenProfileCommandProperty = BindableProperty.Create(nameof(OpenProfileCommand), typeof(ICommand), typeof(RoomInfoFlyout));
-    public static readonly BindableProperty WallpaperChangedCommandProperty = BindableProperty.Create(nameof(WallpaperChangedCommand), typeof(ICommand), typeof(RoomInfoFlyout));
+    public static readonly BindableProperty ClientProperty = BindableProperty.Create(
+        nameof(Client),
+        typeof(ManagedMatrixClient),
+        typeof(RoomInfoFlyout)
+    );
+    public static readonly BindableProperty RoomProperty = BindableProperty.Create(
+        nameof(Room),
+        typeof(Room),
+        typeof(RoomInfoFlyout),
+        propertyChanged: OnRoomChanged
+    );
+    public static readonly BindableProperty MembersProperty = BindableProperty.Create(
+        nameof(Members),
+        typeof(IEnumerable<RoomMember>),
+        typeof(RoomInfoFlyout)
+    );
+    public static readonly BindableProperty OpenProfileCommandProperty = BindableProperty.Create(
+        nameof(OpenProfileCommand),
+        typeof(ICommand),
+        typeof(RoomInfoFlyout)
+    );
+    public static readonly BindableProperty WallpaperChangedCommandProperty =
+        BindableProperty.Create(
+            nameof(WallpaperChangedCommand),
+            typeof(ICommand),
+            typeof(RoomInfoFlyout)
+        );
     public static readonly BindableProperty IsOpenProperty = BindableProperty.Create(
-        nameof(IsOpen), typeof(bool), typeof(RoomInfoFlyout), false,
-        BindingMode.TwoWay, propertyChanged: OnIsOpenChanged);
+        nameof(IsOpen),
+        typeof(bool),
+        typeof(RoomInfoFlyout),
+        false,
+        BindingMode.TwoWay,
+        propertyChanged: OnIsOpenChanged
+    );
 
-    public ManagedMatrixClient? Client { get => (ManagedMatrixClient?)GetValue(ClientProperty); set => SetValue(ClientProperty, value); }
-    public Room? Room { get => (Room?)GetValue(RoomProperty); set => SetValue(RoomProperty, value); }
-    public IEnumerable<RoomMember>? Members { get => (IEnumerable<RoomMember>?)GetValue(MembersProperty); set => SetValue(MembersProperty, value); }
-    public ICommand? OpenProfileCommand { get => (ICommand?)GetValue(OpenProfileCommandProperty); set => SetValue(OpenProfileCommandProperty, value); }
-    public ICommand? WallpaperChangedCommand { get => (ICommand?)GetValue(WallpaperChangedCommandProperty); set => SetValue(WallpaperChangedCommandProperty, value); }
-    public bool IsOpen { get => (bool)GetValue(IsOpenProperty); set => SetValue(IsOpenProperty, value); }
+    public ManagedMatrixClient? Client
+    {
+        get => (ManagedMatrixClient?)GetValue(ClientProperty);
+        set => SetValue(ClientProperty, value);
+    }
+    public Room? Room
+    {
+        get => (Room?)GetValue(RoomProperty);
+        set => SetValue(RoomProperty, value);
+    }
+    public IEnumerable<RoomMember>? Members
+    {
+        get => (IEnumerable<RoomMember>?)GetValue(MembersProperty);
+        set => SetValue(MembersProperty, value);
+    }
+    public ICommand? OpenProfileCommand
+    {
+        get => (ICommand?)GetValue(OpenProfileCommandProperty);
+        set => SetValue(OpenProfileCommandProperty, value);
+    }
+    public ICommand? WallpaperChangedCommand
+    {
+        get => (ICommand?)GetValue(WallpaperChangedCommandProperty);
+        set => SetValue(WallpaperChangedCommandProperty, value);
+    }
+    public bool IsOpen
+    {
+        get => (bool)GetValue(IsOpenProperty);
+        set => SetValue(IsOpenProperty, value);
+    }
 
     public RoomInfoFlyout()
     {
@@ -140,8 +196,8 @@ public sealed class RoomInfoFlyout : ContentView
                 },
             },
         }
-        .DynamicResource(VisualElement.BackgroundColorProperty, "Surface")
-        .DynamicResource(Border.StrokeProperty, "OutlineVariant");
+            .DynamicResource(VisualElement.BackgroundColorProperty, "Surface")
+            .DynamicResource(Border.StrokeProperty, "OutlineVariant");
 
         Content = new Grid { Children = { _scrim, _drawer } };
     }
@@ -168,10 +224,17 @@ public sealed class RoomInfoFlyout : ContentView
                     VerticalOptions = LayoutOptions.Center,
                     Children =
                     {
-                        new Label { FontAttributes = FontAttributes.Bold, LineBreakMode = LineBreakMode.TailTruncation }
-                            .Bind(Label.TextProperty, nameof(RoomMember.DisplayName)),
-                        new Label { FontSize = 11, Opacity = .6, LineBreakMode = LineBreakMode.TailTruncation }
-                            .Bind(Label.TextProperty, nameof(RoomMember.UserId)),
+                        new Label
+                        {
+                            FontAttributes = FontAttributes.Bold,
+                            LineBreakMode = LineBreakMode.TailTruncation,
+                        }.Bind(Label.TextProperty, nameof(RoomMember.DisplayName)),
+                        new Label
+                        {
+                            FontSize = 11,
+                            Opacity = .6,
+                            LineBreakMode = LineBreakMode.TailTruncation,
+                        }.Bind(Label.TextProperty, nameof(RoomMember.UserId)),
                     },
                 }.Column(1),
             },
@@ -190,14 +253,21 @@ public sealed class RoomInfoFlyout : ContentView
 
     private async Task ShowMemberActionsAsync(RoomMember member)
     {
-        if (Room is null || Client is null || Shell.Current?.CurrentPage is not { } page) return;
+        if (Room is null || Client is null || Shell.Current?.CurrentPage is not { } page)
+            return;
         var actions = new List<string> { "View profile" };
         using var powerLevels = await Room.GetPowerLevels();
         var isSelf = member.UserId == Room.OwnUserId();
-        if (!isSelf && powerLevels.CanOwnUserKick()) actions.Add("Remove from room");
-        if (!isSelf && powerLevels.CanOwnUserBan()) actions.Add("Ban from room");
+        if (!isSelf && powerLevels.CanOwnUserKick())
+            actions.Add("Remove from room");
+        if (!isSelf && powerLevels.CanOwnUserBan())
+            actions.Add("Ban from room");
 
-        var action = await InAppDialogs.ChooseAsync(page, member.DisplayName ?? member.UserId, actions);
+        var action = await InAppDialogs.ChooseAsync(
+            page,
+            member.DisplayName ?? member.UserId,
+            actions
+        );
         switch (action)
         {
             case "View profile":
@@ -216,11 +286,27 @@ public sealed class RoomInfoFlyout : ContentView
         Page page,
         RoomMember member,
         string title,
-        Func<string, string, string?, Task> operation)
+        Func<string, string, string?, Task> operation
+    )
     {
-        if (Room is null) return;
-        if (!await page.DisplayAlertAsync(title, $"{title} {member.DisplayName ?? member.UserId}?", title, "Cancel")) return;
-        var reason = await InAppDialogs.PromptAsync(page, title, "Reason (optional)", title, multiline: true);
+        if (Room is null)
+            return;
+        if (
+            !await page.DisplayAlertAsync(
+                title,
+                $"{title} {member.DisplayName ?? member.UserId}?",
+                title,
+                "Cancel"
+            )
+        )
+            return;
+        var reason = await InAppDialogs.PromptAsync(
+            page,
+            title,
+            "Reason (optional)",
+            title,
+            multiline: true
+        );
         try
         {
             await operation(Room.Id(), member.UserId, reason);
@@ -233,30 +319,26 @@ public sealed class RoomInfoFlyout : ContentView
 
     private View WallpaperControls()
     {
-        var set = new Button
-        {
-            Text = "Set wallpaper",
-            Padding = new Thickness(18, 10),
-        }
-        .DynamicResource(VisualElement.BackgroundColorProperty, "Primary")
-        .DynamicResource(Button.TextColorProperty, "OnPrimary");
-        var clear = new Button
-        {
-            Text = "Clear",
-            Padding = new Thickness(18, 10),
-        }
-        .DynamicResource(VisualElement.BackgroundColorProperty, "SurfaceContainer")
-        .DynamicResource(Button.TextColorProperty, "OnSurface");
+        var set = new Button { Text = "Set wallpaper", Padding = new Thickness(18, 10) }
+            .DynamicResource(VisualElement.BackgroundColorProperty, "Primary")
+            .DynamicResource(Button.TextColorProperty, "OnPrimary");
+        var clear = new Button { Text = "Clear", Padding = new Thickness(18, 10) }
+            .DynamicResource(VisualElement.BackgroundColorProperty, "SurfaceContainer")
+            .DynamicResource(Button.TextColorProperty, "OnSurface");
 
         set.Clicked += async (_, _) =>
         {
-            if (Client is null || Room is null) return;
-            var attachment = await AttachmentPicker.PickConfirmedAsync(new PickOptions
-            {
-                PickerTitle = "Choose room wallpaper",
-                FileTypes = FilePickerFileType.Images,
-            });
-            if (attachment is null) return;
+            if (Client is null || Room is null)
+                return;
+            var attachment = await AttachmentPicker.PickConfirmedAsync(
+                new PickOptions
+                {
+                    PickerTitle = "Choose room wallpaper",
+                    FileTypes = FilePickerFileType.Images,
+                }
+            );
+            if (attachment is null)
+                return;
             try
             {
                 set.IsEnabled = clear.IsEnabled = false;
@@ -281,7 +363,8 @@ public sealed class RoomInfoFlyout : ContentView
 
         clear.Clicked += async (_, _) =>
         {
-            if (Client is null || Room is null) return;
+            if (Client is null || Room is null)
+                return;
             try
             {
                 set.IsEnabled = clear.IsEnabled = false;
@@ -308,7 +391,8 @@ public sealed class RoomInfoFlyout : ContentView
 
     private async Task ShowActionsAsync()
     {
-        if (Client is null || Room is null || Shell.Current?.CurrentPage is not { } page) return;
+        if (Client is null || Room is null || Shell.Current?.CurrentPage is not { } page)
+            return;
         var info = await Room.RoomInfo();
         var actions = new List<string>
         {
@@ -323,7 +407,8 @@ public sealed class RoomInfoFlyout : ContentView
             "Leave room",
         };
         var action = await InAppDialogs.ChooseAsync(page, "Room actions", actions);
-        if (action is null) return;
+        if (action is null)
+            return;
 
         try
         {
@@ -357,7 +442,14 @@ public sealed class RoomInfoFlyout : ContentView
                     await ReportRoomAsync(page);
                     break;
                 case "Leave room":
-                    if (await page.DisplayAlertAsync("Leave room", $"Leave {_title.Text}?", "Leave", "Cancel"))
+                    if (
+                        await page.DisplayAlertAsync(
+                            "Leave room",
+                            $"Leave {_title.Text}?",
+                            "Leave",
+                            "Cancel"
+                        )
+                    )
                     {
                         await Client.LeaveRoomAsync(Room.Id(), forget: true);
                         IsOpen = false;
@@ -373,37 +465,70 @@ public sealed class RoomInfoFlyout : ContentView
 
     private async Task InviteMemberAsync(Page page)
     {
-        if (Client is null || Room is null) return;
+        if (Client is null || Room is null)
+            return;
         using var powerLevels = await Room.GetPowerLevels();
         if (!powerLevels.CanOwnUserInvite())
         {
-            await page.DisplayAlertAsync("Permission required", "You do not have permission to invite members.", "OK");
+            await page.DisplayAlertAsync(
+                "Permission required",
+                "You do not have permission to invite members.",
+                "OK"
+            );
             return;
         }
 
-        var userId = await InAppDialogs.PromptAsync(page, "Invite member", "Matrix ID", "Invite", "@alice:example.org");
-        if (!string.IsNullOrWhiteSpace(userId)) await Client.InviteUserAsync(Room.Id(), userId.Trim());
+        var userId = await InAppDialogs.PromptAsync(
+            page,
+            "Invite member",
+            "Matrix ID",
+            "Invite",
+            "@alice:example.org"
+        );
+        if (!string.IsNullOrWhiteSpace(userId))
+            await Client.InviteUserAsync(Room.Id(), userId.Trim());
     }
 
     private async Task ChangeNameAsync(Page page)
     {
-        if (Client is null || Room is null) return;
-        var name = await InAppDialogs.PromptAsync(page, "Room name", "Name", "Save", initialValue: _title.Text);
-        if (!string.IsNullOrWhiteSpace(name)) await Client.SetRoomNameAsync(Room.Id(), name.Trim());
+        if (Client is null || Room is null)
+            return;
+        var name = await InAppDialogs.PromptAsync(
+            page,
+            "Room name",
+            "Name",
+            "Save",
+            initialValue: _title.Text
+        );
+        if (!string.IsNullOrWhiteSpace(name))
+            await Client.SetRoomNameAsync(Room.Id(), name.Trim());
     }
 
     private async Task ChangeTopicAsync(Page page)
     {
-        if (Client is null || Room is null) return;
-        var topic = await InAppDialogs.PromptAsync(page, "Room topic", "Topic", "Save", initialValue: _topic.Text, multiline: true);
-        if (topic is not null) await Client.SetRoomTopicAsync(Room.Id(), topic.Trim());
+        if (Client is null || Room is null)
+            return;
+        var topic = await InAppDialogs.PromptAsync(
+            page,
+            "Room topic",
+            "Topic",
+            "Save",
+            initialValue: _topic.Text,
+            multiline: true
+        );
+        if (topic is not null)
+            await Client.SetRoomTopicAsync(Room.Id(), topic.Trim());
     }
 
     private async Task ChangeHistoryVisibilityAsync(Page page)
     {
-        if (Client is null || Room is null) return;
+        if (Client is null || Room is null)
+            return;
         var selected = await InAppDialogs.ChooseAsync(
-            page, "History visibility", ["Invited members", "Joined members", "Shared", "World readable"]);
+            page,
+            "History visibility",
+            ["Invited members", "Joined members", "Shared", "World readable"]
+        );
         RoomHistoryVisibility? visibility = selected switch
         {
             "Invited members" => new RoomHistoryVisibility.Invited(),
@@ -412,21 +537,31 @@ public sealed class RoomInfoFlyout : ContentView
             "World readable" => new RoomHistoryVisibility.WorldReadable(),
             _ => null,
         };
-        if (visibility is not null) await Client.SetRoomHistoryVisibilityAsync(Room.Id(), visibility);
+        if (visibility is not null)
+            await Client.SetRoomHistoryVisibilityAsync(Room.Id(), visibility);
     }
 
     private async Task ReportRoomAsync(Page page)
     {
-        if (Room is null) return;
-        var reason = await InAppDialogs.PromptAsync(page, "Report room", "Reason", "Report", multiline: true);
-        if (!string.IsNullOrWhiteSpace(reason)) await Room.ReportRoom(reason);
+        if (Room is null)
+            return;
+        var reason = await InAppDialogs.PromptAsync(
+            page,
+            "Report room",
+            "Reason",
+            "Report",
+            multiline: true
+        );
+        if (!string.IsNullOrWhiteSpace(reason))
+            await Room.ReportRoom(reason);
     }
 
     private static void OnRoomChanged(BindableObject bindable, object oldValue, object newValue)
     {
         var flyout = (RoomInfoFlyout)bindable;
         flyout.StopRoomInfoUpdates();
-        if (newValue is not Room room) return;
+        if (newValue is not Room room)
+            return;
 
         ApplyInitialRoomInfo(flyout, room);
         flyout._roomInfoListener = new RoomInfoUpdateListener(flyout, room);
@@ -463,13 +598,14 @@ public sealed class RoomInfoFlyout : ContentView
 
     private sealed class RoomInfoUpdateListener(RoomInfoFlyout flyout, Room room) : RoomInfoListener
     {
-        public void Call(RoomInfo roomInfo) => flyout.Dispatcher.Dispatch(() =>
-        {
-            if (ReferenceEquals(flyout.Room, room))
+        public void Call(RoomInfo roomInfo) =>
+            flyout.Dispatcher.Dispatch(() =>
             {
-                flyout.ApplyRoomInfo(roomInfo);
-            }
-        });
+                if (ReferenceEquals(flyout.Room, room))
+                {
+                    flyout.ApplyRoomInfo(roomInfo);
+                }
+            });
     }
 
     private static void ApplyInitialRoomInfo(RoomInfoFlyout flyout, Room room)
@@ -484,8 +620,11 @@ public sealed class RoomInfoFlyout : ContentView
         flyout._avatar.DisplayName = name;
     }
 
-    private static void OnIsOpenChanged(BindableObject bindable, object oldValue, object newValue) =>
-        ((RoomInfoFlyout)bindable).SetOpen((bool)newValue);
+    private static void OnIsOpenChanged(
+        BindableObject bindable,
+        object oldValue,
+        object newValue
+    ) => ((RoomInfoFlyout)bindable).SetOpen((bool)newValue);
 
     private void SetOpen(bool open)
     {
@@ -499,18 +638,31 @@ public sealed class RoomInfoFlyout : ContentView
         }
 
         var animation = new Animation();
-        animation.Add(0, 1, new Animation(
-            value => _drawer.TranslationX = value,
-            _drawer.TranslationX,
-            open ? 0 : width,
-            Easing.CubicOut));
-        animation.Add(0, 1, new Animation(
-            value => _scrim.Opacity = value,
-            _scrim.Opacity,
-            open ? 1 : 0));
-        animation.Commit(this, AnimationName, 16, 200, finished: (_, cancelled) =>
-        {
-            if (!open && !cancelled) IsVisible = false;
-        });
+        animation.Add(
+            0,
+            1,
+            new Animation(
+                value => _drawer.TranslationX = value,
+                _drawer.TranslationX,
+                open ? 0 : width,
+                Easing.CubicOut
+            )
+        );
+        animation.Add(
+            0,
+            1,
+            new Animation(value => _scrim.Opacity = value, _scrim.Opacity, open ? 1 : 0)
+        );
+        animation.Commit(
+            this,
+            AnimationName,
+            16,
+            200,
+            finished: (_, cancelled) =>
+            {
+                if (!open && !cancelled)
+                    IsVisible = false;
+            }
+        );
     }
 }

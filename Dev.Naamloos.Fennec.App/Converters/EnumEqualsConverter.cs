@@ -8,14 +8,13 @@ public sealed class EnumEqualsConverter : IValueConverter
         object? value,
         Type targetType,
         object? parameter,
-        CultureInfo culture) => string.Equals(
-            value?.ToString(),
-            parameter?.ToString(),
-            StringComparison.Ordinal);
+        CultureInfo culture
+    ) => string.Equals(value?.ToString(), parameter?.ToString(), StringComparison.Ordinal);
 
     public object? ConvertBack(
         object? value,
         Type targetType,
         object? parameter,
-        CultureInfo culture) => Binding.DoNothing;
+        CultureInfo culture
+    ) => Binding.DoNothing;
 }

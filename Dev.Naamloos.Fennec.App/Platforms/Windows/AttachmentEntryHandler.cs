@@ -1,18 +1,18 @@
+using System.Diagnostics;
 using Dev.Naamloos.Fennec.App.Components;
 using Microsoft.Maui.Handlers;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using System.Diagnostics;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using Windows.System;
 using Windows.UI.Core;
-using NativeDataPackageView = Windows.ApplicationModel.DataTransfer.DataPackageView;
-using NativeDataPackageOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation;
-using NativeDragEventArgs = Microsoft.UI.Xaml.DragEventArgs;
 using NativeClipboard = Windows.ApplicationModel.DataTransfer.Clipboard;
+using NativeDataPackageOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation;
+using NativeDataPackageView = Windows.ApplicationModel.DataTransfer.DataPackageView;
+using NativeDragEventArgs = Microsoft.UI.Xaml.DragEventArgs;
 
 namespace Dev.Naamloos.Fennec.App.Platforms.Windows;
 
@@ -90,7 +90,8 @@ public sealed class AttachmentEntryHandler : EntryHandler
     }
 
     private static async Task<IReadOnlyList<PickedAttachment>> ReadAttachmentsAsync(
-        NativeDataPackageView content)
+        NativeDataPackageView content
+    )
     {
         var attachments = new List<PickedAttachment>();
 
@@ -99,12 +100,15 @@ public sealed class AttachmentEntryHandler : EntryHandler
             foreach (var file in (await content.GetStorageItemsAsync()).OfType<StorageFile>())
             {
                 await using var input = await file.OpenStreamForReadAsync();
-                attachments.Add(await ReadAsync(
-                    file.Name,
-                    string.IsNullOrWhiteSpace(file.ContentType)
-                        ? "application/octet-stream"
-                        : file.ContentType,
-                    input));
+                attachments.Add(
+                    await ReadAsync(
+                        file.Name,
+                        string.IsNullOrWhiteSpace(file.ContentType)
+                            ? "application/octet-stream"
+                            : file.ContentType,
+                        input
+                    )
+                );
             }
         }
 
@@ -116,10 +120,13 @@ public sealed class AttachmentEntryHandler : EntryHandler
             var mimeType = string.IsNullOrWhiteSpace(randomAccess.ContentType)
                 ? "image/png"
                 : randomAccess.ContentType;
-            attachments.Add(await ReadAsync(
-                $"clipboard-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}{Extension(mimeType)}",
-                mimeType,
-                input));
+            attachments.Add(
+                await ReadAsync(
+                    $"clipboard-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}{Extension(mimeType)}",
+                    mimeType,
+                    input
+                )
+            );
         }
 
         return attachments;
@@ -128,7 +135,8 @@ public sealed class AttachmentEntryHandler : EntryHandler
     private static async Task<PickedAttachment> ReadAsync(
         string fileName,
         string mimeType,
-        Stream input)
+        Stream input
+    )
     {
         using var data = new MemoryStream();
         await input.CopyToAsync(data);
@@ -136,19 +144,21 @@ public sealed class AttachmentEntryHandler : EntryHandler
     }
 
     private static bool HasAttachments(NativeDataPackageView content) =>
-        content.Contains(StandardDataFormats.StorageItems) ||
-        content.Contains(StandardDataFormats.Bitmap);
+        content.Contains(StandardDataFormats.StorageItems)
+        || content.Contains(StandardDataFormats.Bitmap);
 
     private static bool ControlIsDown() =>
-        InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control)
+        InputKeyboardSource
+            .GetKeyStateForCurrentThread(VirtualKey.Control)
             .HasFlag(CoreVirtualKeyStates.Down);
 
-    private static string Extension(string mimeType) => mimeType.ToLowerInvariant() switch
-    {
-        "image/gif" => ".gif",
-        "image/jpeg" => ".jpg",
-        "image/webp" => ".webp",
-        "image/bmp" => ".bmp",
-        _ => ".png",
-    };
+    private static string Extension(string mimeType) =>
+        mimeType.ToLowerInvariant() switch
+        {
+            "image/gif" => ".gif",
+            "image/jpeg" => ".jpg",
+            "image/webp" => ".webp",
+            "image/bmp" => ".bmp",
+            _ => ".png",
+        };
 }

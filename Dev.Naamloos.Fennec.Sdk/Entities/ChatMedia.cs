@@ -14,12 +14,14 @@ public sealed class ChatMedia : ObservableModel
     private byte[]? _fullImageData;
     private string? _videoPath;
     private bool _isLoading;
+
     public ChatMedia(
         ChatMediaKind kind,
         string sourceJson,
         string filename,
         string? mimeType,
-        string? thumbnailSourceJson = null)
+        string? thumbnailSourceJson = null
+    )
     {
         Kind = kind;
         SourceJson = sourceJson;
@@ -38,12 +40,15 @@ public sealed class ChatMedia : ObservableModel
 
     public string? ThumbnailSourceJson { get; }
 
-    public bool IsAnimatedGif => Kind == ChatMediaKind.Image &&
-        (string.Equals(MimeType, "image/gif", StringComparison.OrdinalIgnoreCase) ||
-         Filename.EndsWith(".gif", StringComparison.OrdinalIgnoreCase));
+    public bool IsAnimatedGif =>
+        Kind == ChatMediaKind.Image
+        && (
+            string.Equals(MimeType, "image/gif", StringComparison.OrdinalIgnoreCase)
+            || Filename.EndsWith(".gif", StringComparison.OrdinalIgnoreCase)
+        );
 
-    public bool HasPreview => Kind != ChatMediaKind.Video ||
-        !string.IsNullOrWhiteSpace(ThumbnailSourceJson);
+    public bool HasPreview =>
+        Kind != ChatMediaKind.Video || !string.IsNullOrWhiteSpace(ThumbnailSourceJson);
 
     public byte[]? FullImageData
     {
@@ -65,7 +70,8 @@ public sealed class ChatMedia : ObservableModel
 
     public async Task<byte[]?> LoadPreviewAsync(
         ManagedMatrixClient client,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         if (!HasPreview)
         {
@@ -85,7 +91,8 @@ public sealed class ChatMedia : ObservableModel
                 ThumbnailSourceJson ?? SourceJson,
                 480,
                 480,
-                cancellationToken: cancellationToken);
+                cancellationToken: cancellationToken
+            );
         }
         finally
         {
@@ -109,7 +116,8 @@ public sealed class ChatMedia : ObservableModel
                 VideoPath = await client.GetVideoFileAsync(
                     SourceJson,
                     Filename,
-                    MimeType ?? "video/mp4");
+                    MimeType ?? "video/mp4"
+                );
             }
             else if (Kind == ChatMediaKind.Image && FullImageData is null)
             {

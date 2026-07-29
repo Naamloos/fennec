@@ -1,10 +1,10 @@
+using System.Windows.Input;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Behaviors;
 using CommunityToolkit.Maui.Converters;
 using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Maui.Controls.Shapes;
-using System.Windows.Input;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
@@ -50,7 +50,14 @@ public sealed partial class AccountButton : ContentView
                 {
                     Binding = new Binding(nameof(TransparentBackground)),
                     Value = true,
-                    Setters = { new Setter { Property = BackgroundColorProperty, Value = Colors.Transparent } },
+                    Setters =
+                    {
+                        new Setter
+                        {
+                            Property = BackgroundColorProperty,
+                            Value = Colors.Transparent,
+                        },
+                    },
                 },
             },
             Behaviors =
@@ -60,9 +67,12 @@ public sealed partial class AccountButton : ContentView
                     BindingContext = this,
                     ShouldMakeChildrenInputTransparent = true,
                 }
-                .Bind(TouchBehavior.CommandProperty, nameof(OpenCommand))
-                .DynamicResource(TouchBehavior.HoveredBackgroundColorProperty, "SurfaceVariant")
-                .DynamicResource(TouchBehavior.PressedBackgroundColorProperty, "SurfaceContainer"),
+                    .Bind(TouchBehavior.CommandProperty, nameof(OpenCommand))
+                    .DynamicResource(TouchBehavior.HoveredBackgroundColorProperty, "SurfaceVariant")
+                    .DynamicResource(
+                        TouchBehavior.PressedBackgroundColorProperty,
+                        "SurfaceContainer"
+                    ),
             },
             Content = new HorizontalStackLayout
             {
@@ -101,8 +111,12 @@ public sealed partial class AccountButton : ContentView
                         LineBreakMode = LineBreakMode.TailTruncation,
                         VerticalTextAlignment = TextAlignment.Center,
                     }
-                    .Bind(Label.TextProperty, nameof(DisplayName))
-                    .Bind(IsVisibleProperty, nameof(ShowUserId), converter: new InvertedBoolConverter()),
+                        .Bind(Label.TextProperty, nameof(DisplayName))
+                        .Bind(
+                            IsVisibleProperty,
+                            nameof(ShowUserId),
+                            converter: new InvertedBoolConverter()
+                        ),
                     new VerticalStackLayout
                     {
                         Spacing = 0,
@@ -125,7 +139,7 @@ public sealed partial class AccountButton : ContentView
                 },
             },
         }
-        .DynamicResource(BackgroundColorProperty, "Surface2")
-        .Invoke(view => SemanticProperties.SetDescription(view, "Open user settings"));
+            .DynamicResource(BackgroundColorProperty, "Surface2")
+            .Invoke(view => SemanticProperties.SetDescription(view, "Open user settings"));
     }
 }

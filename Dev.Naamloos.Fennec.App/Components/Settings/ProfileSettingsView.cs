@@ -9,7 +9,10 @@ namespace Dev.Naamloos.Fennec.App.Components;
 public sealed partial class ProfileSettingsView : ContentView
 {
     public static readonly BindableProperty MatrixClientProperty = BindableProperty.Create(
-        nameof(MatrixClient), typeof(ManagedMatrixClient), typeof(ProfileSettingsView));
+        nameof(MatrixClient),
+        typeof(ManagedMatrixClient),
+        typeof(ProfileSettingsView)
+    );
 
     public ManagedMatrixClient? MatrixClient
     {
@@ -24,14 +27,16 @@ public sealed partial class ProfileSettingsView : ContentView
     public string Status { get; set; } = string.Empty;
     public string TimeZone { get; set; } = TimeZoneInfo.Local.Id;
     public string Pronouns { get; set; } = string.Empty;
-    public string Initial => string.IsNullOrWhiteSpace(DisplayName) ? "@" : DisplayName[..1].ToUpperInvariant();
+    public string Initial =>
+        string.IsNullOrWhiteSpace(DisplayName) ? "@" : DisplayName[..1].ToUpperInvariant();
 
     public ProfileSettingsView()
     {
         this.BindService<ManagedMatrixClient, ProfileSettingsView>(MatrixClientProperty);
         Loaded += async (_, _) => await RefreshAsync();
 
-        Content = new SettingsSection("Profile",
+        Content = new SettingsSection(
+            "Profile",
             new Border
             {
                 Padding = 20,
@@ -68,22 +73,39 @@ public sealed partial class ProfileSettingsView : ContentView
                                     {
                                         IsJson = false,
                                         Aspect = Aspect.AspectFill,
-                                    }.Bind(MatrixImage.MatrixSourceProperty, nameof(AvatarUrl), source: this),
+                                    }.Bind(
+                                        MatrixImage.MatrixSourceProperty,
+                                        nameof(AvatarUrl),
+                                        source: this
+                                    ),
                                 },
                             },
-                        }
-                        .DynamicResource(VisualElement.BackgroundColorProperty, "PrimaryContainer"),
+                        }.DynamicResource(
+                            VisualElement.BackgroundColorProperty,
+                            "PrimaryContainer"
+                        ),
                         new VerticalStackLayout
                         {
                             VerticalOptions = LayoutOptions.Center,
                             Spacing = 4,
                             Children =
                             {
-                                new Label { Text = "Your profile", Opacity = .7, FontSize = 12 },
-                                new Label { FontSize = 20, FontAttributes = FontAttributes.Bold }
-                                    .Bind(Label.TextProperty, nameof(DisplayName), source: this),
-                                new Label { Opacity = .7, LineBreakMode = LineBreakMode.TailTruncation }
-                                    .Bind(Label.TextProperty, nameof(UserId), source: this),
+                                new Label
+                                {
+                                    Text = "Your profile",
+                                    Opacity = .7,
+                                    FontSize = 12,
+                                },
+                                new Label
+                                {
+                                    FontSize = 20,
+                                    FontAttributes = FontAttributes.Bold,
+                                }.Bind(Label.TextProperty, nameof(DisplayName), source: this),
+                                new Label
+                                {
+                                    Opacity = .7,
+                                    LineBreakMode = LineBreakMode.TailTruncation,
+                                }.Bind(Label.TextProperty, nameof(UserId), source: this),
                             },
                         }.Column(1),
                     },
@@ -97,15 +119,20 @@ public sealed partial class ProfileSettingsView : ContentView
             Field("Status", nameof(Status)),
             Field("Pronouns (comma separated)", nameof(Pronouns)),
             Field("Time zone", nameof(TimeZone)),
-            new Button { Text = "Save profile" }.BindCommand(nameof(SaveProfileCommand), source: this),
+            new Button { Text = "Save profile" }.BindCommand(
+                nameof(SaveProfileCommand),
+                source: this
+            ),
             new Button { Text = "Copy Matrix ID", BackgroundColor = Colors.Transparent }
                 .DynamicResource(Button.TextColorProperty, "Primary")
-                .BindCommand(nameof(CopyMatrixIdCommand), source: this));
+                .BindCommand(nameof(CopyMatrixIdCommand), source: this)
+        );
     }
 
     private async Task RefreshAsync()
     {
-        if (MatrixClient is null) return;
+        if (MatrixClient is null)
+            return;
 
         var profile = await MatrixClient.GetOwnMatrixProfileAsync();
         DisplayName = profile.DisplayName;
@@ -128,26 +155,44 @@ public sealed partial class ProfileSettingsView : ContentView
     [RelayCommand]
     private async Task SaveProfileAsync()
     {
-        if (string.IsNullOrWhiteSpace(DisplayName) || MatrixClient is null) return;
-        await MatrixClient.SetOwnMatrixProfileAsync(new MatrixProfile(UserId, DisplayName.Trim(), AvatarUrl,
-            Bio.Trim(), Status.Trim(), "online", TimeZone.Trim(),
-            Pronouns.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries), string.Empty));
+        if (string.IsNullOrWhiteSpace(DisplayName) || MatrixClient is null)
+            return;
+        await MatrixClient.SetOwnMatrixProfileAsync(
+            new MatrixProfile(
+                UserId,
+                DisplayName.Trim(),
+                AvatarUrl,
+                Bio.Trim(),
+                Status.Trim(),
+                "online",
+                TimeZone.Trim(),
+                Pronouns.Split(
+                    ',',
+                    StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries
+                ),
+                string.Empty
+            )
+        );
         await RefreshAsync();
     }
 
     [RelayCommand]
     private async Task ChangeAvatarAsync()
     {
-        if (MatrixClient is null) return;
+        if (MatrixClient is null)
+            return;
 
         try
         {
-            var attachment = await AttachmentPicker.PickConfirmedAsync(new PickOptions
-            {
-                PickerTitle = "Choose profile picture",
-                FileTypes = FilePickerFileType.Images,
-            });
-            if (attachment is null) return;
+            var attachment = await AttachmentPicker.PickConfirmedAsync(
+                new PickOptions
+                {
+                    PickerTitle = "Choose profile picture",
+                    FileTypes = FilePickerFileType.Images,
+                }
+            );
+            if (attachment is null)
+                return;
 
             await MatrixClient.SetOwnAvatarAsync(attachment.MimeType, attachment.Data);
             await RefreshAsync();
@@ -158,16 +203,19 @@ public sealed partial class ProfileSettingsView : ContentView
             await Shell.Current.DisplayAlertAsync(
                 "Profile picture",
                 "Could not update your profile picture.",
-                "OK");
+                "OK"
+            );
         }
     }
 
     [RelayCommand]
     private Task CopyMatrixIdAsync() => Clipboard.Default.SetTextAsync(UserId);
 
-    private Entry Field(string placeholder, string property) => new Entry
-    {
-        Placeholder = placeholder,
-    }
-    .Bind(Entry.TextProperty, property, BindingMode.TwoWay, source: this);
+    private Entry Field(string placeholder, string property) =>
+        new Entry { Placeholder = placeholder }.Bind(
+            Entry.TextProperty,
+            property,
+            BindingMode.TwoWay,
+            source: this
+        );
 }
