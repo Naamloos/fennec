@@ -92,6 +92,9 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// </summary>
     public bool IsLoggedIn => _client?.UserId() is not null;
 
+    /// <summary>Gets whether the native client store is currently paused.</summary>
+    public bool IsPaused => _isPaused;
+
     /// <summary>Resolves a Matrix server name through its client well-known record.</summary>
     public static async Task<string> DiscoverHomeserverAsync(string homeserver)
     {
@@ -373,6 +376,10 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
             _initializationLock.Release();
         }
     }
+
+    /// <summary>Returns whether local secure storage still contains a session to recover.</summary>
+    public async Task<bool> HasSavedSessionAsync() =>
+        !string.IsNullOrWhiteSpace(await _secureStore.GetAsync(SessionStorageKey));
 
     /// <summary>
     /// Determines whether the Matrix client and sync infrastructure currently
@@ -1185,20 +1192,28 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
             return url.GetString();
         }
 
-        var tag = tags.EnumerateObject()
-            .FirstOrDefault(tag =>
-                tag.Name.StartsWith(LegacyWallpaperTagPrefix, StringComparison.Ordinal)
+        var tagName = tags.EnumerateObject()
+            .Select(tag => tag.Name)
+            .FirstOrDefault(name =>
+                name.StartsWith(LegacyWallpaperTagPrefix, StringComparison.Ordinal)
             );
-        if (tag.Name is null)
+        if (tagName is null)
             return null;
-        var encoded = tag.Name[LegacyWallpaperTagPrefix.Length..]
+        var encoded = tagName[LegacyWallpaperTagPrefix.Length..]
             .Replace('-', '+')
             .Replace('_', '/');
-        return Encoding.UTF8.GetString(
-            Convert.FromBase64String(
-                encoded.PadRight(encoded.Length + (4 - encoded.Length % 4) % 4, '=')
-            )
-        );
+        try
+        {
+            return Encoding.UTF8.GetString(
+                Convert.FromBase64String(
+                    encoded.PadRight(encoded.Length + (4 - encoded.Length % 4) % 4, '=')
+                )
+            );
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
     }
 
     public async Task SetRoomWallpaperAsync(string roomId, string mxcUrl)

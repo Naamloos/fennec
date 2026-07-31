@@ -4,6 +4,8 @@ using Dev.Naamloos.Fennec.Sdk;
 
 namespace Dev.Naamloos.Fennec.App.Services;
 
+public sealed record EmojiFontOption(string Id, string DisplayName, string? FontFamily);
+
 public sealed partial class UserSettingsService(ManagedMatrixClient matrixClient) : ObservableObject
 {
     public const string EventType = "dev.naamloos.fennec.settings";
@@ -13,6 +15,32 @@ public sealed partial class UserSettingsService(ManagedMatrixClient matrixClient
 
     [ObservableProperty]
     private bool _experimentalFeatureEnabled;
+
+    [ObservableProperty]
+    private string _emojiFontId = "system";
+
+    private static readonly EmojiFontOption[] AllEmojiFontOptions =
+    [
+        new("system", "System default", null),
+        new("fluent", "Fluent Emoji", "FluentEmojiColor"),
+        new("twitter", "Twitter Color Emoji", "TwitterColorEmoji"),
+        new("noto", "Noto Color Emoji", "NotoColorEmoji"),
+        new("openmoji", "OpenMoji Color", "OpenMojiColor"),
+        new("mona", "Mona Color Emoji", "Mona12ColorEmoji"),
+        new("serenityos", "SerenityOS Emoji", "SerenityOSEmoji"),
+    ];
+
+    public IReadOnlyList<EmojiFontOption> EmojiFontOptions => AllEmojiFontOptions;
+
+    public EmojiFontOption SelectedEmojiFont
+    {
+        get =>
+            EmojiFontOptions.FirstOrDefault(option => option.Id == EmojiFontId)
+            ?? EmojiFontOptions[0];
+        set => EmojiFontId = value?.Id ?? "system";
+    }
+
+    public string? SelectedEmojiFontFamily => SelectedEmojiFont.FontFamily;
 
     public async Task LoadAsync()
     {
@@ -55,13 +83,11 @@ public sealed partial class UserSettingsService(ManagedMatrixClient matrixClient
         {
             if (MainThread.IsMainThread)
             {
-                ExperimentalFeatureEnabled = settings?.ExperimentalFeatureEnabled ?? false;
+                Apply(settings);
             }
             else
             {
-                await MainThread.InvokeOnMainThreadAsync(() =>
-                    ExperimentalFeatureEnabled = settings?.ExperimentalFeatureEnabled ?? false
-                );
+                await MainThread.InvokeOnMainThreadAsync(() => Apply(settings));
             }
         }
         finally
@@ -72,14 +98,35 @@ public sealed partial class UserSettingsService(ManagedMatrixClient matrixClient
 
     partial void OnExperimentalFeatureEnabledChanged(bool value)
     {
+        Save();
+    }
+
+    partial void OnEmojiFontIdChanged(string value)
+    {
+        OnPropertyChanged(nameof(SelectedEmojiFont));
+        OnPropertyChanged(nameof(SelectedEmojiFontFamily));
+        Save();
+    }
+
+    private void Apply(UserSettings? settings)
+    {
+        ExperimentalFeatureEnabled = settings?.ExperimentalFeatureEnabled ?? false;
+        if (!string.IsNullOrWhiteSpace(settings?.EmojiFontId))
+        {
+            EmojiFontId = settings.EmojiFontId;
+        }
+    }
+
+    private void Save()
+    {
         if (_loaded && !_applyingRemoteSettings)
         {
             _ = matrixClient.SetAccountDataAsync(
                 EventType,
-                JsonSerializer.Serialize(new UserSettings(value))
+                JsonSerializer.Serialize(new UserSettings(ExperimentalFeatureEnabled, EmojiFontId))
             );
         }
     }
 
-    private sealed record UserSettings(bool ExperimentalFeatureEnabled);
+    private sealed record UserSettings(bool ExperimentalFeatureEnabled, string? EmojiFontId = null);
 }

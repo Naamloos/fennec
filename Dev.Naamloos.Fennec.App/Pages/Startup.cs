@@ -65,21 +65,31 @@ public sealed partial class Startup : ContentPage
 
         _started = true;
 
-        try
+        while (await _matrixClient.HasSavedSessionAsync())
         {
-            if (await Task.Run(_matrixClient.RecoverSessionAsync))
+            try
             {
-                _appNavigation.ShowShell();
+                if (await _matrixClient.RecoverSessionAsync())
+                {
+                    _appNavigation.ShowShell();
+                    return;
+                }
             }
-            else
+            catch (Exception exception)
             {
-                _appNavigation.ShowLogin();
+                // ServerUnreachable during ClientBuilder.Build is transient; keep the
+                // persisted session and retry instead of presenting a false logout.
+                System.Diagnostics.Debug.WriteLine($"Could not recover Matrix session: {exception}");
             }
+
+            if (!await _matrixClient.HasSavedSessionAsync())
+            {
+                break;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(5));
         }
-        catch (Exception exception)
-        {
-            System.Diagnostics.Debug.WriteLine(exception);
-            _appNavigation.ShowLogin();
-        }
+
+        _appNavigation.ShowLogin();
     }
 }

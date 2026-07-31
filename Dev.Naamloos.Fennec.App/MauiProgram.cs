@@ -40,6 +40,12 @@ public static class MauiProgram
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+                fonts.AddFont("FluentEmojiColor.ttf", "FluentEmojiColor");
+                fonts.AddFont("TwitterColorEmoji.ttf", "TwitterColorEmoji");
+                fonts.AddFont("NotoColorEmoji-Regular.ttf", "NotoColorEmoji");
+                fonts.AddFont("OpenMoji-color-colr1_svg.ttf", "OpenMojiColor");
+                fonts.AddFont("Mona12ColorEmoji.ttf", "Mona12ColorEmoji");
+                fonts.AddFont("SerenityOS-Emoji.ttf", "SerenityOSEmoji");
             });
 
 #if ANDROID || IOS || MACCATALYST
@@ -62,6 +68,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<ToastService>();
         builder.Services.AddSingleton<MatrixRecoveryService>();
         builder.Services.AddSingleton<UserSettingsService>();
+        builder.Services.AddSingleton<EmojiUsageService>();
 
         builder.ConfigureMauiHandlers(handlers =>
         {

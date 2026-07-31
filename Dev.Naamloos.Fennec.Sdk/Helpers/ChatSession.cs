@@ -20,6 +20,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
     private readonly RoomInfoListener _roomInfoListener;
     private readonly TaskHandle _roomInfoSubscription;
     private readonly SemaphoreSlim _membersLoadGate = new(1, 1);
+    private readonly SemaphoreSlim _customEmotesLoadGate = new(1, 1);
     private readonly SynchronizationContext? _synchronizationContext;
     private string? _lastReadEventId;
     private bool _disposed;
@@ -33,6 +34,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
     private ChatTimelineItem? _threadTarget;
     private string? _roomAvatarUrl;
     private bool _canInvalidateAvatars;
+    private bool _customEmotesLoaded;
 
     private ChatSession(ManagedMatrixClient client, Room room, ObservableTimeline timeline)
     {
@@ -157,7 +159,6 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         var session = new ChatSession(client, room, timeline);
         _ = session.LoadRoomsAsync();
         _ = session.LoadMembersAsync();
-        _ = session.LoadUserEmotesAsync();
         return session;
     }
 
@@ -305,7 +306,11 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
     public async Task ToggleReactionAsync(ChatTimelineItem item, string key)
     {
         ArgumentNullException.ThrowIfNull(item);
-        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        if (!UnicodeEmoji.IsValid(key))
+        {
+            Debug.WriteLine("Rejected a non-Unicode Matrix reaction key.");
+            return;
+        }
 
         await _timeline.Timeline.ToggleReaction(
             item.EventId is { } eventId
@@ -313,6 +318,40 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                 : new EventOrTransactionId.TransactionId(item.EventOrTransactionId),
             key
         );
+    }
+
+    /// <summary>Loads optional custom-emote metadata only when the composer asks for it.</summary>
+    public async Task LoadCustomEmotesAsync(CancellationToken cancellationToken = default)
+    {
+        await _customEmotesLoadGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (_disposed || _customEmotesLoaded)
+                return;
+
+            // Room packs already present in the local timeline require no extra request.
+            foreach (var item in Items)
+                UpdateEmotes(item.EventType, item.SourceJson);
+
+            var userEmotes = await _client.GetUserEmotesAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (var emote in userEmotes)
+            {
+                if (!Emotes.Any(existing => existing.Name == emote.Name))
+                    Emotes.Add(emote);
+            }
+
+            _customEmotesLoaded = true;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Could not load custom emotes: {exception}");
+        }
+        finally
+        {
+            _customEmotesLoadGate.Release();
+        }
     }
 
     public void ReplyTo(ChatTimelineItem? item)
@@ -731,7 +770,8 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                 ),
             };
 
-            UpdateEmotes(eventItem.EventTypeRaw, result.SourceJson);
+            if (_customEmotesLoaded)
+                UpdateEmotes(eventItem.EventTypeRaw, result.SourceJson);
 
             PopulateContent(result, eventItem);
             PopulateReactions(result, eventItem);
@@ -799,24 +839,6 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         catch (JsonException)
         {
             // The SDK can expose local echoes without raw JSON.
-        }
-    }
-
-    private async Task LoadUserEmotesAsync()
-    {
-        try
-        {
-            foreach (var emote in await _client.GetUserEmotesAsync())
-            {
-                if (!Emotes.Any(existing => existing.Name == emote.Name))
-                {
-                    Emotes.Add(emote);
-                }
-            }
-        }
-        catch
-        {
-            // Personal emotes are optional and must not block a chat session.
         }
     }
 

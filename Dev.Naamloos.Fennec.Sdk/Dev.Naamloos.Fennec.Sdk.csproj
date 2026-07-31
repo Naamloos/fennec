@@ -7,6 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <EmbeddedResource Include="..\Dev.Naamloos.Fennec.App\Resources\Raw\emoji-test.txt" Link="Resources\emoji-test.txt" LogicalName="Dev.Naamloos.Fennec.Sdk.emoji-test.txt" />
         <None
             Include="native\win-x64\matrix_sdk_ffi.dll"
             Pack="true"

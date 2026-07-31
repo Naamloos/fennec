@@ -175,6 +175,11 @@ public sealed partial class Chat : ContentView
                             .Row(1),
                         new ChatComposer()
                             .Bind(
+                                ChatComposer.SessionProperty,
+                                nameof(Session),
+                                source: this
+                            )
+                            .Bind(
                                 ChatComposer.TextProperty,
                                 $"{nameof(Session)}.{nameof(ChatSession.DraftText)}",
                                 BindingMode.TwoWay,
@@ -541,7 +546,7 @@ public sealed partial class Chat : ContentView
             return;
         }
 
-        await page.ShowPopupAsync(new EmotePickerPopup(Session, item));
+        await page.ShowPopupAsync(new EmojiPickerPopup(Session, item));
     }
 
     [RelayCommand]
@@ -803,10 +808,14 @@ public sealed partial class Chat : ContentView
         chat._globalWallpaperCancellation?.Dispose();
         chat._globalWallpaperCancellation = null;
         if (oldValue is ManagedMatrixClient oldClient)
+        {
             oldClient.GlobalWallpaperChanged -= chat.OnGlobalWallpaperChanged;
+            oldClient.ConnectionRecovered -= chat.OnConnectionRecovered;
+        }
         if (newValue is ManagedMatrixClient newClient)
         {
             newClient.GlobalWallpaperChanged += chat.OnGlobalWallpaperChanged;
+            newClient.ConnectionRecovered += chat.OnConnectionRecovered;
             chat._globalWallpaperCancellation = new CancellationTokenSource();
             _ = chat.WatchGlobalWallpaperAsync(newClient, chat._globalWallpaperCancellation.Token);
         }
@@ -817,36 +826,36 @@ public sealed partial class Chat : ContentView
         CancellationToken cancellationToken
     )
     {
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            try
-            {
-                if (client.IsLoggedIn)
-                {
-                    var wallpaper = await client.GetGlobalWallpaperAsync();
-                    if (!ReferenceEquals(MatrixClient, client))
-                        return;
-
-                    Dispatcher.Dispatch(() =>
-                    {
-                        _globalWallpaperUrl = wallpaper;
-                        UpdateWallpaper();
-                    });
-                }
-            }
-            catch (Exception exception)
-            {
-                Debug.WriteLine($"Could not load global wallpaper: {exception}");
-            }
-
-            try
-            {
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            if (cancellationToken.IsCancellationRequested || !client.IsLoggedIn || client.IsPaused)
             {
                 return;
             }
+
+            var wallpaper = await client.GetGlobalWallpaperAsync();
+            if (cancellationToken.IsCancellationRequested || !ReferenceEquals(MatrixClient, client))
+            {
+                return;
+            }
+
+            Dispatcher.Dispatch(() =>
+            {
+                _globalWallpaperUrl = wallpaper;
+                UpdateWallpaper();
+            });
+        }
+        catch (Exception) when (
+            cancellationToken.IsCancellationRequested
+            || !ReferenceEquals(MatrixClient, client)
+            || client.IsPaused
+        )
+        {
+            // The Matrix store was paused or replaced while the request was in flight.
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Could not load global wallpaper: {exception.Message}");
         }
     }
 
@@ -857,41 +866,41 @@ public sealed partial class Chat : ContentView
         CancellationToken cancellationToken
     )
     {
-        while (!cancellationToken.IsCancellationRequested && ReferenceEquals(Session, session))
+        try
         {
-            try
-            {
-                if (client.IsLoggedIn)
-                {
-                    var wallpaper = await client.GetRoomWallpaperAsync(roomId);
-                    if (
-                        cancellationToken.IsCancellationRequested
-                        || !ReferenceEquals(Session, session)
-                    )
-                    {
-                        return;
-                    }
-
-                    Dispatcher.Dispatch(() =>
-                    {
-                        _roomWallpaperUrl = wallpaper;
-                        UpdateWallpaper();
-                    });
-                }
-            }
-            catch (Exception exception)
-            {
-                Debug.WriteLine($"Could not load room wallpaper for {roomId}: {exception}");
-            }
-
-            try
-            {
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            if (
+                cancellationToken.IsCancellationRequested
+                || !ReferenceEquals(Session, session)
+                || !client.IsLoggedIn
+                || client.IsPaused
+            )
             {
                 return;
             }
+
+            var wallpaper = await client.GetRoomWallpaperAsync(roomId);
+            if (cancellationToken.IsCancellationRequested || !ReferenceEquals(Session, session))
+            {
+                return;
+            }
+
+            Dispatcher.Dispatch(() =>
+            {
+                _roomWallpaperUrl = wallpaper;
+                UpdateWallpaper();
+            });
+        }
+        catch (Exception) when (
+            cancellationToken.IsCancellationRequested
+            || !ReferenceEquals(Session, session)
+            || client.IsPaused
+        )
+        {
+            // The Matrix store was paused or the selected room changed mid-request.
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Could not load room wallpaper for {roomId}: {exception.Message}");
         }
     }
 
@@ -913,6 +922,26 @@ public sealed partial class Chat : ContentView
             _globalWallpaperUrl = url;
             UpdateWallpaper();
         });
+
+    private void OnConnectionRecovered(object? sender, EventArgs e)
+    {
+        var cancellation = _globalWallpaperCancellation;
+        if (
+            sender is not ManagedMatrixClient client
+            || !ReferenceEquals(MatrixClient, client)
+            || cancellation is null
+            || cancellation.IsCancellationRequested
+        )
+        {
+            return;
+        }
+
+        _ = WatchGlobalWallpaperAsync(client, cancellation.Token);
+        if (Session is { } session && SelectedRoom is { } room)
+        {
+            _ = LoadRoomWallpaperAsync(client, room.Id(), session, _loadCancellation?.Token ?? default);
+        }
+    }
 
     private void UpdateWallpaper() => RoomWallpaperUrl = _roomWallpaperUrl ?? _globalWallpaperUrl;
 

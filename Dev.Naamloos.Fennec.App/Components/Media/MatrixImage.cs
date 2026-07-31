@@ -20,6 +20,15 @@ public partial class MatrixImage : Image
     [BindableProperty]
     public partial bool UseAvatarCache { get; set; }
 
+    [BindableProperty]
+    public partial bool UseRoomImageCache { get; set; }
+
+    [BindableProperty]
+    public partial int ThumbnailWidth { get; set; } = 200;
+
+    [BindableProperty]
+    public partial int ThumbnailHeight { get; set; } = 200;
+
     private int _loadId;
     private CancellationTokenSource? _loadCancellation;
     private ManagedMatrixClient? _avatarChangeClient;
@@ -51,6 +60,9 @@ public partial class MatrixImage : Image
                     or nameof(IsJson)
                     or nameof(UseFullSize)
                     or nameof(UseAvatarCache)
+                    or nameof(UseRoomImageCache)
+                    or nameof(ThumbnailWidth)
+                    or nameof(ThumbnailHeight)
             )
             {
                 if (e.PropertyName == nameof(MatrixSource))
@@ -95,10 +107,14 @@ public partial class MatrixImage : Image
                     ? await client.GetMediaContentAsync(source, IsJson).ConfigureAwait(false)
                 : UseAvatarCache
                     ? await client
-                        .GetAvatarThumbnailAsync(source, 200, 200, IsJson, cancellationToken)
+                        .GetAvatarThumbnailAsync(source, (ulong)Math.Max(1, ThumbnailWidth), (ulong)Math.Max(1, ThumbnailHeight), IsJson, cancellationToken)
+                        .ConfigureAwait(false)
+                : UseRoomImageCache
+                    ? await client
+                        .GetRoomImageThumbnailAsync(source, (ulong)Math.Max(1, ThumbnailWidth), (ulong)Math.Max(1, ThumbnailHeight), IsJson, cancellationToken)
                         .ConfigureAwait(false)
                 : await client
-                    .GetThumbnailAsync(source, 200, 200, IsJson, cancellationToken)
+                    .GetThumbnailAsync(source, (ulong)Math.Max(1, ThumbnailWidth), (ulong)Math.Max(1, ThumbnailHeight), IsJson, cancellationToken)
                     .ConfigureAwait(false);
 
             if (loadId != _loadId)

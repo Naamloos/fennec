@@ -9,6 +9,15 @@ namespace Dev.Naamloos.Fennec.App.Components;
 
 public sealed partial class MessageReactionsView : ContentView
 {
+    public static readonly BindableProperty UserSettingsProperty = BindableProperty.Create(
+        nameof(UserSettings), typeof(UserSettingsService), typeof(MessageReactionsView));
+
+    public UserSettingsService? UserSettings
+    {
+        get => (UserSettingsService?)GetValue(UserSettingsProperty);
+        set => SetValue(UserSettingsProperty, value);
+    }
+
     [BindableProperty]
     public partial ChatTimelineItem? Item { get; set; }
 
@@ -17,6 +26,7 @@ public sealed partial class MessageReactionsView : ContentView
 
     public MessageReactionsView()
     {
+        this.BindService<UserSettingsService, MessageReactionsView>(UserSettingsProperty);
         Content = new HorizontalStackLayout
         {
             Spacing = 4,
@@ -64,7 +74,9 @@ public sealed partial class MessageReactionsView : ContentView
                                 Spacing = 2,
                                 Children =
                                 {
-                                    new Label().Bind(Label.TextProperty, nameof(ChatReaction.Key)),
+                                    new Label()
+                                        .Bind(Label.TextProperty, nameof(ChatReaction.Key))
+                                        .Bind(Label.FontFamilyProperty, $"{nameof(UserSettings)}.{nameof(UserSettingsService.SelectedEmojiFontFamily)}", source: this),
                                     new Label { FontSize = 11 }.Bind(
                                         Label.TextProperty,
                                         nameof(ChatReaction.Count)
