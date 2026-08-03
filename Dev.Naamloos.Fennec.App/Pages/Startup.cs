@@ -10,8 +10,20 @@ namespace Dev.Naamloos.Fennec.App.Pages;
 public sealed partial class Startup : ContentPage
 {
     private bool _started;
+    private string _status = "Starting Fennec…";
     private readonly ManagedMatrixClient _matrixClient;
     private readonly AppNavigationService _appNavigation;
+
+    public string Status
+    {
+        get => _status;
+        private set
+        {
+            if (_status == value) return;
+            _status = value;
+            OnPropertyChanged();
+        }
+    }
 
     public Startup(ManagedMatrixClient matrixClient, AppNavigationService appNavigation)
     {
@@ -20,13 +32,15 @@ public sealed partial class Startup : ContentPage
 
         BindingContext = this;
         Shell.SetNavBarIsVisible(this, false);
-        build();
+        Build();
     }
 
-    private void build()
+    private void Build()
     {
         Content = new VerticalStackLayout
         {
+            SafeAreaEdges = SafeAreaEdges.All,
+            Padding = 24,
             HorizontalOptions = LayoutOptions.Center,
             VerticalOptions = LayoutOptions.Center,
             Spacing = 16,
@@ -48,9 +62,9 @@ public sealed partial class Startup : ContentPage
                 },
                 new Label
                 {
-                    Text = "Starting Fennec…",
                     HorizontalTextAlignment = TextAlignment.Center,
-                },
+                    LineBreakMode = LineBreakMode.WordWrap,
+                }.Bind(Label.TextProperty, nameof(Status), source: this),
             },
         };
     }
@@ -67,6 +81,7 @@ public sealed partial class Startup : ContentPage
 
         while (await _matrixClient.HasSavedSessionAsync())
         {
+            Status = "Restoring your session…";
             try
             {
                 if (await _matrixClient.RecoverSessionAsync())
@@ -80,6 +95,7 @@ public sealed partial class Startup : ContentPage
                 // ServerUnreachable during ClientBuilder.Build is transient; keep the
                 // persisted session and retry instead of presenting a false logout.
                 System.Diagnostics.Debug.WriteLine($"Could not recover Matrix session: {exception}");
+                Status = "Can’t reach your homeserver. Retrying…";
             }
 
             if (!await _matrixClient.HasSavedSessionAsync())
@@ -90,6 +106,7 @@ public sealed partial class Startup : ContentPage
             await Task.Delay(TimeSpan.FromSeconds(5));
         }
 
+        Status = "Opening sign in…";
         _appNavigation.ShowLogin();
     }
 }

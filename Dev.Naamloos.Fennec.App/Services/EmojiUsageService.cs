@@ -1,63 +1,98 @@
 using System.Text.Json;
-using Dev.Naamloos.Fennec.App.Components;
+using System.Text.Json.Serialization;
+using Dev.Naamloos.Fennec.Sdk;
+using Dev.Naamloos.Fennec.Sdk.Helpers;
 
 namespace Dev.Naamloos.Fennec.App.Services;
 
-/// <summary>Small local index; catalog metadata stays out of user settings.</summary>
 public sealed class EmojiUsageService
 {
-    private const string StorageKey = "fennec.emoji.usage.v1";
-    private EmojiUsageState _state;
+    private const string FavouritesKey = "fennec.emoji.favourites.v1";
+    private const string AccountDataType = "m.recent_emoji";
+    private readonly ManagedMatrixClient _client;
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly List<RecentEmojiEntry> _recent = [];
+    private readonly HashSet<string> _favourites;
 
-    public EmojiUsageService()
+    public EmojiUsageService(ManagedMatrixClient client)
     {
-        try
-        {
-            _state = JsonSerializer.Deserialize<EmojiUsageState>(Preferences.Default.Get(StorageKey, "")) ?? new();
-        }
-        catch (JsonException)
-        {
-            _state = new();
-        }
+        _client = client;
+        _favourites = Preferences.Default.Get(FavouritesKey, string.Empty)
+            .Split('|', StringSplitOptions.RemoveEmptyEntries)
+            .ToHashSet(StringComparer.Ordinal);
+        _ = RefreshAsync();
     }
 
-    public IReadOnlyList<string> RecentIds(EmojiPickerMode mode) =>
-        (mode == EmojiPickerMode.Reaction ? _state.Reaction : _state.Composer)
-            .OrderByDescending(entry => entry.LastUsed)
-            .Select(entry => entry.Id)
-            .ToArray();
+    public IReadOnlyList<string> RecentEmoji => _recent.Select(entry => entry.Emoji).ToArray();
+    public IReadOnlySet<string> FavouriteIds => _favourites;
 
-    public IReadOnlySet<string> FavouriteIds => _state.Favourites.Select(entry => entry.Id).ToHashSet(StringComparer.Ordinal);
-
-    public void Record(EmojiPickerMode mode, string id)
+    public void Record(string? emoji)
     {
-        var entries = mode == EmojiPickerMode.Reaction ? _state.Reaction : _state.Composer;
-        var existing = entries.FirstOrDefault(entry => entry.Id == id);
-        if (existing is not null)
-            entries.Remove(existing);
-        entries.Insert(0, new EmojiUsageEntry(id, DateTimeOffset.UtcNow, (existing?.UseCount ?? 0) + 1));
-        if (entries.Count > 48)
-            entries.RemoveRange(48, entries.Count - 48);
-        Save();
+        if (!UnicodeEmoji.IsValid(emoji)) return;
+        _ = RecordAsync(emoji!);
     }
 
     public void ToggleFavourite(string id)
     {
-        var existing = _state.Favourites.FirstOrDefault(entry => entry.Id == id);
-        if (existing is null)
-            _state.Favourites.Add(new EmojiUsageEntry(id, DateTimeOffset.UtcNow, 0));
-        else
-            _state.Favourites.Remove(existing);
-        Save();
+        if (!_favourites.Add(id)) _favourites.Remove(id);
+        Preferences.Default.Set(FavouritesKey, string.Join('|', _favourites));
     }
 
-    private void Save() => Preferences.Default.Set(StorageKey, JsonSerializer.Serialize(_state));
-
-    private sealed record EmojiUsageEntry(string Id, DateTimeOffset LastUsed, int UseCount);
-    private sealed class EmojiUsageState
+    public async Task RefreshAsync()
     {
-        public List<EmojiUsageEntry> Reaction { get; init; } = [];
-        public List<EmojiUsageEntry> Composer { get; init; } = [];
-        public List<EmojiUsageEntry> Favourites { get; init; } = [];
+        if (!_client.IsLoggedIn) return;
+        await _gate.WaitAsync();
+        try
+        {
+            var content = await _client.GetAccountDataAsync(AccountDataType);
+            _recent.Clear();
+            if (!string.IsNullOrWhiteSpace(content))
+            {
+                var state = JsonSerializer.Deserialize<RecentEmojiContent>(content);
+                if (state?.Recent is not null)
+                    _recent.AddRange(state.Recent.Where(entry => UnicodeEmoji.IsValid(entry.Emoji)).Take(100));
+            }
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine($"Could not load recent emoji: {exception}");
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
+
+    private async Task RecordAsync(string emoji)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            var existing = _recent.FirstOrDefault(entry => entry.Emoji == emoji);
+            if (existing is not null) _recent.Remove(existing);
+            _recent.Insert(0, new RecentEmojiEntry(emoji, (existing?.Total ?? 0) + 1));
+            if (_recent.Count > 100) _recent.RemoveRange(100, _recent.Count - 100);
+            await _client.SetAccountDataAsync(
+                AccountDataType,
+                JsonSerializer.Serialize(new RecentEmojiContent(_recent.ToArray()))
+            );
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine($"Could not save recent emoji: {exception}");
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private sealed record RecentEmojiEntry(
+        [property: JsonPropertyName("emoji")] string Emoji,
+        [property: JsonPropertyName("total")] ulong Total
+    );
+
+    private sealed record RecentEmojiContent(
+        [property: JsonPropertyName("recent_emoji")] RecentEmojiEntry[] Recent
+    );
 }

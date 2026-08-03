@@ -16,6 +16,7 @@ public sealed partial class MatrixHtmlView : ContentView
 {
     private INotifyCollectionChanged? _membersSource;
     private int _emojiOnlyCount;
+    private bool _buildQueued;
 
     [BindableProperty]
     public partial string? Html { get; set; }
@@ -65,11 +66,24 @@ public sealed partial class MatrixHtmlView : ContentView
                     or nameof(EmojiFontFamily)
             )
             {
-                Build();
+                QueueBuild();
             }
         };
 
         Build();
+    }
+
+    private void QueueBuild()
+    {
+        if (_buildQueued)
+            return;
+
+        _buildQueued = true;
+        Dispatcher.Dispatch(() =>
+        {
+            _buildQueued = false;
+            Build();
+        });
     }
 
     private void Build()
@@ -106,12 +120,18 @@ public sealed partial class MatrixHtmlView : ContentView
     private void OnMembersChanged(object? sender, NotifyCollectionChangedEventArgs args)
     {
         if (
-            args.NewItems?.OfType<RoomMember>()
-                .Any(member => Html?.Contains(member.UserId, StringComparison.Ordinal) == true)
-            == true
+            (
+                args.Action == NotifyCollectionChangedAction.Reset
+                && Members?.Any(member =>
+                    Html?.Contains(member.UserId, StringComparison.Ordinal) == true
+                ) == true
+            )
+            || args.NewItems?.OfType<RoomMember>()
+                    .Any(member => Html?.Contains(member.UserId, StringComparison.Ordinal) == true)
+                == true
         )
         {
-            Build();
+            QueueBuild();
         }
     }
 

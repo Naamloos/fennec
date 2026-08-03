@@ -134,8 +134,8 @@ public sealed partial class ChatComposer : ContentView
                             Icon = MaterialIcons.Close,
                             IconSize = 20,
                             IconColor = Colors.Red,
-                            WidthRequest = 32,
-                            HeightRequest = 32,
+                            WidthRequest = 44,
+                            HeightRequest = 44,
                             GestureRecognizers =
                             {
                                 new TapGestureRecognizer().BindCommand(
@@ -143,7 +143,11 @@ public sealed partial class ChatComposer : ContentView
                                     source: this
                                 ),
                             },
-                        }.Column(1),
+                        }
+                            .Invoke(view =>
+                                SemanticProperties.SetDescription(view, "Cancel reply")
+                            )
+                            .Column(1),
                     },
                 }
                     .Bind(
@@ -176,8 +180,8 @@ public sealed partial class ChatComposer : ContentView
                             Icon = MaterialIcons.Close,
                             IconSize = 20,
                             IconColor = Colors.Red,
-                            WidthRequest = 32,
-                            HeightRequest = 32,
+                            WidthRequest = 44,
+                            HeightRequest = 44,
                             GestureRecognizers =
                             {
                                 new TapGestureRecognizer().BindCommand(
@@ -185,7 +189,11 @@ public sealed partial class ChatComposer : ContentView
                                     source: this
                                 ),
                             },
-                        }.Column(1),
+                        }
+                            .Invoke(view =>
+                                SemanticProperties.SetDescription(view, "Cancel edit")
+                            )
+                            .Column(1),
                     },
                 }
                     .Bind(
@@ -204,19 +212,21 @@ public sealed partial class ChatComposer : ContentView
                     .Bind(MatrixHtmlView.HtmlProperty, nameof(PreviewHtml), source: this)
                     .Bind(
                         IsVisibleProperty,
-                        nameof(Text),
+                        nameof(PreviewHtml),
                         converter: new IsStringNotNullOrEmptyConverter(),
                         source: this
                     )
                     .Row(2),
                 new Grid
                 {
-                    Padding = 12,
+                    Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                        ? new Thickness(6, 8)
+                        : new Thickness(12),
                     Children =
                     {
                         new Grid
                         {
-                            ColumnSpacing = 8,
+                            ColumnSpacing = DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 4 : 8,
                             ColumnDefinitions =
                             {
                                 new ColumnDefinition(GridLength.Auto),
@@ -231,8 +241,8 @@ public sealed partial class ChatComposer : ContentView
                                 {
                                     Icon = MaterialIcons.AttachFile,
                                     IconSize = 24,
-                                    WidthRequest = 40,
-                                    HeightRequest = 40,
+                                    WidthRequest = 44,
+                                    HeightRequest = 44,
                                     VerticalOptions = LayoutOptions.Center,
                                     GestureRecognizers =
                                     {
@@ -241,14 +251,18 @@ public sealed partial class ChatComposer : ContentView
                                             source: this
                                         ),
                                     },
-                                }.Column(0),
+                                }
+                                    .Invoke(view =>
+                                        SemanticProperties.SetDescription(view, "Attach file")
+                                    )
+                                    .Column(0),
                                 CreateEntry().Column(1),
                                 new MauiIcon
                                 {
                                     Icon = MaterialIcons.AddReaction,
                                     IconSize = 24,
-                                    WidthRequest = 40,
-                                    HeightRequest = 40,
+                                    WidthRequest = 44,
+                                    HeightRequest = 44,
                                     VerticalOptions = LayoutOptions.Center,
                                     GestureRecognizers =
                                     {
@@ -257,13 +271,17 @@ public sealed partial class ChatComposer : ContentView
                                             source: this
                                         ),
                                     },
-                                }.Column(2),
+                                }
+                                    .Invoke(view =>
+                                        SemanticProperties.SetDescription(view, "Choose emoji")
+                                    )
+                                    .Column(2),
                                 new MauiIcon
                                 {
                                     Icon = MaterialIcons.Add,
                                     IconSize = 24,
-                                    WidthRequest = 40,
-                                    HeightRequest = 40,
+                                    WidthRequest = 44,
+                                    HeightRequest = 44,
                                     VerticalOptions = LayoutOptions.Center,
                                     GestureRecognizers =
                                     {
@@ -272,13 +290,26 @@ public sealed partial class ChatComposer : ContentView
                                             source: this
                                         ),
                                     },
-                                }.Column(3),
+                                }
+                                    .Bind(
+                                        IsVisibleProperty,
+                                        nameof(MoreCommand),
+                                        converter: new NotNullConverter(),
+                                        source: this
+                                    )
+                                    .Invoke(view =>
+                                        SemanticProperties.SetDescription(
+                                            view,
+                                            "More message options"
+                                        )
+                                    )
+                                    .Column(3),
                                 new MauiIcon
                                 {
                                     Icon = MaterialIcons.Send,
                                     IconSize = 24,
-                                    WidthRequest = 40,
-                                    HeightRequest = 40,
+                                    WidthRequest = 44,
+                                    HeightRequest = 44,
                                     VerticalOptions = LayoutOptions.Center,
                                     GestureRecognizers =
                                     {
@@ -287,7 +318,16 @@ public sealed partial class ChatComposer : ContentView
                                             source: this
                                         ),
                                     },
-                                }.Column(4),
+                                }
+                                    .Bind(
+                                        IsEnabledProperty,
+                                        $"{nameof(Session)}.{nameof(ChatSession.CanSend)}",
+                                        source: this
+                                    )
+                                    .Invoke(view =>
+                                        SemanticProperties.SetDescription(view, "Send message")
+                                    )
+                                    .Column(4),
                             },
                         },
                         new ComposerAutocomplete
@@ -328,7 +368,7 @@ public sealed partial class ChatComposer : ContentView
     private EmojiPicker CreateEmojiPicker() => new EmojiPicker
     {
         Mode = EmojiPickerMode.Composer,
-        HeightRequest = 320,
+        HeightRequest = DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 280 : 320,
         SelectedCommand = new Command<EmojiSelection>(selection =>
         {
             if (selection?.Kind == EmojiKind.Unicode && !string.IsNullOrEmpty(selection.Unicode))
@@ -447,6 +487,17 @@ public sealed partial class ChatComposer : ContentView
 
     private string Preview(string text)
     {
+        if (
+            string.IsNullOrWhiteSpace(text)
+            || (
+                !Bold.IsMatch(text)
+                && !Italic.IsMatch(text)
+                && !Emote.IsMatch(text)
+                && !Mention.IsMatch(text)
+            )
+        )
+            return string.Empty;
+
         var html = WebUtility.HtmlEncode(text).ReplaceLineEndings("<br />");
         html = Bold.Replace(html, "<strong>$1</strong>");
         html = Italic.Replace(html, "<em>$1</em>");

@@ -54,6 +54,20 @@ public sealed partial class Chat : ContentView
     [BindableProperty]
     public partial string? RoomWallpaperUrl { get; set; }
 
+    [BindableProperty(PropertyChangedMethodName = nameof(OnFocusedEventIdChanged))]
+    public partial string? FocusedEventId { get; set; }
+
+    [BindableProperty]
+    public partial bool IsThreadListOpen { get; set; }
+
+    [BindableProperty]
+    public partial bool IsThreadOpen { get; set; }
+
+    [BindableProperty]
+    public partial string? ThreadRootEventId { get; set; }
+
+    public bool IsEventContext => !string.IsNullOrWhiteSpace(FocusedEventId);
+
     public Chat()
     {
         Content = new Grid
@@ -65,8 +79,8 @@ public sealed partial class Chat : ContentView
                     IsJson = false,
                     UseFullSize = true,
                     Aspect = Aspect.AspectFill,
-                    Opacity = .42,
                     InputTransparent = true,
+                    Opacity = .80,
                 }
                     .Bind(MatrixImage.MatrixSourceProperty, nameof(RoomWallpaperUrl), source: this)
                     .Bind(MatrixImage.ClientProperty, nameof(MatrixClient), source: this),
@@ -149,6 +163,16 @@ public sealed partial class Chat : ContentView
                                 source: this
                             )
                             .Bind(
+                                ChatTimeline.ThreadCommandProperty,
+                                nameof(OpenThreadCommand),
+                                source: this
+                            )
+                            .Bind(
+                                ChatTimeline.FocusedEventIdProperty,
+                                nameof(FocusedEventId),
+                                source: this
+                            )
+                            .Bind(
                                 ChatTimeline.IsNearBottomProperty,
                                 nameof(TimelineIsNearBottom),
                                 BindingMode.TwoWay,
@@ -174,11 +198,7 @@ public sealed partial class Chat : ContentView
                             )
                             .Row(1),
                         new ChatComposer()
-                            .Bind(
-                                ChatComposer.SessionProperty,
-                                nameof(Session),
-                                source: this
-                            )
+                            .Bind(ChatComposer.SessionProperty, nameof(Session), source: this)
                             .Bind(
                                 ChatComposer.TextProperty,
                                 $"{nameof(Session)}.{nameof(ChatSession.DraftText)}",
@@ -250,6 +270,71 @@ public sealed partial class Chat : ContentView
                                 $"{nameof(Session)}.{nameof(ChatSession.Rooms)}",
                                 source: this
                             )
+                            .Bind<ChatComposer, bool, bool, bool>(
+                                IsVisibleProperty,
+                                new Binding(
+                                    $"{nameof(Session)}.{nameof(ChatSession.IsServerNoticeRoom)}",
+                                    source: this
+                                ),
+                                new Binding(nameof(IsEventContext), source: this),
+                                convert: static values => !values.Item1 && !values.Item2
+                            )
+                            .Row(2),
+                        new Border
+                        {
+                            Margin = 12,
+                            Padding = 10,
+                            StrokeThickness = 0,
+                            Content = new Label
+                            {
+                                Text =
+                                    "Server notices are sent by your homeserver and cannot be replied to.",
+                                HorizontalTextAlignment = TextAlignment.Center,
+                            },
+                        }
+                            .Bind<Border, bool, bool, bool>(
+                                IsVisibleProperty,
+                                new Binding(
+                                    $"{nameof(Session)}.{nameof(ChatSession.IsServerNoticeRoom)}",
+                                    source: this
+                                ),
+                                new Binding(nameof(IsEventContext), source: this),
+                                convert: static values => values.Item1 && !values.Item2
+                            )
+                            .DynamicResource(BackgroundColorProperty, "SurfaceContainer")
+                            .Row(2),
+                        new Border
+                        {
+                            Margin = 12,
+                            Padding = 8,
+                            StrokeThickness = 0,
+                            Content = new Grid
+                            {
+                                ColumnSpacing = 8,
+                                ColumnDefinitions =
+                                {
+                                    new ColumnDefinition(GridLength.Star),
+                                    new ColumnDefinition(GridLength.Auto),
+                                },
+                                Children =
+                                {
+                                    new Label
+                                    {
+                                        Text = "Viewing event context",
+                                        VerticalTextAlignment = TextAlignment.Center,
+                                    },
+                                    new Button
+                                    {
+                                        Text = "Return to live",
+                                        MinimumHeightRequest = 44,
+                                    }
+                                        .BindCommand(nameof(ClearEventContextCommand), source: this)
+                                        .Column(1),
+                                },
+                            },
+                        }
+                            .Bind(IsVisibleProperty, nameof(IsEventContext), source: this)
+                            .DynamicResource(BackgroundColorProperty, "SurfaceContainer")
                             .Row(2),
                     },
                 },
@@ -294,6 +379,54 @@ public sealed partial class Chat : ContentView
                         },
                     },
                 }.Bind(IsVisibleProperty, nameof(IsLoading), source: this),
+                new Border
+                {
+                    Margin =
+                        DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                            ? new Thickness(16)
+                            : new Thickness(24),
+                    Padding = 18,
+                    MaximumWidthRequest = 520,
+                    HorizontalOptions = LayoutOptions.Center,
+                    VerticalOptions = LayoutOptions.Center,
+                    StrokeThickness = 0,
+                    StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
+                    {
+                        CornerRadius = 16,
+                    },
+                    Content = new VerticalStackLayout
+                    {
+                        Spacing = 10,
+                        Children =
+                        {
+                            new Label
+                            {
+                                Text = "Couldn’t load this conversation",
+                                FontSize = 18,
+                                FontAttributes = FontAttributes.Bold,
+                                HorizontalTextAlignment = TextAlignment.Center,
+                            },
+                            new Label
+                            {
+                                HorizontalTextAlignment = TextAlignment.Center,
+                                LineBreakMode = LineBreakMode.WordWrap,
+                            }.Bind(Label.TextProperty, nameof(RoomLoadError), source: this),
+                            new Button
+                            {
+                                Text = "Try again",
+                                MinimumHeightRequest = 44,
+                                HorizontalOptions = LayoutOptions.Fill,
+                            }.BindCommand(nameof(RetryRoomCommand), source: this),
+                        },
+                    },
+                }
+                    .Bind(
+                        IsVisibleProperty,
+                        nameof(RoomLoadError),
+                        converter: new IsStringNotNullOrEmptyConverter(),
+                        source: this
+                    )
+                    .DynamicResource(BackgroundColorProperty, "SurfaceContainerHigh"),
                 new MediaOverlay()
                     .Bind(MediaOverlay.ClientProperty, nameof(MatrixClient), source: this)
                     .Bind(MediaOverlay.MediaProperty, nameof(FullscreenMedia), source: this)
@@ -320,6 +453,35 @@ public sealed partial class Chat : ContentView
                         BindingMode.TwoWay,
                         source: this
                     ),
+                new ThreadListFlyout()
+                    .Bind(ThreadListFlyout.RoomProperty, nameof(SelectedRoom), source: this)
+                    .Bind(
+                        ThreadListFlyout.IsOpenProperty,
+                        nameof(IsThreadListOpen),
+                        BindingMode.TwoWay,
+                        source: this
+                    )
+                    .Bind(
+                        ThreadListFlyout.OpenThreadCommandProperty,
+                        nameof(OpenThreadByIdCommand),
+                        source: this
+                    )
+                    .Bind(IsVisibleProperty, nameof(IsThreadListOpen), source: this),
+                new ThreadView()
+                    .Bind(ThreadView.RoomProperty, nameof(SelectedRoom), source: this)
+                    .Bind(
+                        ThreadView.RootEventIdProperty,
+                        nameof(ThreadRootEventId),
+                        BindingMode.TwoWay,
+                        source: this
+                    )
+                    .Bind(
+                        ThreadView.IsOpenProperty,
+                        nameof(IsThreadOpen),
+                        BindingMode.TwoWay,
+                        source: this
+                    )
+                    .Bind(IsVisibleProperty, nameof(IsThreadOpen), source: this),
                 _profileSheet,
             },
         };
@@ -345,12 +507,24 @@ public sealed partial class Chat : ContentView
 
             var client =
                 MatrixClient ?? throw new InvalidOperationException("Matrix client is required.");
-            var session = await ChatSession.CreateAsync(client, room, token);
+            var session = await ChatSession.CreateAsync(
+                client,
+                room,
+                token,
+                string.IsNullOrWhiteSpace(FocusedEventId)
+                    ? null
+                    : new TimelineFocus.Event(
+                        FocusedEventId,
+                        40,
+                        new uniffi.matrix_sdk_ui.TimelineEventFocusThreadMode.Automatic(false)
+                    )
+            );
             token.ThrowIfCancellationRequested();
             Session = session;
             _subscribedSession = session;
             _subscribedSession.Items.CollectionChanged += OnSessionItemsChanged;
-            _ = session.MarkAsReadAsync();
+            if (string.IsNullOrWhiteSpace(FocusedEventId))
+                _ = session.MarkAsReadAsync();
             _ = LoadInitialHistoryAsync(session, token);
             _ = LoadRoomWallpaperAsync(client, room.Id(), session, token);
         }
@@ -375,6 +549,10 @@ public sealed partial class Chat : ContentView
     [RelayCommand]
     private Task SendMessageAsync() =>
         Session?.CanSend == true ? Session.SendMessageAsync() : Task.CompletedTask;
+
+    [RelayCommand]
+    private Task RetryRoomAsync() =>
+        SelectedRoom is null ? Task.CompletedTask : SetRoomAsync(SelectedRoom);
 
     [RelayCommand]
     private async Task AttachFileAsync()
@@ -514,6 +692,32 @@ public sealed partial class Chat : ContentView
     [RelayCommand]
     private async Task OpenLinkAsync(string? value)
     {
+        if (value?.StartsWith('$') == true)
+        {
+            FocusedEventId = value;
+            return;
+        }
+
+        if (
+            MatrixClient is not null
+            && Uri.TryCreate(value, UriKind.Absolute, out var matrixUri)
+            && matrixUri.Host.Equals("matrix.to", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            var parts = matrixUri
+                .Fragment.TrimStart('#', '/')
+                .Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2 && Uri.UnescapeDataString(parts[1]).StartsWith('$'))
+            {
+                SelectedRoom = MatrixClient
+                    .GetSyncService()
+                    .RoomListService()
+                    .Room(Uri.UnescapeDataString(parts[0]));
+                FocusedEventId = Uri.UnescapeDataString(parts[1]).Split('?', 2)[0];
+                return;
+            }
+        }
+
         if (
             CurrentPage() is not { } page
             || !Uri.TryCreate(value, UriKind.Absolute, out var uri)
@@ -599,27 +803,28 @@ public sealed partial class Chat : ContentView
             return;
         }
 
-        var actions = new List<string> { "View source" };
+        var actions = new List<string>();
 
         if (item.IsMessage)
         {
-            actions.Insert(0, "React");
-            actions.Insert(0, "Copy text");
-
             if (item.CanReply)
             {
-                actions.Insert(0, "Reply in thread");
-                actions.Insert(0, "Reply");
+                actions.Add("Reply");
+                actions.Add("Reply in thread");
             }
 
             if (item.IsOwn && item.EventId is not null)
             {
-                actions.Insert(0, "Edit");
+                actions.Add("Edit");
             }
 
-            if (Session is not null && await Session.CanDeleteAsync(item))
+            actions.Add("React");
+            actions.Add("Copy text");
+
+            if (item.EventId is not null)
             {
-                actions.Add("Delete");
+                actions.Add("Copy link");
+                actions.Add("Share link");
             }
 
             if (item.Media is not null)
@@ -627,17 +832,35 @@ public sealed partial class Chat : ContentView
                 actions.Add("Save file");
             }
 
+            actions.Add("View source");
+
             if (!item.IsOwn)
             {
                 actions.Add("Report message");
                 actions.Add("Block user");
             }
+
+            if (Session is not null && await Session.CanDeleteAsync(item))
+            {
+                actions.Add("Delete");
+            }
+        }
+        else
+        {
+            actions.Add("View source");
         }
 
-        switch (await InAppDialogs.ChooseAsync(page, "Timeline item", actions))
+        switch (
+            await InAppDialogs.ChooseAsync(
+                page,
+                item.IsMessage ? "Message actions" : "Event actions",
+                actions,
+                item.IsMessage ? item.Sender : item.EventType
+            )
+        )
         {
             case "Reply in thread":
-                Session?.ReplyInThread(item);
+                OpenThread(item);
                 break;
             case "Reply":
                 Reply(item);
@@ -650,6 +873,20 @@ public sealed partial class Chat : ContentView
                 break;
             case "Copy text":
                 await Clipboard.Default.SetTextAsync(item.Body);
+                break;
+            case "Copy link" when item.EventId is not null && Session is not null:
+                await Clipboard.Default.SetTextAsync(
+                    await Session.Room.MatrixToEventPermalink(item.EventId)
+                );
+                break;
+            case "Share link" when item.EventId is not null && Session is not null:
+                await Share.Default.RequestAsync(
+                    new ShareTextRequest
+                    {
+                        Title = "Share Matrix message",
+                        Text = await Session.Room.MatrixToEventPermalink(item.EventId),
+                    }
+                );
                 break;
             case "React":
                 await OpenReactionPickerAsync(item);
@@ -845,11 +1082,11 @@ public sealed partial class Chat : ContentView
                 UpdateWallpaper();
             });
         }
-        catch (Exception) when (
-            cancellationToken.IsCancellationRequested
-            || !ReferenceEquals(MatrixClient, client)
-            || client.IsPaused
-        )
+        catch (Exception)
+            when (cancellationToken.IsCancellationRequested
+                || !ReferenceEquals(MatrixClient, client)
+                || client.IsPaused
+            )
         {
             // The Matrix store was paused or replaced while the request was in flight.
         }
@@ -857,6 +1094,41 @@ public sealed partial class Chat : ContentView
         {
             Debug.WriteLine($"Could not load global wallpaper: {exception.Message}");
         }
+    }
+
+    private static void OnFocusedEventIdChanged(
+        BindableObject bindable,
+        object oldValue,
+        object newValue
+    )
+    {
+        var chat = (Chat)bindable;
+        chat.OnPropertyChanged(nameof(IsEventContext));
+        if (chat.SelectedRoom is not null)
+            _ = chat.SetRoomAsync(chat.SelectedRoom);
+    }
+
+    [RelayCommand]
+    private void ClearEventContext() => FocusedEventId = null;
+
+    [RelayCommand]
+    private void OpenThreadById(string? rootEventId)
+    {
+        if (string.IsNullOrWhiteSpace(rootEventId))
+            return;
+        IsThreadListOpen = false;
+        ThreadRootEventId = rootEventId;
+        IsThreadOpen = true;
+        if (Session is not null)
+            _ = Session.Room.SetThreadSubscription(rootEventId, true);
+    }
+
+    [RelayCommand]
+    private void OpenThread(ChatTimelineItem? item)
+    {
+        if (item is null)
+            return;
+        OpenThreadById(item.ThreadRootEventId ?? item.EventId);
     }
 
     private async Task LoadRoomWallpaperAsync(
@@ -890,11 +1162,11 @@ public sealed partial class Chat : ContentView
                 UpdateWallpaper();
             });
         }
-        catch (Exception) when (
-            cancellationToken.IsCancellationRequested
-            || !ReferenceEquals(Session, session)
-            || client.IsPaused
-        )
+        catch (Exception)
+            when (cancellationToken.IsCancellationRequested
+                || !ReferenceEquals(Session, session)
+                || client.IsPaused
+            )
         {
             // The Matrix store was paused or the selected room changed mid-request.
         }
@@ -909,10 +1181,19 @@ public sealed partial class Chat : ContentView
         CancellationToken cancellationToken
     )
     {
-        await Task.Yield();
-        if (!cancellationToken.IsCancellationRequested && ReferenceEquals(Session, session))
+        try
         {
-            await session.LoadMoreHistoryAsync(100, cancellationToken);
+            await Task.Yield();
+            if (!cancellationToken.IsCancellationRequested && ReferenceEquals(Session, session))
+            {
+                await session.LoadMoreHistoryAsync(100, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            if (ReferenceEquals(Session, session))
+                RoomLoadError = exception.Message;
         }
     }
 
@@ -939,7 +1220,12 @@ public sealed partial class Chat : ContentView
         _ = WatchGlobalWallpaperAsync(client, cancellation.Token);
         if (Session is { } session && SelectedRoom is { } room)
         {
-            _ = LoadRoomWallpaperAsync(client, room.Id(), session, _loadCancellation?.Token ?? default);
+            _ = LoadRoomWallpaperAsync(
+                client,
+                room.Id(),
+                session,
+                _loadCancellation?.Token ?? default
+            );
         }
     }
 
@@ -951,7 +1237,7 @@ public sealed partial class Chat : ContentView
         object newValue
     )
     {
-        if (newValue is true)
+        if (newValue is true && !((Chat)bindable).IsEventContext)
         {
             _ = ((Chat)bindable).Session?.MarkAsReadAsync();
         }
@@ -959,7 +1245,7 @@ public sealed partial class Chat : ContentView
 
     private void OnSessionItemsChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs)
     {
-        if (TimelineIsNearBottom)
+        if (TimelineIsNearBottom && !IsEventContext)
         {
             _ = Session?.MarkAsReadAsync();
         }

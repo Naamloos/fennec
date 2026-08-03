@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Dev.Naamloos.Fennec.Sdk.Events;
 using uniffi.matrix_sdk;
@@ -6,12 +5,13 @@ using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.Sdk.Helpers;
 
-public sealed class ObservableTimeline : ObservableCollection<TimelineItem>, IDisposable
+public sealed class ObservableTimeline : ObservableRangeCollection<TimelineItem>, IDisposable
 {
     private const ushort DefaultPageSize = 50;
 
     private readonly ManagedMatrixClient _client;
     private readonly Timeline _timeline;
+    private readonly bool _subscribeToPaginationStatus;
     private readonly SynchronizationContext? _synchronizationContext;
     private readonly TaskCompletionSource _initialItemsLoaded = new(
         TaskCreationOptions.RunContinuationsAsynchronously
@@ -27,10 +27,15 @@ public sealed class ObservableTimeline : ObservableCollection<TimelineItem>, IDi
     private int _isRestarting;
     private bool _disposed;
 
-    private ObservableTimeline(ManagedMatrixClient client, Timeline timeline)
+    private ObservableTimeline(
+        ManagedMatrixClient client,
+        Timeline timeline,
+        bool subscribeToPaginationStatus
+    )
     {
         _client = client;
         _timeline = timeline;
+        _subscribeToPaginationStatus = subscribeToPaginationStatus;
         _synchronizationContext = SynchronizationContext.Current;
 
         _client.ConnectionRecovered += OnConnectionRecovered;
@@ -85,13 +90,18 @@ public sealed class ObservableTimeline : ObservableCollection<TimelineItem>, IDi
     internal static async Task<ObservableTimeline> CreateAsync(
         ManagedMatrixClient client,
         Timeline timeline,
+        bool subscribeToPaginationStatus,
         CancellationToken cancellationToken = default
     )
     {
         ArgumentNullException.ThrowIfNull(timeline);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var observableTimeline = new ObservableTimeline(client, timeline);
+        var observableTimeline = new ObservableTimeline(
+            client,
+            timeline,
+            subscribeToPaginationStatus
+        );
 
         try
         {
@@ -111,7 +121,6 @@ public sealed class ObservableTimeline : ObservableCollection<TimelineItem>, IDi
         ThrowIfDisposed();
 
         _listener = TimelineListenerCallback.Create(UpdateEntries);
-        _paginationListener = PaginationStatusListenerCallback.Create(UpdatePaginationStatus);
 
         /*
          * In the generated Matrix FFI bindings, AddListener commonly returns
@@ -119,9 +128,14 @@ public sealed class ObservableTimeline : ObservableCollection<TimelineItem>, IDi
          * itself; it remains active until its handle is cancelled.
          */
         _listenerHandle = await _timeline.AddListener(_listener);
-        _paginationListenerHandle = await _timeline.SubscribeToBackPaginationStatus(
-            _paginationListener
-        );
+
+        if (_subscribeToPaginationStatus)
+        {
+            _paginationListener = PaginationStatusListenerCallback.Create(UpdatePaginationStatus);
+            _paginationListenerHandle = await _timeline.SubscribeToBackPaginationStatus(
+                _paginationListener
+            );
+        }
     }
 
     private void OnConnectionRecovered(object? sender, EventArgs e)
@@ -212,7 +226,7 @@ public sealed class ObservableTimeline : ObservableCollection<TimelineItem>, IDi
 
     private void UpdateEntries(TimelineDiff[] updates)
     {
-        if (_disposed || updates.Length == 0)
+        if (_disposed)
         {
             return;
         }
@@ -310,10 +324,7 @@ public sealed class ObservableTimeline : ObservableCollection<TimelineItem>, IDi
 
     private void ApplyAppend(TimelineDiff.Append append)
     {
-        foreach (var item in append.Values)
-        {
-            Add(item);
-        }
+        AddRange(append.Values);
     }
 
     private void ApplyInsert(TimelineDiff.Insert insert)
@@ -384,12 +395,7 @@ public sealed class ObservableTimeline : ObservableCollection<TimelineItem>, IDi
          * stable timeline-item ID instead of clearing and rebuilding their
          * own view model collection.
          */
-        Clear();
-
-        foreach (var item in reset.Values)
-        {
-            Add(item);
-        }
+        ReplaceAll(reset.Values);
     }
 
     private void RunOnCapturedContext(System.Action action)

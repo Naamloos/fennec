@@ -31,10 +31,10 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
     private string _draftText = string.Empty;
     private ChatTimelineItem? _replyTarget;
     private ChatTimelineItem? _editTarget;
-    private ChatTimelineItem? _threadTarget;
     private string? _roomAvatarUrl;
     private bool _canInvalidateAvatars;
     private bool _customEmotesLoaded;
+    private bool _isServerNoticeRoom;
 
     private ChatSession(ManagedMatrixClient client, Room room, ObservableTimeline timeline)
     {
@@ -55,13 +55,13 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         _canInvalidateAvatars = true;
     }
 
-    public ObservableCollection<ChatTimelineItem> Items { get; } = [];
+    public ObservableRangeCollection<ChatTimelineItem> Items { get; } = [];
 
     public ObservableCollection<MatrixEmote> Emotes { get; } = [];
 
-    public ObservableCollection<RoomMember> Members { get; } = [];
+    public ObservableRangeCollection<RoomMember> Members { get; } = [];
 
-    public ObservableCollection<ManagedRoom> Rooms { get; } = [];
+    public ObservableRangeCollection<ManagedRoom> Rooms { get; } = [];
 
     public Room Room => _room;
 
@@ -134,12 +134,6 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         private set => Set(ref _editTarget, value);
     }
 
-    public ChatTimelineItem? ThreadTarget
-    {
-        get => _threadTarget;
-        private set => Set(ref _threadTarget, value);
-    }
-
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public bool CanLoadMoreHistory => !_timeline.HasReachedStart;
@@ -148,17 +142,25 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
     public bool CanSend => !IsLoading && !IsSending && !string.IsNullOrWhiteSpace(DraftText);
 
+    public bool IsServerNoticeRoom
+    {
+        get => _isServerNoticeRoom;
+        private set => Set(ref _isServerNoticeRoom, value);
+    }
+
     public static async Task<ChatSession> CreateAsync(
         ManagedMatrixClient client,
         Room room,
-        CancellationToken cancellationToken = default
+        CancellationToken cancellationToken = default,
+        TimelineFocus? focus = null
     )
     {
-        var timeline = await client.GetObservableTimelineAsync(room, cancellationToken);
+        var timeline = await client.GetObservableTimelineAsync(room, focus, cancellationToken);
 
         var session = new ChatSession(client, room, timeline);
         _ = session.LoadRoomsAsync();
         _ = session.LoadMembersAsync();
+        _ = session.LoadServerNoticeStateAsync();
         return session;
     }
 
@@ -182,30 +184,6 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
             {
                 await _room.Edit(editEventId, content);
             }
-            else if (ThreadTarget?.EventId is { } threadRoot)
-            {
-                var threadRelation = new Dictionary<string, object?>
-                {
-                    ["rel_type"] = "m.thread",
-                    ["event_id"] = threadRoot,
-                    ["is_falling_back"] = true,
-                    ["m.in_reply_to"] = new Dictionary<string, string>
-                    {
-                        ["event_id"] = threadRoot,
-                    },
-                };
-                await _room.SendRaw(
-                    "m.room.message",
-                    JsonSerializer.Serialize(
-                        new Dictionary<string, object?>
-                        {
-                            ["body"] = text,
-                            ["msgtype"] = "m.text",
-                            ["m.relates_to"] = threadRelation,
-                        }
-                    )
-                );
-            }
             else if (ReplyTarget?.EventId is { } eventId)
             {
                 await _timeline.Timeline.SendReply(content, eventId);
@@ -218,7 +196,6 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
             DraftText = string.Empty;
             ReplyTarget = null;
             EditTarget = null;
-            ThreadTarget = null;
         }
         catch (Exception exception)
         {
@@ -242,14 +219,36 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
         try
         {
-            var url = await _client.UploadMediaAsync(mimeType, data);
-            using var source = MediaSource.FromUrl(url);
-            using var content =
-                _timeline.Timeline.CreateMessageContent(
-                    CreateAttachment(filename, mimeType, (ulong)data.Length, source)
-                ) ?? throw new InvalidOperationException("Could not create attachment content.");
-
-            await _timeline.Timeline.Send(content);
+            var upload = new UploadParameters(
+                new UploadSource.Data(data, filename),
+                null,
+                null,
+                null,
+                ReplyTarget?.EventId
+            );
+            using var handle = mimeType.Split('/', 2)[0] switch
+            {
+                "audio" => _timeline.Timeline.SendAudio(
+                    upload,
+                    new AudioInfo(null, (ulong)data.Length, mimeType)
+                ),
+                "image" => _timeline.Timeline.SendImage(
+                    upload,
+                    null,
+                    new ImageInfo(null, null, mimeType, (ulong)data.Length, null, null, null, null)
+                ),
+                "video" => _timeline.Timeline.SendVideo(
+                    upload,
+                    null,
+                    new VideoInfo(null, null, null, mimeType, (ulong)data.Length, null, null, null)
+                ),
+                _ => _timeline.Timeline.SendFile(
+                    upload,
+                    new uniffi.matrix_sdk_ffi.FileInfo(mimeType, (ulong)data.Length, null, null)
+                ),
+            };
+            await handle.Join();
+            ReplyTarget = null;
         }
         catch (Exception exception)
         {
@@ -295,6 +294,8 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         try
         {
             await _timeline.Timeline.MarkAsRead(ReceiptType.Read);
+            await _timeline.Timeline.MarkAsRead(ReceiptType.FullyRead);
+            await _room.SetUnreadFlag(false);
             _lastReadEventId = eventId;
         }
         catch (Exception exception)
@@ -357,7 +358,6 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
     public void ReplyTo(ChatTimelineItem? item)
     {
         EditTarget = null;
-        ThreadTarget = null;
         ReplyTarget = item;
     }
 
@@ -369,7 +369,6 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         }
 
         ReplyTarget = null;
-        ThreadTarget = null;
         EditTarget = item;
         DraftText = MarkdownFromHtml(item.FormattedBody, item.Body);
     }
@@ -377,20 +376,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
     public void CancelReply()
     {
         ReplyTarget = null;
-        ThreadTarget = null;
     }
-
-    public void ReplyInThread(ChatTimelineItem? item)
-    {
-        if (item is not { IsMessage: true, EventId: not null })
-            return;
-        ReplyTarget = null;
-        EditTarget = null;
-        ThreadTarget = item;
-        ReplyTarget = item;
-    }
-
-    public void CancelThreadReply() => ThreadTarget = null;
 
     public void CancelEdit()
     {
@@ -603,11 +589,36 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                 UpdateMessageGroups();
                 break;
         }
+
     }
 
     private void ResetItems()
     {
         var timelineItems = _timeline.Select(CreateItem).ToArray();
+        if (
+            Items.Count <= timelineItems.Length
+            && Items.Select((item, index) => item.Id == timelineItems[index].Id).All(matches => matches)
+        )
+        {
+            for (var i = 0; i < Items.Count; i++)
+                Items[i].UpdateFrom(timelineItems[i]);
+            Items.AddRange(timelineItems.Skip(Items.Count));
+            return;
+        }
+
+        var offset = timelineItems.Length - Items.Count;
+        if (
+            offset >= 0
+            && Items.Select((item, index) => item.Id == timelineItems[index + offset].Id)
+                .All(matches => matches)
+        )
+        {
+            for (var i = 0; i < Items.Count; i++)
+                Items[i].UpdateFrom(timelineItems[i + offset]);
+            Items.InsertRange(0, timelineItems.Take(offset));
+            return;
+        }
+
         var index = 0;
 
         foreach (var timelineItem in timelineItems)
@@ -733,12 +744,33 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
         if (eventItem is null)
         {
-            return new ChatTimelineItem(id)
+            return timelineItem.AsVirtual() switch
             {
-                EventType = "timeline marker",
-                Body = "Unknown event",
-                IsUnknown = true,
-                SourceJson = FormatSource(null, new { timeline = timelineItem.FmtDebug() }),
+                VirtualTimelineItem.ReadMarker => new ChatTimelineItem(id)
+                {
+                    EventType = "read marker",
+                    Body = "Unread",
+                    IsReadMarker = true,
+                },
+                VirtualTimelineItem.DateDivider divider => new ChatTimelineItem(id)
+                {
+                    EventType = "date divider",
+                    Body = DateTimeOffset
+                        .FromUnixTimeMilliseconds((long)Math.Min(divider.Ts, 253402300799999UL))
+                        .ToLocalTime()
+                        .ToString("D"),
+                },
+                VirtualTimelineItem.TimelineStart => new ChatTimelineItem(id)
+                {
+                    EventType = "timeline start",
+                    Body = "Beginning of chat",
+                },
+                _ => new ChatTimelineItem(id)
+                {
+                    EventType = "timeline marker",
+                    Body = "Timeline marker",
+                    SourceJson = FormatSource(null, new { timeline = timelineItem.FmtDebug() }),
+                },
             };
         }
 
@@ -774,7 +806,18 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                 UpdateEmotes(eventItem.EventTypeRaw, result.SourceJson);
 
             PopulateContent(result, eventItem);
+            if (
+                !result.IsMessage
+                && (
+                    eventItem.Content is not TimelineItemContent.RoomMembership membership
+                    || membership.UserId != result.SenderId
+                )
+            )
+            {
+                result.Body = $"{DisplayNameAndId(result.Sender, result.SenderId)} — {result.Body}";
+            }
             PopulateReactions(result, eventItem);
+            PopulateReadReceipts(result, eventItem);
             return result;
         }
     }
@@ -850,16 +893,13 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
         try
         {
-            foreach (
-                var room in _client
+            var currentRoomId = _room.Id();
+            Rooms.AddRange(
+                _client
                     .GetRooms()
-                    .Where(room => !room.IsSpace() && room.Id() != _room.Id())
-            )
-            {
-                if (_disposed)
-                    return;
-                Rooms.Add(new ManagedRoom(room));
-            }
+                    .Select(room => new ManagedRoom(room, includeRoomInfo: false))
+                    .Where(room => !room.IsSpace && room.Id != currentRoomId)
+            );
         }
         catch (Exception exception)
         {
@@ -877,6 +917,13 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                 result.Body = message.Content.Body;
                 result.FormattedBody = GetFormattedBody(message.Content.MsgType)?.Body;
                 result.ReplyPreview = ReplyPreview(msg.Content.InReplyTo);
+                result.ReplyToEventId = msg.Content.InReplyTo?.EventId();
+                result.ThreadRootEventId = msg.Content.ThreadRoot;
+                result.ThreadReplyCount = msg.Content.ThreadSummary?.NumReplies() ?? 0;
+                result.IsServerNotice = message.Content.MsgType is MessageType.Other
+                {
+                    Msgtype: "m.server_notice",
+                };
                 result.Media = CreateMedia(message.Content.MsgType);
                 return;
 
@@ -909,9 +956,37 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                 );
                 return;
 
+            case TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Redacted }:
+                result.IsMessage = true;
+                result.Body = "Message removed";
+                return;
+
+            case TimelineItemContent.MsgLike
+            {
+                Content.Kind: MsgLikeKind.UnableToDecrypt,
+            }:
+                result.IsMessage = true;
+                result.Body =
+                    "Unable to decrypt this message. Encryption keys are unavailable on this device.";
+                return;
+
+            case TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.LiveLocation live }:
+                result.IsMessage = true;
+                result.Body =
+                    live.Content.Description
+                    ?? (live.Content.IsLive
+                        ? "Started sharing live location"
+                        : "Stopped sharing live location");
+                return;
+
+            case TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Other other }:
+                result.Body =
+                    RawEventBody(result.SourceJson) ?? MessageLikeEventText(other.EventType);
+                return;
+
             case TimelineItemContent.RoomMembership membership:
                 result.Body =
-                    $"{membership.UserDisplayName ?? membership.UserId} {MembershipText(membership.Change)}";
+                    $"{DisplayNameAndId(membership.UserDisplayName, membership.UserId)} {MembershipText(membership.Change)}";
                 return;
 
             case TimelineItemContent.ProfileChange profile:
@@ -926,8 +1001,10 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                 return;
 
             case TimelineItemContent.State state:
-                result.Body = StateText(state.Content);
-                result.IsUnknown = state.Content is OtherState.Custom;
+                result.Body =
+                    state.Content is OtherState.Custom custom
+                        ? RawEventBody(result.SourceJson) ?? $"Updated {custom.EventType}"
+                        : StateText(state.Content);
                 return;
 
             case TimelineItemContent.RtcNotification:
@@ -938,9 +1015,19 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                 result.Body = "Incoming call";
                 return;
 
+            case TimelineItemContent.FailedToParseMessageLike failed:
+                result.Body =
+                    RawEventBody(result.SourceJson) ?? $"Unsupported event: {failed.EventType}";
+                return;
+
+            case TimelineItemContent.FailedToParseState failed:
+                result.Body =
+                    RawEventBody(result.SourceJson)
+                    ?? $"Unsupported room update: {failed.EventType}";
+                return;
+
             default:
-                result.Body = "Unknown event";
-                result.IsUnknown = true;
+                result.Body = $"Event: {result.EventType}";
                 return;
         }
     }
@@ -959,6 +1046,21 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                     reaction.Key,
                     reaction.Senders.Length,
                     reaction.Senders.Any(sender => sender.SenderId == _room.OwnUserId())
+                )
+            );
+        }
+    }
+
+    private void PopulateReadReceipts(ChatTimelineItem result, EventTimelineItem eventItem)
+    {
+        foreach (var userId in eventItem.ReadReceipts.Keys)
+        {
+            var member = Members.FirstOrDefault(candidate => candidate.UserId == userId);
+            result.ReadReceipts.Add(
+                new ChatReadReceipt(
+                    userId,
+                    member?.DisplayName ?? userId,
+                    member?.AvatarUrl
                 )
             );
         }
@@ -1011,16 +1113,14 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                 var joined = members
                     .Where(member => member.Membership is MembershipState.Join)
                     .ToArray();
+                var profiles = joined.ToDictionary(member => member.UserId);
                 RunOnCapturedContext(() =>
                 {
                     if (_disposed)
                         return;
 
-                    Members.Clear();
-                    foreach (var member in joined)
-                    {
-                        Members.Add(member);
-                    }
+                    if (!Members.SequenceEqual(joined))
+                        Members.ReplaceAll(joined);
 
                     foreach (
                         var item in Items.Where(item =>
@@ -1028,13 +1128,18 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                         )
                     )
                     {
-                        var member = joined.FirstOrDefault(candidate =>
-                            candidate.UserId == item.SenderId
-                        );
-                        if (member is null)
+                        if (!profiles.TryGetValue(item.SenderId, out var member))
                             continue;
                         item.SenderAvatarUrl = member.AvatarUrl;
                         item.Sender = member.DisplayName ?? member.UserId;
+                    }
+
+                    foreach (var receipt in Items.SelectMany(item => item.ReadReceipts))
+                    {
+                        if (!profiles.TryGetValue(receipt.UserId, out var member))
+                            continue;
+                        receipt.Name = member.DisplayName ?? member.UserId;
+                        receipt.AvatarUrl = member.AvatarUrl;
                     }
                 });
             }
@@ -1050,6 +1155,11 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         {
             _membersLoadGate.Release();
         }
+    }
+
+    private async Task LoadServerNoticeStateAsync()
+    {
+        IsServerNoticeRoom = await _client.IsServerNoticeRoomAsync(_room.Id());
     }
 
     private sealed class MemberListUpdateListener(ChatSession session) : RoomInfoListener
@@ -1192,62 +1302,16 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         RegexOptions.IgnoreCase | RegexOptions.Compiled
     );
 
-    private static MessageType CreateAttachment(
-        string filename,
-        string mimeType,
-        ulong size,
-        MediaSource source
-    ) =>
-        mimeType switch
-        {
-            _ when mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) =>
-                new MessageType.Image(
-                    new ImageMessageContent(
-                        filename,
-                        null,
-                        null,
-                        source,
-                        new ImageInfo(null, null, mimeType, size, null, null, null, null)
-                    )
-                ),
-            _ when mimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase) =>
-                new MessageType.Video(
-                    new VideoMessageContent(
-                        filename,
-                        null,
-                        null,
-                        source,
-                        new VideoInfo(null, null, null, mimeType, size, null, null, null)
-                    )
-                ),
-            _ when mimeType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) =>
-                new MessageType.Audio(
-                    new AudioMessageContent(
-                        filename,
-                        null,
-                        null,
-                        source,
-                        new AudioInfo(null, size, mimeType),
-                        null,
-                        null
-                    )
-                ),
-            _ => new MessageType.File(
-                new FileMessageContent(
-                    filename,
-                    null,
-                    null,
-                    source,
-                    new uniffi.matrix_sdk_ffi.FileInfo(mimeType, size, null, null)
-                )
-            ),
-        };
-
     private static string DisplayName(EventTimelineItem item) =>
         item.SenderProfile is ProfileDetails.Ready ready
         && !string.IsNullOrWhiteSpace(ready.DisplayName)
             ? ready.DisplayName
             : item.Sender;
+
+    private static string DisplayNameAndId(string? displayName, string userId) =>
+        string.IsNullOrWhiteSpace(displayName) || displayName == userId
+            ? userId
+            : $"{displayName} ({userId})";
 
     private static string? AvatarUrl(EventTimelineItem item) =>
         item.SenderProfile is ProfileDetails.Ready ready ? ready.AvatarUrl : null;
@@ -1287,14 +1351,109 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
     private static string StateText(OtherState state) =>
         state switch
         {
+            OtherState.PolicyRuleRoom => "Updated a room moderation rule",
+            OtherState.PolicyRuleServer => "Updated a server moderation rule",
+            OtherState.PolicyRuleUser => "Updated a user moderation rule",
             OtherState.RoomName { Name: { } name } => $"changed the room name to {name}",
             OtherState.RoomTopic { Topic: { } topic } => $"changed the room topic to {topic}",
             OtherState.RoomAvatar => "changed the room avatar",
+            OtherState.RoomCanonicalAlias => "changed the room address",
             OtherState.RoomEncryption => "enabled encryption",
             OtherState.RoomCreate => "created the room",
-            OtherState.Custom { EventType: { } type } => $"Unknown event: {type}",
+            OtherState.RoomGuestAccess => "changed guest access",
+            OtherState.RoomHistoryVisibility visibility =>
+                $"changed history visibility to {visibility.HistoryVisibility}",
+            OtherState.RoomJoinRules rules =>
+                $"changed join rules to {JoinRuleText(rules.JoinRule)}",
+            OtherState.RoomPinnedEvents => "updated pinned messages",
+            OtherState.RoomPowerLevels => "changed room permissions",
+            OtherState.RoomServerAcl => "changed the server access rules",
+            OtherState.RoomThirdPartyInvite invite =>
+                invite.DisplayName is { } name
+                    ? $"invited {name}"
+                    : "updated a third-party invite",
+            OtherState.RoomTombstone => "upgraded the room",
+            OtherState.SpaceChild => "updated a room in this space",
+            OtherState.SpaceParent => "updated this room's parent space",
+            OtherState.Custom { EventType: { } type } => $"Updated {type}",
             _ => "Room settings changed",
         };
+
+    private static string JoinRuleText(JoinRule? rule) =>
+        rule switch
+        {
+            JoinRule.Public => "public",
+            JoinRule.Invite => "invite only",
+            JoinRule.Knock => "knock",
+            JoinRule.Private => "private",
+            JoinRule.Restricted => "restricted",
+            JoinRule.KnockRestricted => "knock restricted",
+            JoinRule.Custom custom => custom.Repr,
+            _ => "unknown",
+        };
+
+    private static string MessageLikeEventText(MessageLikeEventType eventType) =>
+        eventType switch
+        {
+            MessageLikeEventType.Audio or MessageLikeEventType.Voice => "Shared audio",
+            MessageLikeEventType.Image => "Shared an image",
+            MessageLikeEventType.Video => "Shared a video",
+            MessageLikeEventType.File => "Shared a file",
+            MessageLikeEventType.Location or MessageLikeEventType.Beacon => "Shared a location",
+            MessageLikeEventType.Emote => "Sent an emote",
+            MessageLikeEventType.CallInvite => "Incoming call",
+            MessageLikeEventType.CallAnswer or MessageLikeEventType.CallSelectAnswer =>
+                "Call answered",
+            MessageLikeEventType.CallHangup => "Call ended",
+            MessageLikeEventType.CallReject or MessageLikeEventType.RtcDecline => "Call declined",
+            MessageLikeEventType.CallCandidates
+                or MessageLikeEventType.CallNegotiate
+                or MessageLikeEventType.CallSdpStreamMetadataChanged
+                or MessageLikeEventType.CallNotify
+                or MessageLikeEventType.RtcNotification => "Call updated",
+            MessageLikeEventType.KeyVerificationAccept
+                or MessageLikeEventType.KeyVerificationCancel
+                or MessageLikeEventType.KeyVerificationDone
+                or MessageLikeEventType.KeyVerificationKey
+                or MessageLikeEventType.KeyVerificationMac
+                or MessageLikeEventType.KeyVerificationReady
+                or MessageLikeEventType.KeyVerificationStart => "Key verification updated",
+            MessageLikeEventType.PollStart or MessageLikeEventType.UnstablePollStart =>
+                "Started a poll",
+            MessageLikeEventType.PollEnd or MessageLikeEventType.UnstablePollEnd =>
+                "Ended a poll",
+            MessageLikeEventType.PollResponse or MessageLikeEventType.UnstablePollResponse =>
+                "Voted in a poll",
+            MessageLikeEventType.Reaction => "Reacted to a message",
+            MessageLikeEventType.RoomRedaction => "Removed an event",
+            MessageLikeEventType.Encrypted or MessageLikeEventType.RoomEncrypted =>
+                "Encrypted event",
+            MessageLikeEventType.Sticker => "Sent a sticker",
+            MessageLikeEventType.Message or MessageLikeEventType.RoomMessage => "Sent a message",
+            MessageLikeEventType.Other other => $"Event: {other.V1}",
+            _ => "Room event",
+        };
+
+    private static string? RawEventBody(string source)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(source);
+            return document.RootElement.TryGetProperty("content", out var content)
+                && content.TryGetProperty("body", out var body)
+                && body.ValueKind is JsonValueKind.String
+                ? body.GetString()
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
 
     private static string? ReplyPreview(InReplyToDetails? reply)
     {

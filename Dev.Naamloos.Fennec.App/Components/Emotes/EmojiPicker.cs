@@ -104,6 +104,13 @@ public sealed partial class EmojiPicker : ContentView
         {
             SelectionMode = SelectionMode.Single,
             ItemSizingStrategy = ItemSizingStrategy.MeasureFirstItem,
+            EmptyView = new Label
+            {
+                Text = "No emoji found.",
+                Opacity = .7,
+                HorizontalTextAlignment = TextAlignment.Center,
+                VerticalTextAlignment = TextAlignment.Center,
+            },
             ItemsLayout = new GridItemsLayout(8, ItemsLayoutOrientation.Vertical)
             {
                 HorizontalItemSpacing = 2, VerticalItemSpacing = 2,
@@ -155,6 +162,7 @@ public sealed partial class EmojiPicker : ContentView
 
     private async Task ConfigureCategoriesAsync()
     {
+        await _usage.RefreshAsync();
         var unicodeCategories = await EmojiCatalog.GetCategoriesAsync();
         Categories.Clear();
         if (Mode == EmojiPickerMode.Composer)
@@ -256,7 +264,10 @@ public sealed partial class EmojiPicker : ContentView
         if (string.IsNullOrEmpty(query))
         {
             if (category == "recent")
-                return _usage.RecentIds(Mode).Where(byId.ContainsKey).Select(id => byId[id]).ToArray();
+                return _usage.RecentEmoji
+                    .Select(emoji => all.FirstOrDefault(item => item.Unicode == emoji))
+                    .OfType<EmojiItem>()
+                    .ToArray();
             if (category == "favourites")
                 return _usage.FavouriteIds.Where(byId.ContainsKey).Select(id => byId[id]).ToArray();
             return all.Where(item => item.CategoryId == category).Take(ResultLimit).ToArray();
@@ -275,7 +286,7 @@ public sealed partial class EmojiPicker : ContentView
         var shortcode = EmojiCatalog.Normalize(item.Shortcode);
         var name = EmojiCatalog.Normalize(item.Name);
         var score = shortcode == query ? 600 : shortcode.StartsWith(query) ? 500 : name.StartsWith(query) ? 400 : item.SearchKey.StartsWith(query) ? 300 : item.SearchKey.Contains(query) ? 100 : 0;
-        return score + (_usage.RecentIds(Mode).Contains(item.Id) ? 10 : 0);
+        return score + (_usage.RecentEmoji.Contains(item.Unicode) ? 10 : 0);
     }
 
     private void OnEmojiSelected(object? sender, SelectionChangedEventArgs args)
@@ -301,7 +312,7 @@ public sealed partial class EmojiPicker : ContentView
 
     private void Select(EmojiItem item)
     {
-        _usage.Record(Mode, item.Id);
+        _usage.Record(item.Unicode);
         SelectedCommand?.Execute(new EmojiSelection { Kind = item.Kind, Id = item.Id, Unicode = item.Unicode, MxcUri = item.MxcUri, Shortcode = item.Shortcode });
     }
 

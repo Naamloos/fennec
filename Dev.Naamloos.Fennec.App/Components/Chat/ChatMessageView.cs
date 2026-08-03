@@ -43,6 +43,9 @@ public sealed partial class ChatMessageView : ContentView
     [BindableProperty]
     public partial ICommand? PollVoteCommand { get; set; }
 
+    [BindableProperty]
+    public partial ICommand? ThreadCommand { get; set; }
+
     public ChatMessageView()
     {
         Content = new Grid
@@ -151,6 +154,11 @@ public sealed partial class ChatMessageView : ContentView
                             .Bind(
                                 MessageBubbleView.PollVoteCommandProperty,
                                 nameof(PollVoteCommand),
+                                source: this
+                            )
+                            .Bind(
+                                MessageBubbleView.ThreadCommandProperty,
+                                nameof(ThreadCommand),
                                 source: this
                             ),
                     },

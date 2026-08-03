@@ -13,7 +13,7 @@ public sealed class PasswordConfirmationPopup : Popup<string?>
         BackgroundColor = Colors.Transparent;
         Content = new Border
         {
-            Padding = 20,
+            Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 16 : 20,
             MaximumWidthRequest = 420,
             StrokeThickness = 0,
             StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 16 },
@@ -28,7 +28,7 @@ public sealed class PasswordConfirmationPopup : Popup<string?>
                         FontSize = 20,
                         FontAttributes = FontAttributes.Bold,
                     },
-                    new Label { Text = message },
+                    new Label { Text = message, LineBreakMode = LineBreakMode.WordWrap },
                     _password,
                     new Grid
                     {
@@ -43,12 +43,14 @@ public sealed class PasswordConfirmationPopup : Popup<string?>
                             new Button
                             {
                                 Text = "Cancel",
+                                MinimumHeightRequest = 44,
                                 BackgroundColor = Colors.Transparent,
                                 Command = new Command(async () => await CloseAsync(null)),
                             }.DynamicResource(Button.TextColorProperty, "Primary"),
                             new Button
                             {
                                 Text = accept,
+                                MinimumHeightRequest = 44,
                                 Command = new Command(async () => await CloseAsync(_password.Text)),
                             }
                                 .DynamicResource(VisualElement.BackgroundColorProperty, "Error")

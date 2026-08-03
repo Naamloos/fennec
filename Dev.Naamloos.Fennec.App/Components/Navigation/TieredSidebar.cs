@@ -122,6 +122,7 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
                 var icon = new MauiIcon { IconSize = 20, HorizontalOptions = LayoutOptions.Center };
                 var row = new Grid
                 {
+                    MinimumHeightRequest = 44,
                     Padding = new Thickness(0, 8, 4, 8),
                     ColumnDefinitions =
                     {
@@ -153,6 +154,8 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
                     if (row.BindingContext is SidebarSection section)
                     {
                         icon.Icon = section.Icon;
+                        SemanticProperties.SetDescription(row, section.Title);
+                        ToolTipProperties.SetText(row, section.Title);
                     }
                 };
                 var tap = new TapGestureRecognizer();
@@ -171,6 +174,7 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
             {
                 var row = new Grid
                 {
+                    MinimumHeightRequest = 48,
                     Padding = new Thickness(0, 8, 4, 8),
                     ColumnDefinitions =
                     {
@@ -204,6 +208,15 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
                             .Column(1),
                     },
                 };
+
+                row.SetBinding(
+                    SemanticProperties.DescriptionProperty,
+                    new Binding(nameof(ManagedRoom.DisplayName), stringFormat: "Space: {0}")
+                );
+                row.SetBinding(
+                    ToolTipProperties.TextProperty,
+                    new Binding(nameof(ManagedRoom.DisplayName))
+                );
 
                 var tap = new TapGestureRecognizer();
                 tap.Tapped += (_, _) => ShowSpace(row.BindingContext as ManagedRoom);

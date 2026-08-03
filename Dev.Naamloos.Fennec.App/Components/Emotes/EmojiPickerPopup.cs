@@ -28,8 +28,12 @@ public sealed class EmojiPickerPopup : Popup
         };
         Content = new Border
         {
-            Padding = 12, MaximumWidthRequest = 420, HeightRequest = 480, StrokeThickness = 0,
-            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 12 }, Content = picker,
+            Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 8 : 12,
+            MaximumWidthRequest = 420,
+            HeightRequest = DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 420 : 480,
+            StrokeThickness = 0,
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 16 },
+            Content = picker,
         }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface");
     }
 

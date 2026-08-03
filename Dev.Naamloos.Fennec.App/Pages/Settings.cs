@@ -9,6 +9,8 @@ namespace Dev.Naamloos.Fennec.App.Pages;
 
 public sealed partial class Settings : ContentPage
 {
+    private readonly AppShell _shell;
+
     public static readonly BindableProperty UserSettingsProperty = BindableProperty.Create(
         nameof(UserSettings),
         typeof(UserSettingsService),
@@ -39,6 +41,7 @@ public sealed partial class Settings : ContentPage
 
     public Settings(AppShell shell)
     {
+        _shell = shell;
         BindingContext = shell;
         this.BindService<UserSettingsService, Settings>(UserSettingsProperty);
         Shell.SetNavBarIsVisible(this, false);
@@ -69,7 +72,10 @@ public sealed partial class Settings : ContentPage
 
         Content = new Grid
         {
-            Padding = new Thickness(24, 20),
+            SafeAreaEdges = SafeAreaEdges.All,
+            Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                ? new Thickness(12)
+                : new Thickness(24, 20),
             RowSpacing = 16,
             RowDefinitions =
             {
@@ -85,13 +91,12 @@ public sealed partial class Settings : ContentPage
                     Spacing = 12,
                     Children =
                     {
-#if !WINDOWS
                         new MauiIcon
                         {
                             Icon = MaterialIcons.ArrowBack,
                             IconSize = 24,
-                            WidthRequest = 40,
-                            HeightRequest = 40,
+                            WidthRequest = 44,
+                            HeightRequest = 44,
                             GestureRecognizers =
                             {
                                 new TapGestureRecognizer().BindCommand(
@@ -99,8 +104,9 @@ public sealed partial class Settings : ContentPage
                                     source: this
                                 ),
                             },
-                        },
-#endif
+                        }.Invoke(view =>
+                            SemanticProperties.SetDescription(view, "Back to chats")
+                        ),
                         new Label
                         {
                             Text = "Settings",
@@ -139,7 +145,7 @@ public sealed partial class Settings : ContentPage
                 }.Row(1),
                 new Grid
                 {
-                    HorizontalOptions = LayoutOptions.Center,
+                    HorizontalOptions = LayoutOptions.Fill,
                     MaximumWidthRequest = 780,
                     Children = { content },
                 }.Row(2),
@@ -150,7 +156,7 @@ public sealed partial class Settings : ContentPage
                     TextColor = Colors.Red,
                     HorizontalOptions = LayoutOptions.Center,
                 }
-                    .BindCommand(nameof(AppShell.LogoutCommand))
+                    .BindCommand(nameof(LogoutCommand), source: this)
                     .Row(3),
             },
         }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface");
@@ -199,6 +205,20 @@ public sealed partial class Settings : ContentPage
 
     [RelayCommand]
     private async Task BackAsync() => await Navigation.PopAsync();
+
+    [RelayCommand]
+    private async Task LogoutAsync()
+    {
+        if (
+            await DisplayAlertAsync(
+                "Log out?",
+                "You will need to sign in again on this device.",
+                "Log out",
+                "Cancel"
+            )
+        )
+            _shell.LogoutCommand.Execute(null);
+    }
 
     protected override void OnAppearing()
     {

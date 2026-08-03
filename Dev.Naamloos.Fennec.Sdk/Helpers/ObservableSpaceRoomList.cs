@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using Dev.Naamloos.Fennec.Sdk.Entities;
 using Dev.Naamloos.Fennec.Sdk.Events;
 using uniffi.matrix_sdk_ffi;
@@ -6,7 +5,9 @@ using uniffi.matrix_sdk_ui;
 
 namespace Dev.Naamloos.Fennec.Sdk.Helpers;
 
-public sealed class ObservableSpaceRoomList : ObservableCollection<ManagedSpaceRoom>, IDisposable
+public sealed class ObservableSpaceRoomList
+    : ObservableRangeCollection<ManagedSpaceRoom>,
+        IDisposable
 {
     private readonly ManagedMatrixClient _client;
     private readonly SpaceService _spaceService;
@@ -77,10 +78,7 @@ public sealed class ObservableSpaceRoomList : ObservableCollection<ManagedSpaceR
             switch (update)
             {
                 case SpaceListUpdate.Append append:
-                    foreach (var room in append.Values)
-                    {
-                        Add(new ManagedSpaceRoom(room));
-                    }
+                    AddRange(append.Values.Select(room => new ManagedSpaceRoom(room)));
                     break;
                 case SpaceListUpdate.Clear:
                     Clear();
@@ -113,11 +111,7 @@ public sealed class ObservableSpaceRoomList : ObservableCollection<ManagedSpaceR
                     }
                     break;
                 case SpaceListUpdate.Reset reset:
-                    Clear();
-                    foreach (var room in reset.Values)
-                    {
-                        Add(new ManagedSpaceRoom(room));
-                    }
+                    ReplaceAll(reset.Values.Select(room => new ManagedSpaceRoom(room)));
                     break;
             }
         }

@@ -32,10 +32,10 @@ public sealed partial class VerificationPopup : ContentView, SessionVerification
     public VerificationPopup()
     {
         BindingContext = this;
-        build();
+        Build();
     }
 
-    private void build()
+    private void Build()
     {
         Content = new Border
         {

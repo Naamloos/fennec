@@ -9,7 +9,7 @@ public class TemplateSwitchView<TValue, TInput> : ContentView
         typeof(object),
         typeof(TemplateSwitchView<TValue, TInput>),
         propertyChanged: static (bindable, _, newValue) =>
-            ((TemplateSwitchView<TValue, TInput>)bindable).build()
+            ((TemplateSwitchView<TValue, TInput>)bindable).Build()
     );
 
     public object? Value
@@ -29,7 +29,7 @@ public class TemplateSwitchView<TValue, TInput> : ContentView
         _inputSelector = inputSelector;
         _templateSelectors = new Dictionary<TemplatePropertySelectorDelegate, View>();
 
-        build();
+        Build();
     }
 
     public TemplateSwitchView<TValue, TInput> Add(
@@ -41,7 +41,7 @@ public class TemplateSwitchView<TValue, TInput> : ContentView
         return this;
     }
 
-    private void build()
+    private void Build()
     {
         if (Value is not TValue value)
         {

@@ -46,6 +46,9 @@ public sealed partial class MessageBubbleView : ContentView
     [BindableProperty]
     public partial ICommand? PollVoteCommand { get; set; }
 
+    [BindableProperty]
+    public partial ICommand? ThreadCommand { get; set; }
+
     public MessageBubbleView()
     {
         var bubble = new Border
@@ -83,6 +86,18 @@ public sealed partial class MessageBubbleView : ContentView
                 Spacing = 6,
                 Children =
                 {
+                    new Label
+                    {
+                        Text = "Server notice",
+                        FontSize = 11,
+                        FontAttributes = FontAttributes.Bold,
+                    }
+                        .Bind(
+                            IsVisibleProperty,
+                            $"{nameof(Item)}.{nameof(ChatTimelineItem.IsServerNotice)}",
+                            source: this
+                        )
+                        .DynamicResource(Label.TextColorProperty, "Primary"),
                     new TextMessageView()
                         .Bind(TextMessageView.ItemProperty, nameof(Item), source: this)
                         .Bind(TextMessageView.ClientProperty, nameof(Client), source: this)
@@ -125,6 +140,31 @@ public sealed partial class MessageBubbleView : ContentView
                             nameof(AddReactionCommand),
                             source: this
                         ),
+                    new Button
+                    {
+                        FontSize = 11,
+                        Padding = new Thickness(8, 2),
+                        HorizontalOptions = LayoutOptions.Start,
+                        BackgroundColor = Colors.Transparent,
+                    }
+                        .Bind(
+                            Button.TextProperty,
+                            $"{nameof(Item)}.{nameof(ChatTimelineItem.ThreadReplyCount)}",
+                            stringFormat: "View thread · {0} replies",
+                            source: this
+                        )
+                        .BindCommand(nameof(ThreadCommand), source: this)
+                        .Bind(Button.CommandParameterProperty, nameof(Item), source: this)
+                        .Bind<Button, bool, ICommand?, bool>(
+                            IsVisibleProperty,
+                            new Binding(
+                                $"{nameof(Item)}.{nameof(ChatTimelineItem.HasThread)}",
+                                source: this
+                            ),
+                            new Binding(nameof(ThreadCommand), source: this),
+                            convert: static values =>
+                                values.Item1 && values.Item2 is not null
+                        ),
                     new CollectionView
                     {
                         HeightRequest = 22,
@@ -166,6 +206,13 @@ public sealed partial class MessageBubbleView : ContentView
                 converter: new BooleanToHorizontalOptionsConverter(),
                 source: this
             )
+            .Bind<Border, bool, double>(
+                Border.StrokeThicknessProperty,
+                $"{nameof(Item)}.{nameof(ChatTimelineItem.IsServerNotice)}",
+                convert: static notice => notice ? 1 : 0,
+                source: this
+            )
+            .DynamicResource(Border.StrokeProperty, "Primary")
             .DynamicResource(BackgroundColorProperty, "SurfaceContainer");
 
         _swipeView = new SwipeView

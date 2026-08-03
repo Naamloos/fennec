@@ -22,15 +22,9 @@ public partial class UserSettingsPopup : ContentView
     [BindableProperty]
     public partial ICommand LogoutCommand { get; set; }
 
-    [BindableProperty]
-    public partial ToastService ToastService { get; set; }
-
     public UserSettingsPopup()
     {
-        // testing self-binding services
-        this.BindService<ToastService, UserSettingsPopup>(ToastServiceProperty);
-
-        build();
+        Build();
     }
 
     [RelayCommand]
@@ -42,16 +36,7 @@ public partial class UserSettingsPopup : ContentView
         }
     }
 
-    [RelayCommand]
-    private async Task TestToast()
-    {
-        if (ToastService is not null)
-        {
-            await ToastService.ShowToastAsync("This is a test toast message!");
-        }
-    }
-
-    private void build()
+    private void Build()
     {
         Content = new VerticalStackLayout
         {
@@ -113,10 +98,6 @@ public partial class UserSettingsPopup : ContentView
                 // Close button
                 new Button { Text = "Close" }.BindCommand(
                     nameof(UserSettingsPopup.CloseUserSettingsPopupCommand),
-                    source: this
-                ),
-                new Button { Text = "TestToast" }.BindCommand(
-                    nameof(UserSettingsPopup.TestToastCommand),
                     source: this
                 ),
             },

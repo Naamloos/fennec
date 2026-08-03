@@ -35,8 +35,10 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     private readonly SemaphoreSlim _connectionLock = new(1, 1);
 
     private readonly SemaphoreSlim _thumbnailLoadGate = new(3, 3);
+    private readonly SemaphoreSlim _serverNoticeLoadGate = new(6, 6);
 
     private readonly ConcurrentDictionary<string, Lazy<Task<string>>> _videoCache = [];
+    private readonly ConcurrentDictionary<string, Lazy<Task<bool>>> _serverNoticeCache = [];
     private readonly ConcurrentDictionary<AvatarCacheKey, Lazy<Task<byte[]>>> _avatarCache = [];
     private readonly ConcurrentQueue<
         KeyValuePair<AvatarCacheKey, Lazy<Task<byte[]>>>
@@ -212,6 +214,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
                 .SqliteStore(storeBuilder)
                 .AutoEnableBackups(true)
                 .AutoEnableCrossSigning(true)
+                .ThreadsEnabled(true, true)
                 .SlidingSyncVersionBuilder(SlidingSyncVersionBuilder.DiscoverNative)
                 .HomeserverUrl(homeserver)
                 .Build();
@@ -351,6 +354,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
                 )
                 .AutoEnableBackups(true)
                 .AutoEnableCrossSigning(true)
+                .ThreadsEnabled(true, true)
                 .SlidingSyncVersionBuilder(SlidingSyncVersionBuilder.DiscoverNative)
                 .HomeserverUrl(session.HomeserverUrl)
                 .Build();
@@ -767,9 +771,15 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
                 .Select(result => new MatrixSearchResult(
                     result.RoomId,
                     result.Result.EventId,
+                    result.Result.SenderProfile is ProfileDetails.Ready ready
+                    && !string.IsNullOrWhiteSpace(ready.DisplayName)
+                        ? ready.DisplayName!
+                        : result.Result.Sender,
                     result.Result.Sender,
                     SearchResultBody(result.Result.Content),
-                    result.Result.Timestamp.ToString()
+                    DateTimeOffset.FromUnixTimeMilliseconds(
+                        (long)Math.Min(result.Result.Timestamp, 253402300799999UL)
+                    ).ToLocalTime().ToString("g")
                 ))
                 .ToArray();
         }
@@ -808,6 +818,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// </param>
     public async Task<ObservableTimeline> GetObservableTimelineAsync(
         Room room,
+        TimelineFocus? focus = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -817,13 +828,26 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var timeline = await room.Timeline();
+        var timeline =
+            focus is null
+                ? await room.Timeline()
+                : await room.TimelineWithConfiguration(
+                    new TimelineConfiguration(
+                        focus,
+                        new TimelineFilter.All(),
+                        null,
+                        DateDividerMode.Daily,
+                        uniffi.matrix_sdk_ui.TimelineReadReceiptTracking.AllEvents,
+                        false
+                    )
+                );
 
         cancellationToken.ThrowIfCancellationRequested();
 
         return await ObservableTimeline.CreateAsync(
             this,
             timeline,
+            subscribeToPaginationStatus: focus is null,
             cancellationToken: cancellationToken
         );
     }
@@ -1139,6 +1163,61 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(eventType);
         ArgumentException.ThrowIfNullOrWhiteSpace(content);
         return GetRequiredClient().SetAccountData(eventType, content);
+    }
+
+    public Task SetRoomUnreadAsync(string roomId, bool unread) =>
+        GetRoomAsync(roomId).SetUnreadFlag(unread);
+
+    public async Task<bool> IsServerNoticeRoomAsync(string roomId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(roomId);
+        try
+        {
+            return await GetCachedValueAsync(
+                _serverNoticeCache,
+                roomId,
+                async () =>
+                {
+                    await _serverNoticeLoadGate.WaitAsync();
+                    try
+                    {
+                        using var response = await SendHttpRequestAsync(
+                            HttpMethod.Get,
+                            RoomTagsPath(roomId)
+                        );
+                        using var document = JsonDocument.Parse(
+                            await response.Content.ReadAsStringAsync()
+                        );
+                        return document.RootElement.TryGetProperty("tags", out var tags)
+                            && tags.TryGetProperty("m.server_notice", out _);
+                    }
+                    finally
+                    {
+                        _serverNoticeLoadGate.Release();
+                    }
+                }
+            );
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public RoomDirectorySession CreateRoomDirectorySession() =>
+        new(GetRequiredClient().RoomDirectorySearch());
+
+    public async Task<MatrixSearchSession> CreateSearchSessionAsync(
+        string query,
+        SearchRoomFilter filter = SearchRoomFilter.Rooms,
+        uint pageSize = 50
+    )
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        return new MatrixSearchSession(
+            await GetRequiredClient().SearchMessages(query.Trim(), filter, pageSize),
+            SearchResultBody
+        );
     }
 
     private const string WallpaperTag = "u.fennec.wallpaper";
@@ -2112,6 +2191,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     private async Task NativeCleanupAsync()
     {
         _videoCache.Clear();
+        _serverNoticeCache.Clear();
         _avatarCache.Clear();
         while (_avatarCacheOrder.TryDequeue(out _)) { }
         _roomImageCache.Clear();

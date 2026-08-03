@@ -18,7 +18,7 @@ public sealed class SyntaxHighlighterPopup : Popup
 
         Content = new Border
         {
-            Padding = 12,
+            Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 8 : 12,
             MaximumWidthRequest = 900,
             MaximumHeightRequest = 800,
             StrokeThickness = 0,
@@ -36,8 +36,8 @@ public sealed class SyntaxHighlighterPopup : Popup
                     {
                         Icon = MaterialIcons.Close,
                         IconSize = 24,
-                        WidthRequest = 40,
-                        HeightRequest = 40,
+                        WidthRequest = 44,
+                        HeightRequest = 44,
                         HorizontalOptions = LayoutOptions.End,
                         GestureRecognizers =
                         {
@@ -46,7 +46,11 @@ public sealed class SyntaxHighlighterPopup : Popup
                                 Command = new AsyncRelayCommand(CloseAsync),
                             },
                         },
-                    }.Row(0),
+                    }
+                        .Invoke(view =>
+                            SemanticProperties.SetDescription(view, "Close source view")
+                        )
+                        .Row(0),
                     new ScrollView { Content = new SyntaxHighlighter { Text = source } }.Row(1),
                 },
             },
