@@ -4,8 +4,16 @@ using Dev.Naamloos.Fennec.Sdk.Helpers;
 using MaterialColorUtilities.Maui;
 using MauiIcons.Material;
 using Microsoft.Extensions.Logging;
+using Microsoft.Maui.LifecycleEvents;
 using MPowerKit.VirtualizeListView;
 using Plugin.Maui.Audio;
+
+#if ANDROID
+using Plugin.Firebase.Core.Platforms.Android;
+#elif IOS
+using Plugin.Firebase.CloudMessaging;
+using Plugin.Firebase.Core.Platforms.iOS;
+#endif
 
 namespace Dev.Naamloos.Fennec.App;
 
@@ -41,6 +49,30 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
+#if ANDROID
+        builder.ConfigureLifecycleEvents(events =>
+            events.AddAndroid(android =>
+                android.OnCreate((activity, _) =>
+                    CrossFirebase.Initialize(
+                        activity,
+                        () => Platform.CurrentActivity ?? activity
+                    )
+                )
+            )
+        );
+#elif IOS
+        builder.ConfigureLifecycleEvents(events =>
+            events.AddiOS(ios =>
+                ios.WillFinishLaunching((_, _) =>
+                {
+                    CrossFirebase.Initialize();
+                    FirebaseCloudMessagingImplementation.Initialize();
+                    return false;
+                })
+            )
+        );
+#endif
+
         // Services
         builder.Services.AddSingleton<AsyncSecureStorage>();
         builder.Services.AddSingleton(sp =>
@@ -57,6 +89,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<ToastService>();
         builder.Services.AddSingleton<MatrixRecoveryService>();
         builder.Services.AddSingleton<UserSettingsService>();
+        builder.Services.AddSingleton<PushNotificationService>();
 
         builder.ConfigureMauiHandlers(handlers =>
         {

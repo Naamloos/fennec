@@ -1,13 +1,39 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.naamloos.fennec">
+<manifest
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools"
+  package="dev.naamloos.fennec"
+>
   <application
     android:allowBackup="true"
     android:icon="@mipmap/appicon"
     android:supportsRtl="true"
     android:label="Fennec"
-  ></application>
+  >
+    <service
+      android:name="crc64d2dcc2805d51c0a8.MyFirebaseMessagingService"
+      android:exported="false"
+      tools:replace="android:exported"
+    />
+    <receiver
+      android:name="com.google.firebase.iid.FirebaseInstanceIdInternalReceiver"
+      android:exported="false"
+    />
+    <receiver
+      android:name="com.google.firebase.iid.FirebaseInstanceIdReceiver"
+      android:exported="true"
+      android:permission="com.google.android.c2dm.permission.SEND"
+    >
+      <intent-filter>
+        <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+        <action android:name="com.google.android.c2dm.intent.REGISTRATION" />
+        <category android:name="${applicationId}" />
+      </intent-filter>
+    </receiver>
+  </application>
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
   <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-permission android:name="android.permission.RECORD_AUDIO" />
   <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />

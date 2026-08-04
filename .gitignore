@@ -435,3 +435,6 @@ Dev.Naamloos.Fennec.Sdk/native/maccatalyst/*
 Dev.Naamloos.Fennec.Sdk/native/macos/*
 Dev.Naamloos.Fennec.Sdk/native/macos/*
 Dev.Naamloos.Fennec.Sdk/native/win-x64/*
+secrets/
+**/google-services.json
+**/GoogleService-Info.plist

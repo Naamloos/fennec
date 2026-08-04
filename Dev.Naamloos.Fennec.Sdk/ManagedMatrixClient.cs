@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -91,6 +92,35 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// Gets whether the underlying Matrix client has an authenticated user.
     /// </summary>
     public bool IsLoggedIn => _client?.UserId() is not null;
+
+    /// <summary>Registers a Matrix HTTP pusher for this device.</summary>
+    public Task SetPushNotificationsAsync(string pushKey, string appId, string gatewayUrl)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pushKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(appId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(gatewayUrl);
+
+        if (
+            !Uri.TryCreate(gatewayUrl, UriKind.Absolute, out var gateway)
+            || gateway.Scheme is not ("http" or "https")
+        )
+        {
+            throw new ArgumentException("Enter a valid push gateway URL.", nameof(gatewayUrl));
+        }
+
+        return GetRequiredClient()
+            .SetPusher(
+                new PusherIdentifiers(pushKey, appId),
+                new PusherKind.Http(
+                    new HttpPusherData(gateway.AbsoluteUri, PushFormat.EventIdOnly, null)
+                ),
+                "Fennec",
+                $"Fennec ({_platformName})",
+                null,
+                CultureInfo.CurrentUICulture.Name,
+                false
+            );
+    }
 
     /// <summary>Resolves a Matrix server name through its client well-known record.</summary>
     public static async Task<string> DiscoverHomeserverAsync(string homeserver)

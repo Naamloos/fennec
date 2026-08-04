@@ -1,0 +1,9 @@
+.git
+.artifacts
+.vs
+**/bin
+**/obj
+matrix-rust-sdk
+secrets
+**/google-services.json
+**/GoogleService-Info.plist

@@ -2,7 +2,7 @@
     <PropertyGroup>
         <TargetFrameworks>net10.0-android</TargetFrameworks>
         <TargetFrameworks Condition="!$([MSBuild]::IsOSPlatform('linux'))">
-            $(TargetFrameworks);net10.0-maccatalyst</TargetFrameworks>
+            $(TargetFrameworks);net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
         <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">
             $(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
         <OutputType>Exe</OutputType>
@@ -17,7 +17,7 @@
         <MauiXamlInflator>SourceGen</MauiXamlInflator>
         <MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
         <ApplicationTitle>Fennec</ApplicationTitle>
-        <ApplicationId>com.companyname.dev.naamloos.fennec.app</ApplicationId>
+        <ApplicationId>dev.naamloos.fennec</ApplicationId>
         <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
         <ApplicationVersion>1</ApplicationVersion>
         <WindowsPackageType>None</WindowsPackageType>
@@ -33,7 +33,7 @@
         <SupportedOSPlatformVersion
             Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'"
         >
-            21.0</SupportedOSPlatformVersion>
+            23.0</SupportedOSPlatformVersion>
         <SupportedOSPlatformVersion
             Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'"
         >
@@ -105,6 +105,11 @@
         <ProjectReference Include="..\Dev.Naamloos.Fennec.Sdk\Dev.Naamloos.Fennec.Sdk.csproj" />
     </ItemGroup>
     <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+        <PackageReference Include="Plugin.Firebase.CloudMessaging" Version="4.0.1" />
+        <GoogleServicesJson
+            Include="Platforms\Android\google-services.json"
+            Condition="Exists('Platforms\Android\google-services.json')"
+        />
         <AndroidNativeLibrary
             Include="..\Dev.Naamloos.Fennec.Sdk\native\android-arm64\libmatrix_sdk_ffi.so"
             Abi="arm64-v8a"
@@ -113,6 +118,33 @@
             Include="..\Dev.Naamloos.Fennec.Sdk\native\android-x64\libmatrix_sdk_ffi.so"
             Abi="x86_64"
         />
+    </ItemGroup>
+    <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+        <PackageReference Include="Plugin.Firebase.CloudMessaging" Version="4.0.1" />
+        <BundleResource
+            Include="Platforms\iOS\GoogleService-Info.plist"
+            Link="GoogleService-Info.plist"
+            Condition="Exists('Platforms\iOS\GoogleService-Info.plist')"
+        />
+    </ItemGroup>
+    <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+        <CodesignEntitlements>Platforms\iOS\Entitlements.plist</CodesignEntitlements>
+        <LinkWithSwiftSystemLibraries>true</LinkWithSwiftSystemLibraries>
+    </PropertyGroup>
+    <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' AND '$(Configuration)' == 'Release'">
+        <CodesignEntitlements>Platforms\iOS\Entitlements.Release.plist</CodesignEntitlements>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(RuntimeIdentifier)' == 'ios-arm64'">
+        <NativeReference Include="..\Dev.Naamloos.Fennec.Sdk\native\ios-arm64\libmatrix_sdk_ffi.a">
+            <Kind>Static</Kind>
+            <ForceLoad>true</ForceLoad>
+        </NativeReference>
+    </ItemGroup>
+    <ItemGroup Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('iossimulator-'))">
+        <NativeReference Include="..\Dev.Naamloos.Fennec.Sdk\native\ios-simulator\libmatrix_sdk_ffi.a">
+            <Kind>Static</Kind>
+            <ForceLoad>true</ForceLoad>
+        </NativeReference>
     </ItemGroup>
     <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
         <Content

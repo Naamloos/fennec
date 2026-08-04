@@ -32,5 +32,9 @@
 	<string>Fennec uses your microphone when you record a voice message.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Fennec uses your location only when you choose to share it in a room.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

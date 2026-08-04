@@ -4,5 +4,9 @@ public sealed class AppNavigationService(IServiceProvider services)
 {
     public void ShowLogin() => App.SetRootPage(services.GetRequiredService<Login>());
 
-    public void ShowShell() => App.SetRootPage(services.GetRequiredService<AppShell>());
+    public void ShowShell()
+    {
+        App.SetRootPage(services.GetRequiredService<AppShell>());
+        _ = services.GetRequiredService<PushNotificationService>().InitializeAsync();
+    }
 }
