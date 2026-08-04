@@ -46,7 +46,8 @@ public sealed partial class AppShell : Shell
         get => _isThreadListOpen;
         set
         {
-            if (_isThreadListOpen == value) return;
+            if (_isThreadListOpen == value)
+                return;
             _isThreadListOpen = value;
             OnPropertyChanged();
         }
@@ -89,7 +90,8 @@ public sealed partial class AppShell : Shell
         get => _selectedEventId;
         set
         {
-            if (_selectedEventId == value) return;
+            if (_selectedEventId == value)
+                return;
             _selectedEventId = value;
             OnPropertyChanged();
         }
@@ -369,7 +371,10 @@ public sealed partial class AppShell : Shell
                                                 Opacity = .7,
                                                 HorizontalTextAlignment = TextAlignment.Center,
                                             },
-                                            new Button { Text = "Start a conversation" }.BindCommand(
+                                            new Button
+                                            {
+                                                Text = "Start a conversation",
+                                            }.BindCommand(
                                                 nameof(OpenConversationCommand),
                                                 source: BindingContext
                                             ),

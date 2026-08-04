@@ -48,9 +48,10 @@ public sealed partial class RoomDiscoveryPage : ContentPage
         SafeAreaEdges = SafeAreaEdges.All;
         Content = new Grid
         {
-            Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                ? new Thickness(12)
-                : new Thickness(16),
+            Padding =
+                DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                    ? new Thickness(12)
+                    : new Thickness(16),
             RowSpacing = 12,
             RowDefinitions =
             {
@@ -106,18 +107,9 @@ public sealed partial class RoomDiscoveryPage : ContentPage
                         new Picker
                         {
                             Title = "Choose a common server",
-                            ItemsSource = new[]
-                            {
-                                "matrix.org",
-                                "mozilla.org",
-                                "tchncs.de",
-                            },
+                            ItemsSource = new[] { "matrix.org", "mozilla.org", "tchncs.de" },
                         }
-                            .Bind(
-                                Picker.SelectedItemProperty,
-                                nameof(Server),
-                                BindingMode.TwoWay
-                            )
+                            .Bind(Picker.SelectedItemProperty, nameof(Server), BindingMode.TwoWay)
                             .Bind(
                                 IsEnabledProperty,
                                 $"{nameof(Session)}.{nameof(RoomDirectorySession.IsLoading)}",
@@ -143,15 +135,15 @@ public sealed partial class RoomDiscoveryPage : ContentPage
                 {
                     SelectionMode = SelectionMode.None,
                     EmptyView = new TemplateSwitchView<bool, bool>(value => value)
+                    {
+                        FallbackTemplate = new Label
                         {
-                            FallbackTemplate = new Label
-                            {
-                                Text = "No public rooms found.",
-                                Opacity = .7,
-                                HorizontalOptions = LayoutOptions.Center,
-                                VerticalOptions = LayoutOptions.Center,
-                            },
-                        }
+                            Text = "No public rooms found.",
+                            Opacity = .7,
+                            HorizontalOptions = LayoutOptions.Center,
+                            VerticalOptions = LayoutOptions.Center,
+                        },
+                    }
                         .Add(
                             value => value,
                             new ActivityIndicator
@@ -194,8 +186,14 @@ public sealed partial class RoomDiscoveryPage : ContentPage
                                 Children =
                                 {
                                     new RoomAvatar { Size = 48 }
-                                        .Bind(RoomAvatar.AvatarUrlProperty, nameof(RoomDescription.AvatarUrl))
-                                        .Bind(RoomAvatar.DisplayNameProperty, nameof(RoomDescription.Name))
+                                        .Bind(
+                                            RoomAvatar.AvatarUrlProperty,
+                                            nameof(RoomDescription.AvatarUrl)
+                                        )
+                                        .Bind(
+                                            RoomAvatar.DisplayNameProperty,
+                                            nameof(RoomDescription.Name)
+                                        )
                                         .Column(0),
                                     new VerticalStackLayout
                                     {
@@ -206,19 +204,28 @@ public sealed partial class RoomDiscoveryPage : ContentPage
                                             {
                                                 FontAttributes = FontAttributes.Bold,
                                                 FontSize = 16,
-                                            }.Bind(Label.TextProperty, nameof(RoomDescription.Name)),
+                                            }.Bind(
+                                                Label.TextProperty,
+                                                nameof(RoomDescription.Name)
+                                            ),
                                             new Label
                                             {
                                                 FontSize = 11,
                                                 Opacity = .65,
                                                 LineBreakMode = LineBreakMode.TailTruncation,
-                                            }.Bind(Label.TextProperty, nameof(RoomDescription.Alias)),
+                                            }.Bind(
+                                                Label.TextProperty,
+                                                nameof(RoomDescription.Alias)
+                                            ),
                                             new Label
                                             {
                                                 MaxLines = 2,
                                                 LineBreakMode = LineBreakMode.TailTruncation,
                                                 Opacity = .75,
-                                            }.Bind(Label.TextProperty, nameof(RoomDescription.Topic)),
+                                            }.Bind(
+                                                Label.TextProperty,
+                                                nameof(RoomDescription.Topic)
+                                            ),
                                             new Label { FontSize = 11, Opacity = .6 }.Bind(
                                                 Label.TextProperty,
                                                 nameof(RoomDescription.JoinedMembers),
@@ -229,9 +236,7 @@ public sealed partial class RoomDiscoveryPage : ContentPage
                                     new Button { Text = "Join", MinimumHeightRequest = 44 }
                                         .BindCommand(nameof(JoinCommand), source: this)
                                         .Bind(Button.CommandParameterProperty, ".")
-                                        .Row(
-                                            DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 1 : 0
-                                        )
+                                        .Row(DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 1 : 0)
                                         .Column(
                                             DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 1 : 2
                                         ),
@@ -245,7 +250,12 @@ public sealed partial class RoomDiscoveryPage : ContentPage
                             )
                             .DynamicResource(BackgroundColorProperty, "SurfaceContainer")
                     ),
-                }.Bind(ItemsView.ItemsSourceProperty, $"{nameof(Session)}.{nameof(RoomDirectorySession.Rooms)}").Row(1),
+                }
+                    .Bind(
+                        ItemsView.ItemsSourceProperty,
+                        $"{nameof(Session)}.{nameof(RoomDirectorySession.Rooms)}"
+                    )
+                    .Row(1),
                 new VerticalStackLayout
                 {
                     Spacing = 6,
@@ -258,16 +268,24 @@ public sealed partial class RoomDiscoveryPage : ContentPage
                                 $"{nameof(Session)}.{nameof(RoomDirectorySession.IsLoading)}",
                                 converter: new CommunityToolkit.Maui.Converters.InvertedBoolConverter()
                             )
-                            .Bind(IsVisibleProperty, $"{nameof(Session)}.{nameof(RoomDirectorySession.HasMore)}"),
-                        new ActivityIndicator { IsRunning = true }
-                            .Bind(IsVisibleProperty, $"{nameof(Session)}.{nameof(RoomDirectorySession.IsLoading)}"),
+                            .Bind(
+                                IsVisibleProperty,
+                                $"{nameof(Session)}.{nameof(RoomDirectorySession.HasMore)}"
+                            ),
+                        new ActivityIndicator { IsRunning = true }.Bind(
+                            IsVisibleProperty,
+                            $"{nameof(Session)}.{nameof(RoomDirectorySession.IsLoading)}"
+                        ),
                         new Label
                         {
                             TextColor = Colors.Red,
                             HorizontalTextAlignment = TextAlignment.Center,
                             LineBreakMode = LineBreakMode.WordWrap,
                         }
-                            .Bind(Label.TextProperty, $"{nameof(Session)}.{nameof(RoomDirectorySession.ErrorMessage)}")
+                            .Bind(
+                                Label.TextProperty,
+                                $"{nameof(Session)}.{nameof(RoomDirectorySession.ErrorMessage)}"
+                            )
                             .Bind(
                                 IsVisibleProperty,
                                 $"{nameof(Session)}.{nameof(RoomDirectorySession.ErrorMessage)}",
@@ -282,7 +300,8 @@ public sealed partial class RoomDiscoveryPage : ContentPage
     }
 
     [RelayCommand]
-    private Task SearchAsync() => Session.SearchAsync(Query, string.IsNullOrWhiteSpace(Server) ? null : Server.Trim());
+    private Task SearchAsync() =>
+        Session.SearchAsync(Query, string.IsNullOrWhiteSpace(Server) ? null : Server.Trim());
 
     [RelayCommand]
     private Task LoadMoreAsync() => Session.LoadMoreAsync();
@@ -290,15 +309,20 @@ public sealed partial class RoomDiscoveryPage : ContentPage
     [RelayCommand]
     private async Task JoinAsync(RoomDescription? room)
     {
-        if (room is null) return;
+        if (room is null)
+            return;
         try
         {
-            await _open(await _client.JoinRoomAsync(
-                room.Alias
-                ?? (string.IsNullOrWhiteSpace(Server)
-                    ? room.RoomId
-                    : $"https://matrix.to/#/{Uri.EscapeDataString(room.RoomId)}?via={Uri.EscapeDataString(Server.Trim())}")
-            ));
+            await _open(
+                await _client.JoinRoomAsync(
+                    room.Alias
+                        ?? (
+                            string.IsNullOrWhiteSpace(Server)
+                                ? room.RoomId
+                                : $"https://matrix.to/#/{Uri.EscapeDataString(room.RoomId)}?via={Uri.EscapeDataString(Server.Trim())}"
+                        )
+                )
+            );
         }
         catch (Exception exception)
         {

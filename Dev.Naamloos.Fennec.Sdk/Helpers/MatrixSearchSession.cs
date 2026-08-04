@@ -35,32 +35,38 @@ public sealed class MatrixSearchSession(
 
     public async Task LoadMoreAsync()
     {
-        if (_disposed || IsLoading || !HasMore) return;
+        if (_disposed || IsLoading || !HasMore)
+            return;
         IsLoading = true;
         ErrorMessage = string.Empty;
         try
         {
             var batch = await iterator.NextEvents();
             HasMore = batch is { Length: > 0 };
-            var results = (batch ?? []).Select(result =>
-            {
-                using (result)
+            var results = (batch ?? [])
+                .Select(result =>
                 {
-                    return new MatrixSearchResult(
-                        result.RoomId,
-                        result.Result.EventId,
-                        result.Result.SenderProfile is ProfileDetails.Ready ready
-                        && !string.IsNullOrWhiteSpace(ready.DisplayName)
-                            ? ready.DisplayName!
-                            : result.Result.Sender,
-                        result.Result.Sender,
-                        body(result.Result.Content),
-                        DateTimeOffset.FromUnixTimeMilliseconds(
-                            (long)Math.Min(result.Result.Timestamp, 253402300799999UL)
-                        ).ToLocalTime().ToString("g")
-                    );
-                }
-            }).ToArray();
+                    using (result)
+                    {
+                        return new MatrixSearchResult(
+                            result.RoomId,
+                            result.Result.EventId,
+                            result.Result.SenderProfile is ProfileDetails.Ready ready
+                            && !string.IsNullOrWhiteSpace(ready.DisplayName)
+                                ? ready.DisplayName!
+                                : result.Result.Sender,
+                            result.Result.Sender,
+                            body(result.Result.Content),
+                            DateTimeOffset
+                                .FromUnixTimeMilliseconds(
+                                    (long)Math.Min(result.Result.Timestamp, 253402300799999UL)
+                                )
+                                .ToLocalTime()
+                                .ToString("g")
+                        );
+                    }
+                })
+                .ToArray();
             if (Results.Count == 0)
                 Results.ReplaceAll(results);
             else
@@ -79,7 +85,8 @@ public sealed class MatrixSearchSession(
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed)
+            return;
         _disposed = true;
         iterator.Dispose();
     }

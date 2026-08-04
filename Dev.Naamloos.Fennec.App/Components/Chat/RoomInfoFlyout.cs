@@ -160,14 +160,16 @@ public sealed class RoomInfoFlyout : ContentView
 
         _drawer = new Border
         {
-            WidthRequest = DeviceInfo.Current.Platform == DevicePlatform.Android
+            WidthRequest =
+                DeviceInfo.Current.Platform == DevicePlatform.Android
                 || DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                ? -1
-                : 360,
-            HorizontalOptions = DeviceInfo.Current.Platform == DevicePlatform.Android
+                    ? -1
+                    : 360,
+            HorizontalOptions =
+                DeviceInfo.Current.Platform == DevicePlatform.Android
                 || DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                ? LayoutOptions.Fill
-                : LayoutOptions.End,
+                    ? LayoutOptions.Fill
+                    : LayoutOptions.End,
             VerticalOptions = LayoutOptions.Fill,
             StrokeThickness = 0,
             Content = new Grid

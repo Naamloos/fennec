@@ -34,22 +34,21 @@ public sealed partial class ThreadListFlyout : ContentView, IDisposable
                     Color = Color.FromArgb("#66000000"),
                     GestureRecognizers =
                     {
-                        new TapGestureRecognizer
-                        {
-                            Command = new Command(() => IsOpen = false),
-                        },
+                        new TapGestureRecognizer { Command = new Command(() => IsOpen = false) },
                     },
                 },
                 new Border
                 {
-                    WidthRequest = DeviceInfo.Current.Platform == DevicePlatform.Android
+                    WidthRequest =
+                        DeviceInfo.Current.Platform == DevicePlatform.Android
                         || DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                        ? -1
-                        : 380,
-                    HorizontalOptions = DeviceInfo.Current.Platform == DevicePlatform.Android
+                            ? -1
+                            : 380,
+                    HorizontalOptions =
+                        DeviceInfo.Current.Platform == DevicePlatform.Android
                         || DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                        ? LayoutOptions.Fill
-                        : LayoutOptions.End,
+                            ? LayoutOptions.Fill
+                            : LayoutOptions.End,
                     StrokeThickness = 0,
                     Padding = 16,
                     Content = new Grid
@@ -99,15 +98,15 @@ public sealed partial class ThreadListFlyout : ContentView, IDisposable
                             {
                                 SelectionMode = SelectionMode.None,
                                 EmptyView = new TemplateSwitchView<bool, bool>(value => value)
+                                {
+                                    FallbackTemplate = new Label
                                     {
-                                        FallbackTemplate = new Label
-                                        {
-                                            Text = "No threads yet.",
-                                            Opacity = .7,
-                                            HorizontalOptions = LayoutOptions.Center,
-                                            VerticalOptions = LayoutOptions.Center,
-                                        },
-                                    }
+                                        Text = "No threads yet.",
+                                        Opacity = .7,
+                                        HorizontalOptions = LayoutOptions.Center,
+                                        VerticalOptions = LayoutOptions.Center,
+                                    },
+                                }
                                     .Add(
                                         value => value,
                                         new ActivityIndicator
@@ -128,10 +127,11 @@ public sealed partial class ThreadListFlyout : ContentView, IDisposable
                                         Margin = new Thickness(0, 0, 0, 8),
                                         Padding = 10,
                                         StrokeThickness = 0,
-                                        StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
-                                        {
-                                            CornerRadius = 10,
-                                        },
+                                        StrokeShape =
+                                            new Microsoft.Maui.Controls.Shapes.RoundRectangle
+                                            {
+                                                CornerRadius = 10,
+                                            },
                                         Content = new Grid
                                         {
                                             ColumnSpacing = 10,
@@ -143,21 +143,56 @@ public sealed partial class ThreadListFlyout : ContentView, IDisposable
                                             Children =
                                             {
                                                 new MatrixAvatar { Size = 36 }
-                                                    .Bind(MatrixAvatar.MatrixSourceProperty, nameof(MatrixThreadSummary.SenderAvatarUrl))
-                                                    .Bind(MatrixAvatar.DisplayNameProperty, nameof(MatrixThreadSummary.Sender)),
+                                                    .Bind(
+                                                        MatrixAvatar.MatrixSourceProperty,
+                                                        nameof(MatrixThreadSummary.SenderAvatarUrl)
+                                                    )
+                                                    .Bind(
+                                                        MatrixAvatar.DisplayNameProperty,
+                                                        nameof(MatrixThreadSummary.Sender)
+                                                    ),
                                                 new VerticalStackLayout
                                                 {
                                                     Spacing = 2,
                                                     Children =
                                                     {
-                                                        new Label { FontAttributes = FontAttributes.Bold }
-                                                            .Bind(Label.TextProperty, nameof(MatrixThreadSummary.Sender)),
-                                                        new Label { MaxLines = 2, LineBreakMode = LineBreakMode.TailTruncation }
-                                                            .Bind(Label.TextProperty, nameof(MatrixThreadSummary.Body)),
-                                                        new Label { MaxLines = 1, FontSize = 12, Opacity = .7, LineBreakMode = LineBreakMode.TailTruncation }
-                                                            .Bind(Label.TextProperty, nameof(MatrixThreadSummary.LatestBody), stringFormat: "Latest: {0}"),
-                                                        new Label { FontSize = 11, Opacity = .65 }
-                                                            .Bind(Label.TextProperty, nameof(MatrixThreadSummary.ReplyCount), stringFormat: "{0} replies"),
+                                                        new Label
+                                                        {
+                                                            FontAttributes = FontAttributes.Bold,
+                                                        }.Bind(
+                                                            Label.TextProperty,
+                                                            nameof(MatrixThreadSummary.Sender)
+                                                        ),
+                                                        new Label
+                                                        {
+                                                            MaxLines = 2,
+                                                            LineBreakMode =
+                                                                LineBreakMode.TailTruncation,
+                                                        }.Bind(
+                                                            Label.TextProperty,
+                                                            nameof(MatrixThreadSummary.Body)
+                                                        ),
+                                                        new Label
+                                                        {
+                                                            MaxLines = 1,
+                                                            FontSize = 12,
+                                                            Opacity = .7,
+                                                            LineBreakMode =
+                                                                LineBreakMode.TailTruncation,
+                                                        }.Bind(
+                                                            Label.TextProperty,
+                                                            nameof(MatrixThreadSummary.LatestBody),
+                                                            stringFormat: "Latest: {0}"
+                                                        ),
+                                                        new Label
+                                                        {
+                                                            FontSize = 11,
+                                                            Opacity = .65,
+                                                        }.Bind(
+                                                            Label.TextProperty,
+                                                            nameof(MatrixThreadSummary.ReplyCount),
+                                                            stringFormat: "{0} replies"
+                                                        ),
                                                     },
                                                 }.Column(1),
                                             },
@@ -165,8 +200,14 @@ public sealed partial class ThreadListFlyout : ContentView, IDisposable
                                         GestureRecognizers =
                                         {
                                             new TapGestureRecognizer()
-                                                .BindCommand(nameof(OpenThreadCommand), source: this)
-                                                .Bind(TapGestureRecognizer.CommandParameterProperty, nameof(MatrixThreadSummary.RootEventId)),
+                                                .BindCommand(
+                                                    nameof(OpenThreadCommand),
+                                                    source: this
+                                                )
+                                                .Bind(
+                                                    TapGestureRecognizer.CommandParameterProperty,
+                                                    nameof(MatrixThreadSummary.RootEventId)
+                                                ),
                                         },
                                     }
                                         .Bind(
@@ -174,9 +215,18 @@ public sealed partial class ThreadListFlyout : ContentView, IDisposable
                                             nameof(MatrixThreadSummary.Body),
                                             stringFormat: "Thread: {0}"
                                         )
-                                        .DynamicResource(BackgroundColorProperty, "SurfaceContainer")
+                                        .DynamicResource(
+                                            BackgroundColorProperty,
+                                            "SurfaceContainer"
+                                        )
                                 ),
-                            }.Bind(ItemsView.ItemsSourceProperty, $"{nameof(Threads)}.{nameof(ObservableThreadList.Items)}", source: this).Row(1),
+                            }
+                                .Bind(
+                                    ItemsView.ItemsSourceProperty,
+                                    $"{nameof(Threads)}.{nameof(ObservableThreadList.Items)}",
+                                    source: this
+                                )
+                                .Row(1),
                             new TemplateSwitchView<bool, bool>(value => value)
                             {
                                 FallbackTemplate = new Label
@@ -239,8 +289,11 @@ public sealed partial class ThreadListFlyout : ContentView, IDisposable
     {
         var view = (ThreadListFlyout)bindable;
         view._threads?.Dispose();
-        view.Threads = view._threads = newValue is Room room ? new ObservableThreadList(room) : null;
-        if (view.Threads is not null) _ = view.Threads.LoadMoreAsync();
+        view.Threads = view._threads = newValue is Room room
+            ? new ObservableThreadList(room)
+            : null;
+        if (view.Threads is not null)
+            _ = view.Threads.LoadMoreAsync();
     }
 
     public void Dispose()

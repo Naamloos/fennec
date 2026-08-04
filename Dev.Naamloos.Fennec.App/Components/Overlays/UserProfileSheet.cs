@@ -36,24 +36,28 @@ public sealed class UserProfileSheet : ContentView
 
         _sheet = new Border
         {
-            Margin = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                ? new Thickness(0)
-                : new Thickness(24),
-            Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                ? new Thickness(20, 8, 20, 24)
-                : new Thickness(24),
+            Margin =
+                DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                    ? new Thickness(0)
+                    : new Thickness(24),
+            Padding =
+                DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                    ? new Thickness(20, 8, 20, 24)
+                    : new Thickness(24),
             MaximumWidthRequest = 620,
             MaximumHeightRequest = 680,
             HorizontalOptions = LayoutOptions.Fill,
-            VerticalOptions = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                ? LayoutOptions.End
-                : LayoutOptions.Center,
+            VerticalOptions =
+                DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                    ? LayoutOptions.End
+                    : LayoutOptions.Center,
             StrokeThickness = 0,
             StrokeShape = new RoundRectangle
             {
-                CornerRadius = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                    ? new CornerRadius(28, 28, 0, 0)
-                    : new CornerRadius(24),
+                CornerRadius =
+                    DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                        ? new CornerRadius(28, 28, 0, 0)
+                        : new CornerRadius(24),
             },
             Content = new Grid
             {

@@ -2,7 +2,6 @@
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
-
 using Plugin.Firebase.CloudMessaging;
 
 namespace Dev.Naamloos.Fennec.App
@@ -33,8 +32,9 @@ namespace Dev.Naamloos.Fennec.App
                     "Messages",
                     NotificationImportance.High
                 );
-                (GetSystemService(NotificationService) as NotificationManager)
-                    ?.CreateNotificationChannel(channel);
+                (
+                    GetSystemService(NotificationService) as NotificationManager
+                )?.CreateNotificationChannel(channel);
             }
 
             FirebaseCloudMessagingImplementation.ChannelId = NotificationChannelId;

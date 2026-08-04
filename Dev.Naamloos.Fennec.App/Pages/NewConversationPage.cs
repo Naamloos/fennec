@@ -20,7 +20,8 @@ public sealed partial class NewConversationPage : ContentPage
         get => _userId;
         set
         {
-            if (_userId == value) return;
+            if (_userId == value)
+                return;
             _userId = value;
             OnPropertyChanged();
             ErrorMessage = string.Empty;
@@ -32,7 +33,8 @@ public sealed partial class NewConversationPage : ContentPage
         get => _roomAddress;
         set
         {
-            if (_roomAddress == value) return;
+            if (_roomAddress == value)
+                return;
             _roomAddress = value;
             OnPropertyChanged();
             ErrorMessage = string.Empty;
@@ -44,7 +46,8 @@ public sealed partial class NewConversationPage : ContentPage
         get => _errorMessage;
         private set
         {
-            if (_errorMessage == value) return;
+            if (_errorMessage == value)
+                return;
             _errorMessage = value;
             OnPropertyChanged();
         }
@@ -55,7 +58,8 @@ public sealed partial class NewConversationPage : ContentPage
         get => _isWorking;
         private set
         {
-            if (_isWorking == value) return;
+            if (_isWorking == value)
+                return;
             _isWorking = value;
             OnPropertyChanged();
         }
@@ -77,9 +81,10 @@ public sealed partial class NewConversationPage : ContentPage
                 {
                     Content = new VerticalStackLayout
                     {
-                        Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                            ? new Thickness(12)
-                            : new Thickness(20),
+                        Padding =
+                            DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                                ? new Thickness(12)
+                                : new Thickness(20),
                         Spacing = 16,
                         MaximumWidthRequest = 620,
                         HorizontalOptions = LayoutOptions.Fill,
@@ -93,7 +98,8 @@ public sealed partial class NewConversationPage : ContentPage
                             },
                             new Label
                             {
-                                Text = "Message someone directly, join a known room, or browse public rooms.",
+                                Text =
+                                    "Message someone directly, join a known room, or browse public rooms.",
                                 Opacity = .72,
                             },
                             new Border
@@ -117,7 +123,8 @@ public sealed partial class NewConversationPage : ContentPage
                                         },
                                         new Label
                                         {
-                                            Text = "Enter the complete Matrix ID of the person you want to message.",
+                                            Text =
+                                                "Enter the complete Matrix ID of the person you want to message.",
                                             Opacity = .7,
                                         },
                                         new Entry
@@ -141,12 +148,15 @@ public sealed partial class NewConversationPage : ContentPage
                                         new Button
                                         {
                                             Text = "Start direct message",
-                                            HorizontalOptions = DeviceInfo.Current.Idiom
-                                                == DeviceIdiom.Phone
-                                                ? LayoutOptions.Fill
-                                                : LayoutOptions.End,
+                                            HorizontalOptions =
+                                                DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                                                    ? LayoutOptions.Fill
+                                                    : LayoutOptions.End,
                                             MinimumHeightRequest = 44,
-                                        }.BindCommand(nameof(StartDirectMessageCommand), source: this),
+                                        }.BindCommand(
+                                            nameof(StartDirectMessageCommand),
+                                            source: this
+                                        ),
                                     },
                                 },
                             }.DynamicResource(BackgroundColorProperty, "SurfaceContainer"),
@@ -171,7 +181,8 @@ public sealed partial class NewConversationPage : ContentPage
                                         },
                                         new Label
                                         {
-                                            Text = "Paste a room alias, room ID, or matrix.to link.",
+                                            Text =
+                                                "Paste a room alias, room ID, or matrix.to link.",
                                             Opacity = .7,
                                         },
                                         new Entry
@@ -181,11 +192,12 @@ public sealed partial class NewConversationPage : ContentPage
                                             ReturnType = ReturnType.Go,
                                             IsSpellCheckEnabled = false,
                                             IsTextPredictionEnabled = false,
-                                        }.Bind(
-                                            Entry.TextProperty,
-                                            nameof(RoomAddress),
-                                            BindingMode.TwoWay
-                                        )
+                                        }
+                                            .Bind(
+                                                Entry.TextProperty,
+                                                nameof(RoomAddress),
+                                                BindingMode.TwoWay
+                                            )
                                             .Bind(
                                                 Entry.ReturnCommandProperty,
                                                 nameof(JoinRoomCommand),
@@ -194,10 +206,10 @@ public sealed partial class NewConversationPage : ContentPage
                                         new Button
                                         {
                                             Text = "Join room",
-                                            HorizontalOptions = DeviceInfo.Current.Idiom
-                                                == DeviceIdiom.Phone
-                                                ? LayoutOptions.Fill
-                                                : LayoutOptions.End,
+                                            HorizontalOptions =
+                                                DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                                                    ? LayoutOptions.Fill
+                                                    : LayoutOptions.End,
                                             MinimumHeightRequest = 44,
                                         }.BindCommand(nameof(JoinRoomCommand), source: this),
                                     },
@@ -229,7 +241,8 @@ public sealed partial class NewConversationPage : ContentPage
                                                 },
                                                 new Label
                                                 {
-                                                    Text = "Search public room directories by name or topic.",
+                                                    Text =
+                                                        "Search public room directories by name or topic.",
                                                     Opacity = .7,
                                                 },
                                             },
@@ -238,10 +251,10 @@ public sealed partial class NewConversationPage : ContentPage
                                         {
                                             Text = "Browse rooms",
                                             MinimumHeightRequest = 44,
-                                            HorizontalOptions = DeviceInfo.Current.Idiom
-                                                == DeviceIdiom.Phone
-                                                ? LayoutOptions.Fill
-                                                : LayoutOptions.End,
+                                            HorizontalOptions =
+                                                DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                                                    ? LayoutOptions.Fill
+                                                    : LayoutOptions.End,
                                         }.BindCommand(nameof(DiscoverRoomsCommand), source: this),
                                     },
                                 },
@@ -309,7 +322,8 @@ public sealed partial class NewConversationPage : ContentPage
 
     private async Task OpenAsync(Func<Task<ManagedRoom>> open)
     {
-        if (IsWorking) return;
+        if (IsWorking)
+            return;
 
         IsWorking = true;
         ErrorMessage = string.Empty;

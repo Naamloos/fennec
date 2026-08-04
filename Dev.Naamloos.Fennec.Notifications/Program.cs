@@ -18,9 +18,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 );
 builder.Services.AddMemoryCache(options => options.SizeLimit = 10_000);
 
-FirebaseApp.Create(
-    new AppOptions { Credential = GoogleCredential.GetApplicationDefault() }
-);
+FirebaseApp.Create(new AppOptions { Credential = GoogleCredential.GetApplicationDefault() });
 builder.Services.AddSingleton(FirebaseMessaging.DefaultInstance);
 
 var app = builder.Build();
@@ -48,14 +46,11 @@ app.MapPost(
 
         if (
             devices.Any(device =>
-                string.IsNullOrWhiteSpace(device.AppId)
-                || string.IsNullOrWhiteSpace(device.Pushkey)
+                string.IsNullOrWhiteSpace(device.AppId) || string.IsNullOrWhiteSpace(device.Pushkey)
             )
         )
         {
-            return Results.BadRequest(
-                new { error = "Every device requires app_id and pushkey" }
-            );
+            return Results.BadRequest(new { error = "Every device requires app_id and pushkey" });
         }
 
         var notification = request.Notification;
@@ -112,10 +107,7 @@ app.MapPost(
             };
 #pragma warning restore CS0618
 
-            var response = await firebase.SendEachForMulticastAsync(
-                message,
-                cancellationToken
-            );
+            var response = await firebase.SendEachForMulticastAsync(message, cancellationToken);
             var rejected = response
                 .Responses.Select((result, index) => (result, index))
                 .Where(item =>
@@ -169,16 +161,11 @@ static class GatewayPayload
 {
     public static IReadOnlyDictionary<string, string> CreateData(MatrixNotification notification)
     {
-        var data = new Dictionary<string, string>
-        {
-            ["is_silent_in_foreground"] = "true",
-        };
+        var data = new Dictionary<string, string> { ["is_silent_in_foreground"] = "true" };
 
         if (notification.Counts?.Unread is { } unread)
         {
-            data["unread"] = Math.Max(0, unread).ToString(
-                CultureInfo.InvariantCulture
-            );
+            data["unread"] = Math.Max(0, unread).ToString(CultureInfo.InvariantCulture);
         }
 
         if (notification.EventId is { Length: > 0 })

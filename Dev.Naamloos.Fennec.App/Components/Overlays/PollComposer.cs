@@ -25,20 +25,24 @@ public sealed class PollComposer : FloatingOverlay<PollDraft>
                 },
                 new Border
                 {
-                    Margin = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                        ? new Thickness(8)
-                        : new Thickness(24),
-                    Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                        ? new Thickness(16)
-                        : new Thickness(20),
+                    Margin =
+                        DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                            ? new Thickness(8)
+                            : new Thickness(24),
+                    Padding =
+                        DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                            ? new Thickness(16)
+                            : new Thickness(20),
                     MaximumWidthRequest = 460,
                     MaximumHeightRequest = 620,
-                    HorizontalOptions = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                        ? LayoutOptions.Fill
-                        : LayoutOptions.Center,
-                    VerticalOptions = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                        ? LayoutOptions.End
-                        : LayoutOptions.Center,
+                    HorizontalOptions =
+                        DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                            ? LayoutOptions.Fill
+                            : LayoutOptions.Center,
+                    VerticalOptions =
+                        DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                            ? LayoutOptions.End
+                            : LayoutOptions.Center,
                     StrokeThickness = 0,
                     StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
                     {

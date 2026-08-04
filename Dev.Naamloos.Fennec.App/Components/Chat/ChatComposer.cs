@@ -144,9 +144,7 @@ public sealed partial class ChatComposer : ContentView
                                 ),
                             },
                         }
-                            .Invoke(view =>
-                                SemanticProperties.SetDescription(view, "Cancel reply")
-                            )
+                            .Invoke(view => SemanticProperties.SetDescription(view, "Cancel reply"))
                             .Column(1),
                     },
                 }
@@ -190,9 +188,7 @@ public sealed partial class ChatComposer : ContentView
                                 ),
                             },
                         }
-                            .Invoke(view =>
-                                SemanticProperties.SetDescription(view, "Cancel edit")
-                            )
+                            .Invoke(view => SemanticProperties.SetDescription(view, "Cancel edit"))
                             .Column(1),
                     },
                 }
@@ -219,9 +215,10 @@ public sealed partial class ChatComposer : ContentView
                     .Row(2),
                 new Grid
                 {
-                    Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                        ? new Thickness(6, 8)
-                        : new Thickness(12),
+                    Padding =
+                        DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                            ? new Thickness(6, 8)
+                            : new Thickness(12),
                     Children =
                     {
                         new Grid
@@ -365,22 +362,29 @@ public sealed partial class ChatComposer : ContentView
         };
     }
 
-    private EmojiPicker CreateEmojiPicker() => new EmojiPicker
-    {
-        Mode = EmojiPickerMode.Composer,
-        HeightRequest = DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 280 : 320,
-        SelectedCommand = new Command<EmojiSelection>(selection =>
+    private EmojiPicker CreateEmojiPicker() =>
+        new EmojiPicker
         {
-            if (selection?.Kind == EmojiKind.Unicode && !string.IsNullOrEmpty(selection.Unicode))
-                InsertAtCursor(selection.Unicode);
-            else if (selection?.Kind == EmojiKind.MatrixCustom && !string.IsNullOrWhiteSpace(selection.Shortcode))
-                InsertAtCursor($":{selection.Shortcode}:");
-            IsEmojiPickerOpen = false;
-        }),
-    }
-        .Bind(EmojiPicker.SessionProperty, nameof(Session), source: this)
-        .Bind(EmojiPicker.IsOpenProperty, nameof(IsEmojiPickerOpen), source: this)
-        .Bind(IsVisibleProperty, nameof(IsEmojiPickerOpen), source: this);
+            Mode = EmojiPickerMode.Composer,
+            HeightRequest = DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 280 : 320,
+            SelectedCommand = new Command<EmojiSelection>(selection =>
+            {
+                if (
+                    selection?.Kind == EmojiKind.Unicode
+                    && !string.IsNullOrEmpty(selection.Unicode)
+                )
+                    InsertAtCursor(selection.Unicode);
+                else if (
+                    selection?.Kind == EmojiKind.MatrixCustom
+                    && !string.IsNullOrWhiteSpace(selection.Shortcode)
+                )
+                    InsertAtCursor($":{selection.Shortcode}:");
+                IsEmojiPickerOpen = false;
+            }),
+        }
+            .Bind(EmojiPicker.SessionProperty, nameof(Session), source: this)
+            .Bind(EmojiPicker.IsOpenProperty, nameof(IsEmojiPickerOpen), source: this)
+            .Bind(IsVisibleProperty, nameof(IsEmojiPickerOpen), source: this);
 
     private Entry CreateEntry()
     {

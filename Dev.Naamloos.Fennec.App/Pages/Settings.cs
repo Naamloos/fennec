@@ -73,9 +73,10 @@ public sealed partial class Settings : ContentPage
         Content = new Grid
         {
             SafeAreaEdges = SafeAreaEdges.All,
-            Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                ? new Thickness(12)
-                : new Thickness(24, 20),
+            Padding =
+                DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                    ? new Thickness(12)
+                    : new Thickness(24, 20),
             RowSpacing = 16,
             RowDefinitions =
             {
@@ -104,9 +105,7 @@ public sealed partial class Settings : ContentPage
                                     source: this
                                 ),
                             },
-                        }.Invoke(view =>
-                            SemanticProperties.SetDescription(view, "Back to chats")
-                        ),
+                        }.Invoke(view => SemanticProperties.SetDescription(view, "Back to chats")),
                         new Label
                         {
                             Text = "Settings",

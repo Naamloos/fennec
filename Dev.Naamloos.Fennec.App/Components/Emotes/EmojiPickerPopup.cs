@@ -8,7 +8,11 @@ namespace Dev.Naamloos.Fennec.App.Components;
 
 public sealed class EmojiPickerPopup : Popup
 {
-    public EmojiPickerPopup(ChatSession session, EmojiPickerMode mode, Func<EmojiSelection, Task> selected)
+    public EmojiPickerPopup(
+        ChatSession session,
+        EmojiPickerMode mode,
+        Func<EmojiSelection, Task> selected
+    )
     {
         CanBeDismissedByTappingOutsideOfPopup = true;
         Padding = 0;
@@ -38,10 +42,14 @@ public sealed class EmojiPickerPopup : Popup
     }
 
     public EmojiPickerPopup(ChatSession session, ChatTimelineItem item)
-        : this(session, EmojiPickerMode.Reaction, selection =>
-        {
-            if (selection.Kind == EmojiKind.Unicode && UnicodeEmoji.IsValid(selection.Unicode))
-                return session.ToggleReactionAsync(item, selection.Unicode!);
-            return Task.CompletedTask;
-        }) { }
+        : this(
+            session,
+            EmojiPickerMode.Reaction,
+            selection =>
+            {
+                if (selection.Kind == EmojiKind.Unicode && UnicodeEmoji.IsValid(selection.Unicode))
+                    return session.ToggleReactionAsync(item, selection.Unicode!);
+                return Task.CompletedTask;
+            }
+        ) { }
 }

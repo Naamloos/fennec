@@ -123,14 +123,32 @@ public partial class MatrixImage : Image
                     ? await client.GetMediaContentAsync(source, IsJson).ConfigureAwait(false)
                 : UseAvatarCache
                     ? await client
-                        .GetAvatarThumbnailAsync(source, (ulong)Math.Max(1, ThumbnailWidth), (ulong)Math.Max(1, ThumbnailHeight), IsJson, cancellationToken)
+                        .GetAvatarThumbnailAsync(
+                            source,
+                            (ulong)Math.Max(1, ThumbnailWidth),
+                            (ulong)Math.Max(1, ThumbnailHeight),
+                            IsJson,
+                            cancellationToken
+                        )
                         .ConfigureAwait(false)
                 : UseRoomImageCache
                     ? await client
-                        .GetRoomImageThumbnailAsync(source, (ulong)Math.Max(1, ThumbnailWidth), (ulong)Math.Max(1, ThumbnailHeight), IsJson, cancellationToken)
+                        .GetRoomImageThumbnailAsync(
+                            source,
+                            (ulong)Math.Max(1, ThumbnailWidth),
+                            (ulong)Math.Max(1, ThumbnailHeight),
+                            IsJson,
+                            cancellationToken
+                        )
                         .ConfigureAwait(false)
                 : await client
-                    .GetThumbnailAsync(source, (ulong)Math.Max(1, ThumbnailWidth), (ulong)Math.Max(1, ThumbnailHeight), IsJson, cancellationToken)
+                    .GetThumbnailAsync(
+                        source,
+                        (ulong)Math.Max(1, ThumbnailWidth),
+                        (ulong)Math.Max(1, ThumbnailHeight),
+                        IsJson,
+                        cancellationToken
+                    )
                     .ConfigureAwait(false);
 
             if (loadId != _loadId || cancellationToken.IsCancellationRequested)

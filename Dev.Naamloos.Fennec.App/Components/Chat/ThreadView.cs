@@ -54,14 +54,16 @@ public sealed partial class ThreadView : ContentView
                 },
                 new Border
                 {
-                    WidthRequest = DeviceInfo.Current.Platform == DevicePlatform.Android
+                    WidthRequest =
+                        DeviceInfo.Current.Platform == DevicePlatform.Android
                         || DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                        ? -1
-                        : 480,
-                    HorizontalOptions = DeviceInfo.Current.Platform == DevicePlatform.Android
+                            ? -1
+                            : 480,
+                    HorizontalOptions =
+                        DeviceInfo.Current.Platform == DevicePlatform.Android
                         || DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                        ? LayoutOptions.Fill
-                        : LayoutOptions.End,
+                            ? LayoutOptions.Fill
+                            : LayoutOptions.End,
                     StrokeThickness = 0,
                     Content = new Grid
                     {
@@ -112,20 +114,75 @@ public sealed partial class ThreadView : ContentView
                             {
                                 Children =
                                 {
-                                    new ChatTimeline { EmptyMessage = "No replies in this thread yet." }
-                                        .Bind(ChatTimeline.ItemsProperty, $"{nameof(Session)}.{nameof(ChatSession.Items)}", source: this)
-                                        .Bind(ChatTimeline.ClientProperty, nameof(Client), source: this)
-                                        .Bind(ChatTimeline.MembersProperty, $"{nameof(Session)}.{nameof(ChatSession.Members)}", source: this)
-                                        .Bind(ChatTimeline.HistoryCommandProperty, nameof(LoadMoreCommand), source: this)
-                                        .Bind(ChatTimeline.HasMoreHistoryProperty, $"{nameof(Session)}.{nameof(ChatSession.CanLoadMoreHistory)}", source: this)
-                                        .Bind(ChatTimeline.IsLoadingHistoryProperty, $"{nameof(Session)}.{nameof(ChatSession.IsLoadingHistory)}", source: this)
-                                        .Bind(ChatTimeline.ReplyCommandProperty, nameof(ReplyCommand), source: this)
-                                        .Bind(ChatTimeline.EditCommandProperty, nameof(EditCommand), source: this)
-                                        .Bind(ChatTimeline.LinkCommandProperty, nameof(OpenLinkCommand), source: this)
-                                        .Bind(ChatTimeline.AddReactionCommandProperty, nameof(ReactCommand), source: this)
-                                        .Bind(ChatTimeline.MenuCommandProperty, nameof(MenuCommand), source: this)
-                                        .Bind(ChatTimeline.OpenMediaCommandProperty, nameof(OpenMediaCommand), source: this)
-                                        .Bind(ChatTimeline.PollVoteCommandProperty, nameof(VotePollCommand), source: this)
+                                    new ChatTimeline
+                                    {
+                                        EmptyMessage = "No replies in this thread yet.",
+                                    }
+                                        .Bind(
+                                            ChatTimeline.ItemsProperty,
+                                            $"{nameof(Session)}.{nameof(ChatSession.Items)}",
+                                            source: this
+                                        )
+                                        .Bind(
+                                            ChatTimeline.ClientProperty,
+                                            nameof(Client),
+                                            source: this
+                                        )
+                                        .Bind(
+                                            ChatTimeline.MembersProperty,
+                                            $"{nameof(Session)}.{nameof(ChatSession.Members)}",
+                                            source: this
+                                        )
+                                        .Bind(
+                                            ChatTimeline.HistoryCommandProperty,
+                                            nameof(LoadMoreCommand),
+                                            source: this
+                                        )
+                                        .Bind(
+                                            ChatTimeline.HasMoreHistoryProperty,
+                                            $"{nameof(Session)}.{nameof(ChatSession.CanLoadMoreHistory)}",
+                                            source: this
+                                        )
+                                        .Bind(
+                                            ChatTimeline.IsLoadingHistoryProperty,
+                                            $"{nameof(Session)}.{nameof(ChatSession.IsLoadingHistory)}",
+                                            source: this
+                                        )
+                                        .Bind(
+                                            ChatTimeline.ReplyCommandProperty,
+                                            nameof(ReplyCommand),
+                                            source: this
+                                        )
+                                        .Bind(
+                                            ChatTimeline.EditCommandProperty,
+                                            nameof(EditCommand),
+                                            source: this
+                                        )
+                                        .Bind(
+                                            ChatTimeline.LinkCommandProperty,
+                                            nameof(OpenLinkCommand),
+                                            source: this
+                                        )
+                                        .Bind(
+                                            ChatTimeline.AddReactionCommandProperty,
+                                            nameof(ReactCommand),
+                                            source: this
+                                        )
+                                        .Bind(
+                                            ChatTimeline.MenuCommandProperty,
+                                            nameof(MenuCommand),
+                                            source: this
+                                        )
+                                        .Bind(
+                                            ChatTimeline.OpenMediaCommandProperty,
+                                            nameof(OpenMediaCommand),
+                                            source: this
+                                        )
+                                        .Bind(
+                                            ChatTimeline.PollVoteCommandProperty,
+                                            nameof(VotePollCommand),
+                                            source: this
+                                        )
                                         .Bind<ChatTimeline, bool, string, bool>(
                                             IsVisibleProperty,
                                             new Binding(nameof(IsLoading), source: this),
@@ -139,7 +196,11 @@ public sealed partial class ThreadView : ContentView
                                         HorizontalOptions = LayoutOptions.Center,
                                         VerticalOptions = LayoutOptions.Center,
                                     }
-                                        .Bind(ActivityIndicator.IsRunningProperty, nameof(IsLoading), source: this)
+                                        .Bind(
+                                            ActivityIndicator.IsRunningProperty,
+                                            nameof(IsLoading),
+                                            source: this
+                                        )
                                         .Bind(IsVisibleProperty, nameof(IsLoading), source: this),
                                     new Label
                                     {
@@ -159,17 +220,62 @@ public sealed partial class ThreadView : ContentView
                             }.Row(1),
                             new ChatComposer()
                                 .Bind(ChatComposer.SessionProperty, nameof(Session), source: this)
-                                .Bind(ChatComposer.TextProperty, $"{nameof(Session)}.{nameof(ChatSession.DraftText)}", BindingMode.TwoWay, source: this)
-                                .Bind(ChatComposer.ReplyToProperty, $"{nameof(Session)}.{nameof(ChatSession.ReplyTarget)}", source: this)
-                                .Bind(ChatComposer.EditTargetProperty, $"{nameof(Session)}.{nameof(ChatSession.EditTarget)}", source: this)
-                                .Bind(ChatComposer.SendCommandProperty, nameof(SendCommand), source: this)
-                                .Bind(ChatComposer.AttachCommandProperty, nameof(AttachCommand), source: this)
-                                .Bind(ChatComposer.CancelReplyCommandProperty, nameof(CancelReplyCommand), source: this)
-                                .Bind(ChatComposer.CancelEditCommandProperty, nameof(CancelEditCommand), source: this)
-                                .Bind(ChatComposer.ErrorMessageProperty, $"{nameof(Session)}.{nameof(ChatSession.ErrorMessage)}", source: this)
-                                .Bind(ChatComposer.HasErrorProperty, $"{nameof(Session)}.{nameof(ChatSession.HasError)}", source: this)
-                                .Bind(ChatComposer.MembersProperty, $"{nameof(Session)}.{nameof(ChatSession.Members)}", source: this)
-                                .Bind(ChatComposer.EmotesProperty, $"{nameof(Session)}.{nameof(ChatSession.Emotes)}", source: this)
+                                .Bind(
+                                    ChatComposer.TextProperty,
+                                    $"{nameof(Session)}.{nameof(ChatSession.DraftText)}",
+                                    BindingMode.TwoWay,
+                                    source: this
+                                )
+                                .Bind(
+                                    ChatComposer.ReplyToProperty,
+                                    $"{nameof(Session)}.{nameof(ChatSession.ReplyTarget)}",
+                                    source: this
+                                )
+                                .Bind(
+                                    ChatComposer.EditTargetProperty,
+                                    $"{nameof(Session)}.{nameof(ChatSession.EditTarget)}",
+                                    source: this
+                                )
+                                .Bind(
+                                    ChatComposer.SendCommandProperty,
+                                    nameof(SendCommand),
+                                    source: this
+                                )
+                                .Bind(
+                                    ChatComposer.AttachCommandProperty,
+                                    nameof(AttachCommand),
+                                    source: this
+                                )
+                                .Bind(
+                                    ChatComposer.CancelReplyCommandProperty,
+                                    nameof(CancelReplyCommand),
+                                    source: this
+                                )
+                                .Bind(
+                                    ChatComposer.CancelEditCommandProperty,
+                                    nameof(CancelEditCommand),
+                                    source: this
+                                )
+                                .Bind(
+                                    ChatComposer.ErrorMessageProperty,
+                                    $"{nameof(Session)}.{nameof(ChatSession.ErrorMessage)}",
+                                    source: this
+                                )
+                                .Bind(
+                                    ChatComposer.HasErrorProperty,
+                                    $"{nameof(Session)}.{nameof(ChatSession.HasError)}",
+                                    source: this
+                                )
+                                .Bind(
+                                    ChatComposer.MembersProperty,
+                                    $"{nameof(Session)}.{nameof(ChatSession.Members)}",
+                                    source: this
+                                )
+                                .Bind(
+                                    ChatComposer.EmotesProperty,
+                                    $"{nameof(Session)}.{nameof(ChatSession.Emotes)}",
+                                    source: this
+                                )
                                 .Bind(
                                     IsVisibleProperty,
                                     nameof(Session),
@@ -183,7 +289,11 @@ public sealed partial class ThreadView : ContentView
                 new MediaOverlay()
                     .Bind(MediaOverlay.ClientProperty, nameof(Client), source: this)
                     .Bind(MediaOverlay.MediaProperty, nameof(FullscreenMedia), source: this)
-                    .Bind(MediaOverlay.CloseCommandProperty, nameof(CloseMediaCommand), source: this)
+                    .Bind(
+                        MediaOverlay.CloseCommandProperty,
+                        nameof(CloseMediaCommand),
+                        source: this
+                    )
                     .Bind(
                         IsVisibleProperty,
                         nameof(FullscreenMedia),
@@ -195,8 +305,11 @@ public sealed partial class ThreadView : ContentView
         Unloaded += (_, _) => _ = DisposeSessionAsync();
     }
 
-    private static void OnSourceChanged(BindableObject bindable, object oldValue, object newValue) =>
-        _ = ((ThreadView)bindable).LoadAsync();
+    private static void OnSourceChanged(
+        BindableObject bindable,
+        object oldValue,
+        object newValue
+    ) => _ = ((ThreadView)bindable).LoadAsync();
 
     private async Task LoadAsync()
     {
@@ -209,7 +322,8 @@ public sealed partial class ThreadView : ContentView
             await DisposeSessionAsync();
             token.ThrowIfCancellationRequested();
             LoadError = string.Empty;
-            if (Client is null || Room is null || string.IsNullOrWhiteSpace(RootEventId)) return;
+            if (Client is null || Room is null || string.IsNullOrWhiteSpace(RootEventId))
+                return;
 
             IsLoading = true;
             var session = await ChatSession.CreateAsync(
@@ -230,7 +344,8 @@ public sealed partial class ThreadView : ContentView
         }
         finally
         {
-            if (ReferenceEquals(_loadCancellation, cancellation)) IsLoading = false;
+            if (ReferenceEquals(_loadCancellation, cancellation))
+                IsLoading = false;
         }
     }
 
@@ -287,40 +402,55 @@ public sealed partial class ThreadView : ContentView
     [RelayCommand]
     private async Task MenuAsync(ChatTimelineItem? item)
     {
-        if (item?.EventId is null || Room is null || Shell.Current?.CurrentPage is not { } page) return;
+        if (item?.EventId is null || Room is null || Shell.Current?.CurrentPage is not { } page)
+            return;
         var actions = new List<string> { "Reply" };
-        if (item.IsOwn) actions.Add("Edit");
+        if (item.IsOwn)
+            actions.Add("Edit");
         actions.Add("React");
         actions.Add("Copy text");
         actions.Add("Copy link");
-        if (Session is not null && await Session.CanDeleteAsync(item)) actions.Add("Delete");
+        if (Session is not null && await Session.CanDeleteAsync(item))
+            actions.Add("Delete");
         var action = await InAppDialogs.ChooseAsync(
             page,
             "Thread message actions",
             actions,
             item.Sender
         );
-        if (action == "Reply") Session?.ReplyTo(item);
-        else if (action == "Edit") Session?.Edit(item);
-        else if (action == "React") await ReactAsync(item);
-        else if (action == "Delete") await (Session?.DeleteAsync(item) ?? Task.FromResult(false));
-        else if (action == "Copy text") await Clipboard.Default.SetTextAsync(item.Body);
-        else if (action == "Copy link") await Clipboard.Default.SetTextAsync(await Room.MatrixToEventPermalink(item.EventId));
+        if (action == "Reply")
+            Session?.ReplyTo(item);
+        else if (action == "Edit")
+            Session?.Edit(item);
+        else if (action == "React")
+            await ReactAsync(item);
+        else if (action == "Delete")
+            await (Session?.DeleteAsync(item) ?? Task.FromResult(false));
+        else if (action == "Copy text")
+            await Clipboard.Default.SetTextAsync(item.Body);
+        else if (action == "Copy link")
+            await Clipboard.Default.SetTextAsync(await Room.MatrixToEventPermalink(item.EventId));
     }
 
     [RelayCommand]
     private async Task AttachAsync()
     {
-        if (Session is null || await FilePicker.Default.PickAsync() is not { } file) return;
+        if (Session is null || await FilePicker.Default.PickAsync() is not { } file)
+            return;
         await using var stream = await file.OpenReadAsync();
         using var memory = new MemoryStream();
         await stream.CopyToAsync(memory);
-        await Session.SendAttachmentAsync(file.FileName, file.ContentType ?? "application/octet-stream", memory.ToArray());
+        await Session.SendAttachmentAsync(
+            file.FileName,
+            file.ContentType ?? "application/octet-stream",
+            memory.ToArray()
+        );
     }
 
     private async Task DisposeSessionAsync()
     {
-        if (Session is null) return;
+        if (Session is null)
+            return;
         await Session.DisposeAsync();
         Session = null;
     }

@@ -17,7 +17,8 @@ public sealed class EmojiUsageService
     public EmojiUsageService(ManagedMatrixClient client)
     {
         _client = client;
-        _favourites = Preferences.Default.Get(FavouritesKey, string.Empty)
+        _favourites = Preferences
+            .Default.Get(FavouritesKey, string.Empty)
             .Split('|', StringSplitOptions.RemoveEmptyEntries)
             .ToHashSet(StringComparer.Ordinal);
         _ = RefreshAsync();
@@ -28,19 +29,22 @@ public sealed class EmojiUsageService
 
     public void Record(string? emoji)
     {
-        if (!UnicodeEmoji.IsValid(emoji)) return;
+        if (!UnicodeEmoji.IsValid(emoji))
+            return;
         _ = RecordAsync(emoji!);
     }
 
     public void ToggleFavourite(string id)
     {
-        if (!_favourites.Add(id)) _favourites.Remove(id);
+        if (!_favourites.Add(id))
+            _favourites.Remove(id);
         Preferences.Default.Set(FavouritesKey, string.Join('|', _favourites));
     }
 
     public async Task RefreshAsync()
     {
-        if (!_client.IsLoggedIn) return;
+        if (!_client.IsLoggedIn)
+            return;
         await _gate.WaitAsync();
         try
         {
@@ -50,7 +54,9 @@ public sealed class EmojiUsageService
             {
                 var state = JsonSerializer.Deserialize<RecentEmojiContent>(content);
                 if (state?.Recent is not null)
-                    _recent.AddRange(state.Recent.Where(entry => UnicodeEmoji.IsValid(entry.Emoji)).Take(100));
+                    _recent.AddRange(
+                        state.Recent.Where(entry => UnicodeEmoji.IsValid(entry.Emoji)).Take(100)
+                    );
             }
         }
         catch (Exception exception)
@@ -69,9 +75,11 @@ public sealed class EmojiUsageService
         try
         {
             var existing = _recent.FirstOrDefault(entry => entry.Emoji == emoji);
-            if (existing is not null) _recent.Remove(existing);
+            if (existing is not null)
+                _recent.Remove(existing);
             _recent.Insert(0, new RecentEmojiEntry(emoji, (existing?.Total ?? 0) + 1));
-            if (_recent.Count > 100) _recent.RemoveRange(100, _recent.Count - 100);
+            if (_recent.Count > 100)
+                _recent.RemoveRange(100, _recent.Count - 100);
             await _client.SetAccountDataAsync(
                 AccountDataType,
                 JsonSerializer.Serialize(new RecentEmojiContent(_recent.ToArray()))

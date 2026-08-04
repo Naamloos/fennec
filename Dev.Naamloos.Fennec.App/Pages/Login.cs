@@ -139,7 +139,8 @@ public partial class Login : ContentPage
     [RelayCommand]
     public async Task LoginAsync()
     {
-        if (IsLoading) return;
+        if (IsLoading)
+            return;
 
         IsLoading = true;
         ErrorMessage = string.Empty;
@@ -211,9 +212,10 @@ public partial class Login : ContentPage
                 HorizontalOptions = LayoutOptions.Fill,
                 MaximumWidthRequest = 480,
                 Spacing = 12,
-                Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                    ? new Thickness(16, 24)
-                    : new Thickness(24),
+                Padding =
+                    DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                        ? new Thickness(16, 24)
+                        : new Thickness(24),
                 Children =
                 {
                     new Label()
@@ -274,11 +276,7 @@ public partial class Login : ContentPage
                             ReturnType = ReturnType.Go,
                         }
                     ).Bind(Entry.ReturnCommandProperty, nameof(LoginCommand)).Bind(Entry.TextProperty, nameof(Password), BindingMode.TwoWay).Bind(Entry.IsEnabledProperty, nameof(IsLoading), BindingMode.Default, new InvertedBoolConverter()),
-                    new Label
-                    {
-                        TextColor = Colors.Red,
-                        LineBreakMode = LineBreakMode.WordWrap,
-                    }
+                    new Label { TextColor = Colors.Red, LineBreakMode = LineBreakMode.WordWrap }
                         .Bind(Label.TextProperty, nameof(ErrorMessage))
                         .Bind(
                             IsVisibleProperty,

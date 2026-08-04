@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using Dev.Naamloos.Fennec.Sdk;
-
 #if ANDROID || IOS
 using Plugin.Firebase.CloudMessaging;
 using Plugin.Firebase.CloudMessaging.EventArgs;
@@ -10,8 +9,7 @@ namespace Dev.Naamloos.Fennec.App.Services;
 
 public sealed class PushNotificationService
 {
-    private const string GatewayUrl =
-        "https://fennec-notif.naamloos.dev/_matrix/push/v1/notify";
+    private const string GatewayUrl = "https://fennec-notif.naamloos.dev/_matrix/push/v1/notify";
 
     private readonly ManagedMatrixClient _matrixClient;
 

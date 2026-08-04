@@ -57,6 +57,8 @@ public class ObservableRangeCollection<T> : ObservableCollection<T>
     {
         OnPropertyChanged(new PropertyChangedEventArgs(nameof(Count)));
         OnPropertyChanged(new PropertyChangedEventArgs("Item[]"));
-        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        OnCollectionChanged(
+            new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset)
+        );
     }
 }

@@ -8,11 +8,16 @@ public static class UnicodeEmoji
     private static readonly Lazy<HashSet<string>> ValidSequences = new(LoadValidSequences);
 
     public static bool IsValid(string? value) =>
-        !string.IsNullOrWhiteSpace(value) && value.Length <= 64 && ValidSequences.Value.Contains(value);
+        !string.IsNullOrWhiteSpace(value)
+        && value.Length <= 64
+        && ValidSequences.Value.Contains(value);
 
     private static HashSet<string> LoadValidSequences()
     {
-        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Dev.Naamloos.Fennec.Sdk.emoji-test.txt")
+        using var stream =
+            Assembly
+                .GetExecutingAssembly()
+                .GetManifestResourceStream("Dev.Naamloos.Fennec.Sdk.emoji-test.txt")
             ?? throw new InvalidOperationException("Bundled Unicode emoji data is missing.");
         using var reader = new StreamReader(stream);
         var result = new HashSet<string>(StringComparer.Ordinal);
@@ -22,8 +27,13 @@ public static class UnicodeEmoji
                 continue;
             var semicolon = line.IndexOf(';');
             if (semicolon > 0)
-                result.Add(string.Concat(line[..semicolon].Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                    .Select(hex => char.ConvertFromUtf32(Convert.ToInt32(hex, 16)))));
+                result.Add(
+                    string.Concat(
+                        line[..semicolon]
+                            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(hex => char.ConvertFromUtf32(Convert.ToInt32(hex, 16)))
+                    )
+                );
         }
         return result;
     }

@@ -32,7 +32,8 @@ public sealed partial class MessageSearchPage : ContentPage
         get => _query;
         set
         {
-            if (_query == value) return;
+            if (_query == value)
+                return;
             _query = value;
             OnPropertyChanged();
             HasSearched = false;
@@ -45,7 +46,8 @@ public sealed partial class MessageSearchPage : ContentPage
         get => _errorMessage;
         private set
         {
-            if (_errorMessage == value) return;
+            if (_errorMessage == value)
+                return;
             _errorMessage = value;
             OnPropertyChanged();
         }
@@ -56,7 +58,8 @@ public sealed partial class MessageSearchPage : ContentPage
         get => _hasSearched;
         private set
         {
-            if (_hasSearched == value) return;
+            if (_hasSearched == value)
+                return;
             _hasSearched = value;
             OnPropertyChanged();
         }
@@ -67,7 +70,8 @@ public sealed partial class MessageSearchPage : ContentPage
         get => _isSearching;
         private set
         {
-            if (_isSearching == value) return;
+            if (_isSearching == value)
+                return;
             _isSearching = value;
             OnPropertyChanged();
         }
@@ -82,9 +86,10 @@ public sealed partial class MessageSearchPage : ContentPage
         SafeAreaEdges = SafeAreaEdges.All;
         Content = new Grid
         {
-            Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                ? new Thickness(12)
-                : new Thickness(16),
+            Padding =
+                DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                    ? new Thickness(12)
+                    : new Thickness(16),
             RowSpacing = 12,
             RowDefinitions =
             {
@@ -130,33 +135,33 @@ public sealed partial class MessageSearchPage : ContentPage
                 {
                     SelectionMode = SelectionMode.None,
                     EmptyView = new TemplateSwitchView<bool, bool>(value => value)
+                    {
+                        FallbackTemplate = new TemplateSwitchView<bool, bool>(value => value)
                         {
-                            FallbackTemplate = new TemplateSwitchView<bool, bool>(value => value)
-                                {
-                                    FallbackTemplate = new Label
-                                    {
-                                        Text = "Enter a term to search message history.",
-                                        Opacity = .7,
-                                        HorizontalOptions = LayoutOptions.Center,
-                                        VerticalOptions = LayoutOptions.Center,
-                                    },
-                                }
-                                .Add(
-                                    value => value,
-                                    new Label
-                                    {
-                                        Text = "No matching messages found.",
-                                        Opacity = .7,
-                                        HorizontalOptions = LayoutOptions.Center,
-                                        VerticalOptions = LayoutOptions.Center,
-                                    }
-                                )
-                                .Bind(
-                                    TemplateSwitchView<bool, bool>.ValueProperty,
-                                    nameof(HasSearched),
-                                    source: this
-                                ),
+                            FallbackTemplate = new Label
+                            {
+                                Text = "Enter a term to search message history.",
+                                Opacity = .7,
+                                HorizontalOptions = LayoutOptions.Center,
+                                VerticalOptions = LayoutOptions.Center,
+                            },
                         }
+                            .Add(
+                                value => value,
+                                new Label
+                                {
+                                    Text = "No matching messages found.",
+                                    Opacity = .7,
+                                    HorizontalOptions = LayoutOptions.Center,
+                                    VerticalOptions = LayoutOptions.Center,
+                                }
+                            )
+                            .Bind(
+                                TemplateSwitchView<bool, bool>.ValueProperty,
+                                nameof(HasSearched),
+                                source: this
+                            ),
+                    }
                         .Add(
                             value => value,
                             new ActivityIndicator
@@ -190,7 +195,10 @@ public sealed partial class MessageSearchPage : ContentPage
                                     {
                                         FontAttributes = FontAttributes.Bold,
                                         LineBreakMode = LineBreakMode.TailTruncation,
-                                    }.Bind(Label.TextProperty, nameof(MatrixSearchResult.SenderName)),
+                                    }.Bind(
+                                        Label.TextProperty,
+                                        nameof(MatrixSearchResult.SenderName)
+                                    ),
                                     new Label
                                     {
                                         MaxLines = 4,
@@ -223,10 +231,12 @@ public sealed partial class MessageSearchPage : ContentPage
                             )
                             .DynamicResource(BackgroundColorProperty, "SurfaceContainer")
                     ),
-                }.Bind(
-                    ItemsView.ItemsSourceProperty,
-                    $"{nameof(Session)}.{nameof(MatrixSearchSession.Results)}"
-                ).Row(1),
+                }
+                    .Bind(
+                        ItemsView.ItemsSourceProperty,
+                        $"{nameof(Session)}.{nameof(MatrixSearchSession.Results)}"
+                    )
+                    .Row(1),
                 new VerticalStackLayout
                 {
                     Spacing = 6,
@@ -243,18 +253,20 @@ public sealed partial class MessageSearchPage : ContentPage
                                 IsVisibleProperty,
                                 $"{nameof(Session)}.{nameof(MatrixSearchSession.HasMore)}"
                             ),
-                        new ActivityIndicator { IsRunning = true }
-                            .Bind(
-                                IsVisibleProperty,
-                                $"{nameof(Session)}.{nameof(MatrixSearchSession.IsLoading)}"
-                            ),
+                        new ActivityIndicator { IsRunning = true }.Bind(
+                            IsVisibleProperty,
+                            $"{nameof(Session)}.{nameof(MatrixSearchSession.IsLoading)}"
+                        ),
                         new Label
                         {
                             TextColor = Colors.Red,
                             HorizontalTextAlignment = TextAlignment.Center,
                             LineBreakMode = LineBreakMode.WordWrap,
                         }
-                            .Bind(Label.TextProperty, $"{nameof(Session)}.{nameof(MatrixSearchSession.ErrorMessage)}")
+                            .Bind(
+                                Label.TextProperty,
+                                $"{nameof(Session)}.{nameof(MatrixSearchSession.ErrorMessage)}"
+                            )
                             .Bind(
                                 IsVisibleProperty,
                                 $"{nameof(Session)}.{nameof(MatrixSearchSession.ErrorMessage)}",
@@ -283,7 +295,8 @@ public sealed partial class MessageSearchPage : ContentPage
     [RelayCommand]
     private async Task SearchAsync()
     {
-        if (IsSearching || string.IsNullOrWhiteSpace(Query)) return;
+        if (IsSearching || string.IsNullOrWhiteSpace(Query))
+            return;
         IsSearching = true;
         ErrorMessage = string.Empty;
         HasSearched = true;

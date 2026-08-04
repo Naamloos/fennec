@@ -40,31 +40,32 @@ public sealed partial class VoiceRecorder : ContentView
                     Color = Color.FromArgb("#66000000"),
                     GestureRecognizers =
                     {
-                        new TapGestureRecognizer().BindCommand(
-                            nameof(CancelCommand),
-                            source: this
-                        ),
+                        new TapGestureRecognizer().BindCommand(nameof(CancelCommand), source: this),
                     },
                 },
                 new Border
                 {
-                    Margin = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                        ? new Thickness(0)
-                        : new Thickness(24),
-                    Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                        ? new Thickness(20, 16, 20, 24)
-                        : new Thickness(24),
+                    Margin =
+                        DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                            ? new Thickness(0)
+                            : new Thickness(24),
+                    Padding =
+                        DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                            ? new Thickness(20, 16, 20, 24)
+                            : new Thickness(24),
                     MaximumWidthRequest = 520,
                     HorizontalOptions = LayoutOptions.Fill,
-                    VerticalOptions = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                        ? LayoutOptions.End
-                        : LayoutOptions.Center,
+                    VerticalOptions =
+                        DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                            ? LayoutOptions.End
+                            : LayoutOptions.Center,
                     StrokeThickness = 0,
                     StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
                     {
-                        CornerRadius = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                            ? new CornerRadius(24, 24, 0, 0)
-                            : new CornerRadius(20),
+                        CornerRadius =
+                            DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                                ? new CornerRadius(24, 24, 0, 0)
+                                : new CornerRadius(20),
                     },
                     Content = new VerticalStackLayout
                     {

@@ -40,15 +40,17 @@ public sealed partial class TextMessageView : ContentView
                         converter: new Dev.Naamloos.Fennec.App.Converters.NotNullConverter(),
                         source: this
                     )
-                    .Invoke(label => label.GestureRecognizers.Add(
-                        new TapGestureRecognizer()
-                            .BindCommand(nameof(LinkCommand), source: this)
-                            .Bind(
-                                TapGestureRecognizer.CommandParameterProperty,
-                                $"{nameof(Item)}.{nameof(ChatTimelineItem.ReplyToEventId)}",
-                                source: this
-                            )
-                    )),
+                    .Invoke(label =>
+                        label.GestureRecognizers.Add(
+                            new TapGestureRecognizer()
+                                .BindCommand(nameof(LinkCommand), source: this)
+                                .Bind(
+                                    TapGestureRecognizer.CommandParameterProperty,
+                                    $"{nameof(Item)}.{nameof(ChatTimelineItem.ReplyToEventId)}",
+                                    source: this
+                                )
+                        )
+                    ),
                 new MatrixHtmlView()
                     .Bind(
                         MatrixHtmlView.HtmlProperty,

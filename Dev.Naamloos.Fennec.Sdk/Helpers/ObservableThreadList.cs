@@ -4,7 +4,11 @@ using uniffi.matrix_sdk_ui;
 
 namespace Dev.Naamloos.Fennec.Sdk.Helpers;
 
-public sealed class ObservableThreadList : ObservableModel, ThreadListEntriesListener, ThreadListPaginationStateListener, IDisposable
+public sealed class ObservableThreadList
+    : ObservableModel,
+        ThreadListEntriesListener,
+        ThreadListPaginationStateListener,
+        IDisposable
 {
     private readonly ThreadListService _service;
     private readonly TaskHandle _itemsSubscription;
@@ -37,7 +41,8 @@ public sealed class ObservableThreadList : ObservableModel, ThreadListEntriesLis
 
     public async Task LoadMoreAsync()
     {
-        if (_disposed || !HasMore || IsLoading) return;
+        if (_disposed || !HasMore || IsLoading)
+            return;
         IsLoading = true;
         try
         {
@@ -101,7 +106,8 @@ public sealed class ObservableThreadList : ObservableModel, ThreadListEntriesLis
                     Items.RemoveAt((int)value.Index);
                     break;
                 case ThreadListUpdate.Truncate value:
-                    while (Items.Count > value.Length) Items.RemoveAt(Items.Count - 1);
+                    while (Items.Count > value.Length)
+                        Items.RemoveAt(Items.Count - 1);
                     break;
                 case ThreadListUpdate.Reset value:
                     Items.ReplaceAll(value.Values.Select(Map));
@@ -110,35 +116,43 @@ public sealed class ObservableThreadList : ObservableModel, ThreadListEntriesLis
         }
     }
 
-    private static MatrixThreadSummary Map(ThreadListItem item) => new(
-        item.RootEvent.EventId,
-        item.RootEvent.SenderProfile is ProfileDetails.Ready ready
-        && !string.IsNullOrWhiteSpace(ready.DisplayName)
-            ? ready.DisplayName!
-            : item.RootEvent.Sender,
-        (item.RootEvent.SenderProfile as ProfileDetails.Ready)?.AvatarUrl,
-        Body(item.RootEvent.Content),
-        Body(item.LatestEvent?.Content),
-        item.NumReplies
-    );
+    private static MatrixThreadSummary Map(ThreadListItem item) =>
+        new(
+            item.RootEvent.EventId,
+            item.RootEvent.SenderProfile is ProfileDetails.Ready ready
+            && !string.IsNullOrWhiteSpace(ready.DisplayName)
+                ? ready.DisplayName!
+                : item.RootEvent.Sender,
+            (item.RootEvent.SenderProfile as ProfileDetails.Ready)?.AvatarUrl,
+            Body(item.RootEvent.Content),
+            Body(item.LatestEvent?.Content),
+            item.NumReplies
+        );
 
-    private static string Body(TimelineItemContent? content) => content switch
-    {
-        TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Message message } => message.Content.Body,
-        TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Sticker sticker } => sticker.Body,
-        TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Poll poll } => poll.Question,
-        _ => "Timeline event",
-    };
+    private static string Body(TimelineItemContent? content) =>
+        content switch
+        {
+            TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Message message } => message
+                .Content
+                .Body,
+            TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Sticker sticker } =>
+                sticker.Body,
+            TimelineItemContent.MsgLike { Content.Kind: MsgLikeKind.Poll poll } => poll.Question,
+            _ => "Timeline event",
+        };
 
     private void RunOnContext(System.Action action)
     {
-        if (_context is null || SynchronizationContext.Current == _context) action();
-        else _context.Post(static state => ((System.Action)state!).Invoke(), action);
+        if (_context is null || SynchronizationContext.Current == _context)
+            action();
+        else
+            _context.Post(static state => ((System.Action)state!).Invoke(), action);
     }
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed)
+            return;
         _disposed = true;
         _itemsSubscription.Cancel();
         _paginationSubscription.Cancel();

@@ -19,7 +19,8 @@ public sealed partial class Startup : ContentPage
         get => _status;
         private set
         {
-            if (_status == value) return;
+            if (_status == value)
+                return;
             _status = value;
             OnPropertyChanged();
         }
@@ -94,7 +95,9 @@ public sealed partial class Startup : ContentPage
             {
                 // ServerUnreachable during ClientBuilder.Build is transient; keep the
                 // persisted session and retry instead of presenting a false logout.
-                System.Diagnostics.Debug.WriteLine($"Could not recover Matrix session: {exception}");
+                System.Diagnostics.Debug.WriteLine(
+                    $"Could not recover Matrix session: {exception}"
+                );
                 Status = "Can’t reach your homeserver. Retrying…";
             }
 

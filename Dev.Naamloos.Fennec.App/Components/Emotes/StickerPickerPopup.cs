@@ -60,9 +60,8 @@ public sealed partial class StickerPickerPopup : Popup
                             {
                                 IsJson = false,
                                 Aspect = Aspect.AspectFit,
-                                HeightRequest = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
-                                    ? 68
-                                    : 84,
+                                HeightRequest =
+                                    DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 68 : 84,
                                 GestureRecognizers =
                                 {
                                     new TapGestureRecognizer()
