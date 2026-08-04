@@ -30,18 +30,12 @@ public sealed partial class AboutSettingsView : ContentView
                             HorizontalOptions = LayoutOptions.Center,
                             StrokeThickness = 0,
                             StrokeShape = new RoundRectangle { CornerRadius = 38 },
-                            Content = new Label
+                            Content = new Image
                             {
-                                Text = "F",
-                                FontSize = 32,
-                                FontAttributes = FontAttributes.Bold,
-                                HorizontalTextAlignment = TextAlignment.Center,
-                                VerticalTextAlignment = TextAlignment.Center,
+                                Source = "fennec_icon.png",
+                                Aspect = Aspect.AspectFit,
                             },
-                        }.DynamicResource(
-                            VisualElement.BackgroundColorProperty,
-                            "PrimaryContainer"
-                        ),
+                        },
                         new Label
                         {
                             Text = "Fennec",

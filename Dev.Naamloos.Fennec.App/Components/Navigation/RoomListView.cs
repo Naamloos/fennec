@@ -196,6 +196,7 @@ public sealed partial class RoomListView : ContentView, IDisposable
                     new ColumnDefinition(6),
                     new ColumnDefinition(GridLength.Auto),
                     new ColumnDefinition(GridLength.Star),
+                    new ColumnDefinition(GridLength.Auto),
                 },
                 Children =
                 {
@@ -231,6 +232,16 @@ public sealed partial class RoomListView : ContentView, IDisposable
                     }
                         .Bind(Label.TextProperty, nameof(ManagedRoom.DisplayName))
                         .Column(2),
+                    new Label
+                    {
+                        FontSize = 12,
+                        FontAttributes = FontAttributes.Bold,
+                        VerticalOptions = LayoutOptions.Center,
+                    }
+                        .Bind(Label.TextProperty, nameof(ManagedRoom.UnreadLabel))
+                        .Bind(IsVisibleProperty, nameof(ManagedRoom.HasUnread))
+                        .DynamicResource(Label.TextColorProperty, "Primary")
+                        .Column(3),
                 },
             };
 

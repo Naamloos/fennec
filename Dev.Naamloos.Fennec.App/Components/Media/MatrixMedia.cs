@@ -52,6 +52,8 @@ public sealed partial class MatrixMedia : ContentView
         {
             _loadVersion++;
             _loadCancellation?.Cancel();
+            _loadCancellation?.Dispose();
+            _loadCancellation = null;
             StopVideo();
             ImageSource = null;
         };
@@ -121,18 +123,21 @@ public sealed partial class MatrixMedia : ContentView
 
     private async Task LoadAsync(int version, CancellationToken cancellationToken)
     {
+        var client = Client;
+        var media = Media;
+        ImageSource = null;
         IsImageVisible = false;
         IsVideoVisible = false;
         IsFileVisible =
-            Media?.Kind is ChatMediaKind.File or ChatMediaKind.Audio
-            || (Media?.Kind == ChatMediaKind.Video && !IsFull && !Media.HasPreview);
+            media?.Kind is ChatMediaKind.File or ChatMediaKind.Audio
+            || (media?.Kind == ChatMediaKind.Video && !IsFull && !media.HasPreview);
 
-        if (Client is null || Media is null || IsFileVisible)
+        if (client is null || media is null || IsFileVisible)
         {
             return;
         }
 
-        if (Media.Kind == ChatMediaKind.Video)
+        if (media.Kind == ChatMediaKind.Video && IsFull)
         {
             EnsureVideoElement();
         }
@@ -142,13 +147,13 @@ public sealed partial class MatrixMedia : ContentView
         {
             if (IsFull)
             {
-                await Media.LoadFullAsync(Client).ConfigureAwait(false);
-                imageData = Media.FullImageData;
+                await media.LoadFullAsync(client).ConfigureAwait(false);
+                imageData = media.FullImageData;
             }
             else
             {
-                imageData = await Media
-                    .LoadPreviewAsync(Client, cancellationToken)
+                imageData = await media
+                    .LoadPreviewAsync(client, cancellationToken)
                     .ConfigureAwait(false);
             }
         }
@@ -160,12 +165,16 @@ public sealed partial class MatrixMedia : ContentView
         {
             System.Diagnostics.Debug.WriteLine($"Could not load media: {exception}");
             await Dispatcher.DispatchAsync(() =>
-                IsFileVisible = Media.Kind == ChatMediaKind.Video && !IsFull
-            );
+            {
+                if (version == _loadVersion && ReferenceEquals(Media, media))
+                {
+                    IsFileVisible = media.Kind == ChatMediaKind.Video && !IsFull;
+                }
+            });
             return;
         }
 
-        if (version != _loadVersion)
+        if (version != _loadVersion || !ReferenceEquals(Media, media))
         {
             return;
         }
@@ -175,12 +184,12 @@ public sealed partial class MatrixMedia : ContentView
             : Microsoft.Maui.Controls.ImageSource.FromStream(() => new MemoryStream(imageData));
         await Dispatcher.DispatchAsync(() =>
         {
-            if (version != _loadVersion)
+            if (version != _loadVersion || !ReferenceEquals(Media, media))
                 return;
 
-            if (Media.Kind == ChatMediaKind.Video && IsFull)
+            if (media.Kind == ChatMediaKind.Video && IsFull)
             {
-                VideoSource = Media.VideoPath is { } path
+                VideoSource = media.VideoPath is { } path
                     ? PlaybackMediaSource.FromFile(path)
                     : null;
                 IsVideoVisible = VideoSource is not null;

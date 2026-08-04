@@ -18,9 +18,15 @@ public enum ComposerAutocompleteMode
 
 public sealed partial class ComposerAutocomplete : ContentView
 {
+    private readonly CollectionView _list = new()
+    {
+        SelectionMode = SelectionMode.None,
+        MaximumHeightRequest = 260,
+    };
     private INotifyCollectionChanged? _membersSource;
     private INotifyCollectionChanged? _emotesSource;
     private INotifyCollectionChanged? _roomsSource;
+    private ComposerAutocompleteMode? _renderedMode;
 
     public ObservableCollection<RoomMember> VisibleMembers { get; } = [];
 
@@ -83,6 +89,7 @@ public sealed partial class ComposerAutocomplete : ContentView
         };
 
         Content = CreateContent();
+        UpdateList();
     }
 
     private void Subscribe(ref INotifyCollectionChanged? current, INotifyCollectionChanged? source)
@@ -183,37 +190,41 @@ public sealed partial class ComposerAutocomplete : ContentView
             }
         }
 
-        Content = CreateContent();
+        UpdateList();
     }
 
     private View CreateContent()
     {
-        var list = new CollectionView
-        {
-            SelectionMode = SelectionMode.None,
-            MaximumHeightRequest = 260,
-            ItemTemplate = Mode switch
-            {
-                ComposerAutocompleteMode.Emotes => CreateEmoteTemplate(),
-                ComposerAutocompleteMode.Rooms => CreateRoomTemplate(),
-                _ => CreateMemberTemplate(),
-            },
-        };
-        list.ItemsSource = Mode switch
-        {
-            ComposerAutocompleteMode.Emotes => VisibleEmotes,
-            ComposerAutocompleteMode.Rooms => VisibleRooms,
-            _ => VisibleMembers,
-        };
-
         return new Border
         {
             MaximumWidthRequest = 360,
             Padding = new Thickness(6),
             StrokeThickness = 0,
             StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 8 },
-            Content = list,
+            Content = _list,
         }.DynamicResource(BackgroundColorProperty, "SurfaceContainer");
+    }
+
+    private void UpdateList()
+    {
+        if (_renderedMode == Mode)
+        {
+            return;
+        }
+
+        _list.ItemTemplate = Mode switch
+        {
+            ComposerAutocompleteMode.Emotes => CreateEmoteTemplate(),
+            ComposerAutocompleteMode.Rooms => CreateRoomTemplate(),
+            _ => CreateMemberTemplate(),
+        };
+        _list.ItemsSource = Mode switch
+        {
+            ComposerAutocompleteMode.Emotes => VisibleEmotes,
+            ComposerAutocompleteMode.Rooms => VisibleRooms,
+            _ => VisibleMembers,
+        };
+        _renderedMode = Mode;
     }
 
     private DataTemplate CreateMemberTemplate() =>

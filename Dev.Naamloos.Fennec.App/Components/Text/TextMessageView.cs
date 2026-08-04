@@ -59,5 +59,5 @@ public sealed partial class TextMessageView : ContentView
     }
 
     private static void OnItemChanged(BindableObject bindable, object oldValue, object newValue) =>
-        ((TextMessageView)bindable).IsVisible = (newValue as ChatTimelineItem)?.Poll is null;
+        ((TextMessageView)bindable).IsVisible = newValue is ChatTimelineItem { Poll: null };
 }

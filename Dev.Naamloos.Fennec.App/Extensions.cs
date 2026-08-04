@@ -17,7 +17,9 @@ namespace Dev.Naamloos.Fennec.App
             ArgumentNullException.ThrowIfNull(bindable);
             ArgumentNullException.ThrowIfNull(targetProperty);
 
-            var service = App.Services.GetRequiredService<TService>();
+            var services =
+                App.Services ?? throw new InvalidOperationException("App services unavailable.");
+            var service = services.GetRequiredService<TService>();
 
             bindable.SetBinding(
                 targetProperty,

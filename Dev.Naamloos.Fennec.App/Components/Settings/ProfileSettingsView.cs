@@ -26,6 +26,8 @@ public sealed partial class ProfileSettingsView : ContentView
     public string Bio { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public string TimeZone { get; set; } = TimeZoneInfo.Local.Id;
+    public IReadOnlyList<string> TimeZones { get; } =
+        TimeZoneInfo.GetSystemTimeZones().Select(timeZone => timeZone.Id).ToArray();
     public string Pronouns { get; set; } = string.Empty;
     public string Initial =>
         string.IsNullOrWhiteSpace(DisplayName) ? "@" : DisplayName[..1].ToUpperInvariant();
@@ -118,7 +120,14 @@ public sealed partial class ProfileSettingsView : ContentView
             Field("Bio", nameof(Bio)),
             Field("Status", nameof(Status)),
             Field("Pronouns (comma separated)", nameof(Pronouns)),
-            Field("Time zone", nameof(TimeZone)),
+            new Picker { Title = "Time zone" }
+                .Bind(Picker.ItemsSourceProperty, nameof(TimeZones), source: this)
+                .Bind(
+                    Picker.SelectedItemProperty,
+                    nameof(TimeZone),
+                    BindingMode.TwoWay,
+                    source: this
+                ),
             new Button { Text = "Save profile" }.BindCommand(
                 nameof(SaveProfileCommand),
                 source: this

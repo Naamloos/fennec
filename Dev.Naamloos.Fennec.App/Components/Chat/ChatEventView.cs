@@ -3,10 +3,11 @@ using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Behaviors;
 using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.Sdk.Entities;
+using MPowerKit.VirtualizeListView;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
-public sealed partial class ChatEventView : ContentView
+public sealed partial class ChatEventView : VirtualizeListViewCell
 {
     [BindableProperty]
     public partial ChatTimelineItem? Item { get; set; }
@@ -16,6 +17,7 @@ public sealed partial class ChatEventView : ContentView
 
     public ChatEventView()
     {
+        GestureRecognizers.Clear();
         Content = new Label
         {
             Margin = new Thickness(18, 4),
@@ -48,5 +50,11 @@ public sealed partial class ChatEventView : ContentView
             Opacity = .8,
             LineBreakMode = LineBreakMode.WordWrap,
         }.Bind(Label.TextProperty, $"{nameof(Item)}.{nameof(ChatTimelineItem.Body)}", source: this);
+    }
+
+    protected override void OnAppearing()
+    {
+        Item = BindingContext as ChatTimelineItem;
+        base.OnAppearing();
     }
 }

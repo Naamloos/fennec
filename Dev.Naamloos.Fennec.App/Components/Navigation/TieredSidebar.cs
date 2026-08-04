@@ -1,3 +1,5 @@
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Diagnostics;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
@@ -46,6 +48,10 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
     ];
 
     private ObservableRoomList? _spaces;
+    private ObservableRoomList? _unreadRooms;
+    private ObservableSpaceRoomIds? _spaceRoomIds;
+    private readonly HashSet<ManagedRoom> _trackedUnreadRooms = [];
+    private bool _spaceUnreadUpdateQueued;
     private bool _disposed;
 
     [BindableProperty]
@@ -103,6 +109,21 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
             );
             _spaces.CaptureCurrentContext();
             _spacesView.ItemsSource = _spaces;
+            _spaces.CollectionChanged += OnSpacesChanged;
+
+            _unreadRooms = await MatrixClient.GetObservableRoomListAsync(
+                new RoomListEntriesDynamicFilterKind.All([
+                    new RoomListEntriesDynamicFilterKind.Joined(),
+                    new RoomListEntriesDynamicFilterKind.NonSpace(),
+                ])
+            );
+            _unreadRooms.CaptureCurrentContext();
+            _unreadRooms.CollectionChanged += OnUnreadRoomsChanged;
+            TrackUnreadRooms(_unreadRooms);
+
+            _spaceRoomIds = await MatrixClient.GetObservableSpaceRoomIdsAsync();
+            _spaceRoomIds.Changed += OnSpaceRoomIdsChanged;
+            QueueSpaceUnreadUpdate();
             ShowSection(_sections[3]);
         }
         catch (Exception exception)
@@ -176,6 +197,7 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
                     {
                         new ColumnDefinition(4),
                         new ColumnDefinition(GridLength.Star),
+                        new ColumnDefinition(GridLength.Auto),
                     },
                     Children =
                     {
@@ -202,6 +224,16 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
                             .Bind(RoomAvatar.AvatarUrlProperty, nameof(ManagedRoom.AvatarUrl))
                             .Bind(RoomAvatar.DisplayNameProperty, nameof(ManagedRoom.DisplayName))
                             .Column(1),
+                        new Label
+                        {
+                            FontSize = 12,
+                            FontAttributes = FontAttributes.Bold,
+                            VerticalOptions = LayoutOptions.Center,
+                        }
+                            .Bind(Label.TextProperty, nameof(ManagedRoom.UnreadLabel))
+                            .Bind(IsVisibleProperty, nameof(ManagedRoom.HasUnread))
+                            .DynamicResource(Label.TextColorProperty, "Primary")
+                            .Column(2),
                     },
                 };
 
@@ -275,6 +307,101 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
 
     private void OnUnloaded(object? sender, EventArgs eventArgs) => Dispose();
 
+    private void OnSpacesChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs) =>
+        QueueSpaceUnreadUpdate();
+
+    private void OnUnreadRoomsChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs)
+    {
+        if (eventArgs.Action is NotifyCollectionChangedAction.Reset)
+        {
+            foreach (var room in _trackedUnreadRooms)
+            {
+                room.PropertyChanged -= OnUnreadRoomChanged;
+            }
+            _trackedUnreadRooms.Clear();
+            if (_unreadRooms is not null)
+            {
+                TrackUnreadRooms(_unreadRooms);
+            }
+        }
+        else
+        {
+            if (eventArgs.OldItems is not null)
+            {
+                TrackUnreadRooms(eventArgs.OldItems.OfType<ManagedRoom>(), subscribe: false);
+            }
+            if (eventArgs.NewItems is not null)
+            {
+                TrackUnreadRooms(eventArgs.NewItems.OfType<ManagedRoom>());
+            }
+        }
+
+        QueueSpaceUnreadUpdate();
+    }
+
+    private void TrackUnreadRooms(IEnumerable<ManagedRoom> rooms, bool subscribe = true)
+    {
+        foreach (var room in rooms)
+        {
+            if (subscribe && _trackedUnreadRooms.Add(room))
+            {
+                room.PropertyChanged += OnUnreadRoomChanged;
+            }
+            else if (!subscribe && _trackedUnreadRooms.Remove(room))
+            {
+                room.PropertyChanged -= OnUnreadRoomChanged;
+            }
+        }
+    }
+
+    private void OnUnreadRoomChanged(object? sender, PropertyChangedEventArgs eventArgs)
+    {
+        if (
+            eventArgs.PropertyName
+            is nameof(ManagedRoom.UnreadCount)
+                or nameof(ManagedRoom.HasUnread)
+        )
+        {
+            QueueSpaceUnreadUpdate();
+        }
+    }
+
+    private void OnSpaceRoomIdsChanged(object? sender, EventArgs eventArgs) =>
+        QueueSpaceUnreadUpdate();
+
+    private void QueueSpaceUnreadUpdate()
+    {
+        if (_spaceUnreadUpdateQueued || _disposed)
+        {
+            return;
+        }
+
+        _spaceUnreadUpdateQueued = true;
+        Dispatcher.Dispatch(() =>
+        {
+            _spaceUnreadUpdateQueued = false;
+            UpdateSpaceUnread();
+        });
+    }
+
+    private void UpdateSpaceUnread()
+    {
+        if (_spaces is null || _unreadRooms is null || _spaceRoomIds is null)
+        {
+            return;
+        }
+
+        foreach (var space in _spaces)
+        {
+            var roomIds = _spaceRoomIds.GetDescendantRoomIds(space.Id ?? string.Empty);
+            var rooms = _unreadRooms.Where(room => roomIds.Contains(room.Id ?? string.Empty));
+            space.UpdateUnread(
+                rooms.Aggregate(0UL, (count, room) => count + room.UnreadCount),
+                rooms.Any(room => room.HasUnread)
+            );
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -283,6 +410,27 @@ public sealed partial class TieredSidebar : ContentView, IDisposable
         }
 
         _disposed = true;
+        foreach (var room in _trackedUnreadRooms)
+        {
+            room.PropertyChanged -= OnUnreadRoomChanged;
+        }
+        _trackedUnreadRooms.Clear();
+        if (_spaces is not null)
+        {
+            _spaces.CollectionChanged -= OnSpacesChanged;
+        }
+        if (_unreadRooms is not null)
+        {
+            _unreadRooms.CollectionChanged -= OnUnreadRoomsChanged;
+            _unreadRooms.Dispose();
+            _unreadRooms = null;
+        }
+        if (_spaceRoomIds is not null)
+        {
+            _spaceRoomIds.Changed -= OnSpaceRoomIdsChanged;
+            _spaceRoomIds.Dispose();
+            _spaceRoomIds = null;
+        }
         _spaces?.Dispose();
         _spaces = null;
         _roomListView.Dispose();

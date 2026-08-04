@@ -3,6 +3,7 @@ using CommunityToolkit.Maui.Markup;
 using CommunityToolkit.Mvvm.Input;
 using Dev.Naamloos.Fennec.Sdk;
 using Dev.Naamloos.Fennec.Sdk.Entities;
+using Microsoft.Maui.Layouts;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
@@ -38,42 +39,52 @@ public sealed partial class EmoteSettingsView : ContentView
             new Button { Text = "Add sticker or emoji", BackgroundColor = Colors.Transparent }
                 .DynamicResource(Button.TextColorProperty, "Primary")
                 .BindCommand(nameof(AddEmoteCommand), source: this),
-            new CollectionView
-            {
-                HeightRequest = 180,
-                SelectionMode = SelectionMode.None,
-                ItemsLayout = new GridItemsLayout(4, ItemsLayoutOrientation.Vertical),
-                ItemTemplate = new DataTemplate(() =>
-                    new VerticalStackLayout
-                    {
-                        Spacing = 2,
-                        Children =
-                        {
-                            new MatrixImage
+            new FlexLayout { Direction = FlexDirection.Row, Wrap = FlexWrap.Wrap }
+                .Bind(BindableLayout.ItemsSourceProperty, nameof(Emotes), source: this)
+                .Invoke(layout =>
+                    BindableLayout.SetItemTemplate(
+                        layout,
+                        new DataTemplate(() =>
+                            new VerticalStackLayout
                             {
-                                IsJson = false,
-                                HeightRequest = 64,
-                                Aspect = Aspect.AspectFit,
-                            }.Bind(MatrixImage.MatrixSourceProperty, nameof(MatrixEmote.Source)),
-                            new Label
-                            {
-                                FontSize = 11,
-                                LineBreakMode = LineBreakMode.TailTruncation,
-                            }.Bind(Label.TextProperty, nameof(MatrixEmote.Name)),
-                            new Button
-                            {
-                                Text = "Remove",
-                                FontSize = 11,
-                                TextColor = Colors.Red,
-                                BackgroundColor = Colors.Transparent,
-                                Padding = 0,
-                            }
-                                .BindCommand(nameof(RemoveEmoteCommand), source: this)
-                                .Bind(Button.CommandParameterProperty, "."),
-                        },
-                    }
-                ),
-            }.Bind(ItemsView.ItemsSourceProperty, nameof(Emotes), source: this)
+                                Padding = 4,
+                                Spacing = 2,
+                                Children =
+                                {
+                                    new MatrixImage
+                                    {
+                                        IsJson = false,
+                                        HeightRequest = 64,
+                                        Aspect = Aspect.AspectFit,
+                                    }.Bind(
+                                        MatrixImage.MatrixSourceProperty,
+                                        nameof(MatrixEmote.Source)
+                                    ),
+                                    new Label
+                                    {
+                                        FontSize = 11,
+                                        LineBreakMode = LineBreakMode.TailTruncation,
+                                    }.Bind(Label.TextProperty, nameof(MatrixEmote.Name)),
+                                    new Button
+                                    {
+                                        Text = "Remove",
+                                        FontSize = 11,
+                                        TextColor = Colors.Red,
+                                        BackgroundColor = Colors.Transparent,
+                                        Padding = 0,
+                                    }
+                                        .BindCommand(nameof(RemoveEmoteCommand), source: this)
+                                        .Bind(Button.CommandParameterProperty, "."),
+                                },
+                            }.Invoke(item =>
+                                FlexLayout.SetBasis(
+                                    item,
+                                    new Microsoft.Maui.Layouts.FlexBasis(.25f, true)
+                                )
+                            )
+                        )
+                    )
+                )
         );
     }
 

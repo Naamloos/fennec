@@ -4,11 +4,12 @@ using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.App.Converters;
 using Dev.Naamloos.Fennec.Sdk;
 using Dev.Naamloos.Fennec.Sdk.Entities;
+using MPowerKit.VirtualizeListView;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
-public sealed partial class ChatMessageView : ContentView
+public sealed partial class ChatMessageView : VirtualizeListViewCell
 {
     [BindableProperty]
     public partial ChatTimelineItem? Item { get; set; }
@@ -45,6 +46,7 @@ public sealed partial class ChatMessageView : ContentView
 
     public ChatMessageView()
     {
+        GestureRecognizers.Clear();
         Content = new Grid
         {
             ColumnDefinitions = { new ColumnDefinition(36), new ColumnDefinition(GridLength.Star) },
@@ -68,7 +70,7 @@ public sealed partial class ChatMessageView : ContentView
                 }
                     .Bind(
                         MatrixAvatar.MatrixSourceProperty,
-                        $"{nameof(Item)}.{nameof(ChatTimelineItem.SenderAvatarUrl)}",
+                        $"{nameof(Item)}.{nameof(ChatTimelineItem.VisibleAvatarUrl)}",
                         source: this
                     )
                     .Bind(
@@ -162,5 +164,11 @@ public sealed partial class ChatMessageView : ContentView
             converter: new MessageGroupMarginConverter(),
             source: this
         );
+    }
+
+    protected override void OnAppearing()
+    {
+        Item = BindingContext as ChatTimelineItem;
+        base.OnAppearing();
     }
 }

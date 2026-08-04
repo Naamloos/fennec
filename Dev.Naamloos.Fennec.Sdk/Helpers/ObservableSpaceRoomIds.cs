@@ -14,6 +14,7 @@ public sealed class ObservableSpaceRoomIds : IDisposable
 
     private TaskHandle? _subscription;
     private HashSet<string> _roomIds = [];
+    private Dictionary<string, HashSet<string>> _spaceRoomIds = [];
     private bool _disposed;
 
     private ObservableSpaceRoomIds(ManagedMatrixClient client, SpaceService spaceService)
@@ -28,6 +29,33 @@ public sealed class ObservableSpaceRoomIds : IDisposable
     public event EventHandler? Changed;
 
     public IReadOnlySet<string> RoomIds => _roomIds;
+
+    public IReadOnlySet<string> GetDescendantRoomIds(string spaceId)
+    {
+        var descendants = new HashSet<string>(StringComparer.Ordinal);
+        var pending = new Stack<string>();
+        pending.Push(spaceId);
+
+        while (pending.TryPop(out var current))
+        {
+            if (!_spaceRoomIds.TryGetValue(current, out var children))
+            {
+                continue;
+            }
+
+            foreach (var child in children)
+            {
+                if (descendants.Add(child) && _spaceRoomIds.ContainsKey(child))
+                {
+                    pending.Push(child);
+                }
+            }
+        }
+
+        descendants.Remove(spaceId);
+        Debug.Assert(!descendants.Contains(spaceId));
+        return descendants;
+    }
 
     internal static async Task<ObservableSpaceRoomIds> CreateAsync(ManagedMatrixClient client)
     {
@@ -60,15 +88,18 @@ public sealed class ObservableSpaceRoomIds : IDisposable
                 return;
             }
 
-            var roomIds = (await _spaceService.SpaceFilters())
-                .SelectMany(filter => filter.Descendants)
+            var filters = await _spaceService.SpaceFilters();
+            var spaceRoomIds = filters
+                .GroupBy(filter => filter.SpaceRoom.RoomId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.SelectMany(filter => filter.Descendants).ToHashSet()
+                );
+            var roomIds = spaceRoomIds
+                .Values.SelectMany(descendants => descendants)
                 .ToHashSet(StringComparer.Ordinal);
 
-            if (_roomIds.SetEquals(roomIds))
-            {
-                return;
-            }
-
+            _spaceRoomIds = spaceRoomIds;
             _roomIds = roomIds;
             NotifyChanged();
         }

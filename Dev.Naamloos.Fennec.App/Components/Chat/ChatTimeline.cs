@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Windows.Input;
@@ -5,19 +6,24 @@ using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.Sdk;
 using Dev.Naamloos.Fennec.Sdk.Entities;
+using MPowerKit.VirtualizeListView;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
 public sealed partial class ChatTimeline : ContentView
 {
-    private readonly CollectionView _collectionView;
+    private readonly ChatVirtualizeListView _collectionView;
+    private readonly Label _emptyView;
     private INotifyCollectionChanged? _itemsSource;
     private bool _initialScrollPending = true;
     private bool _followingLatest = true;
     private bool _scrollQueued;
-    private int _firstVisibleItemIndex;
-    private ChatTimelineItem? _historyAnchor;
+    private bool _scrollPending;
+    private double _previousScrollY;
+
+    private double MaximumScrollY =>
+        Math.Max(0, _collectionView.ContentSize.Height - _collectionView.Height);
 
     [BindableProperty(PropertyChangedMethodName = nameof(OnItemsChanged))]
     public partial ObservableCollection<ChatTimelineItem>? Items { get; set; }
@@ -61,7 +67,7 @@ public sealed partial class ChatTimeline : ContentView
     )]
     public partial bool IsNearBottom { get; set; } = true;
 
-    [BindableProperty(PropertyChangedMethodName = nameof(OnIsLoadingHistoryChanged))]
+    [BindableProperty]
     public partial bool IsLoadingHistory { get; set; }
 
     [BindableProperty]
@@ -71,45 +77,23 @@ public sealed partial class ChatTimeline : ContentView
 
     public ChatTimeline()
     {
-        _collectionView = new CollectionView
+        _collectionView = new ChatVirtualizeListView
         {
             BackgroundColor = Colors.Transparent,
-            SelectionMode = SelectionMode.None,
-            ItemsUpdatingScrollMode = ItemsUpdatingScrollMode.KeepScrollOffset,
-            ItemSizingStrategy = ItemSizingStrategy.MeasureAllItems,
-            ItemsLayout = new LinearItemsLayout(ItemsLayoutOrientation.Vertical),
+            Orientation = ScrollOrientation.Vertical,
+            ItemsLayout = new LinearLayout { InitialCachePoolSize = 2 },
             ItemTemplate = new ChatTimelineTemplateSelector(this),
-            Header = new TemplateSwitchView<bool, bool>(value => value)
-            {
-                Padding = new Thickness(12, 8),
-                FallbackTemplate = new Label
-                {
-                    Text = "Beginning of chat",
-                    Opacity = .6,
-                    HorizontalOptions = LayoutOptions.Center,
-                },
-            }
-                .Add(value => value, CreateLoadMoreButton())
-                .Bind(
-                    TemplateSwitchView<bool, bool>.ValueProperty,
-                    nameof(HasMoreHistory),
-                    source: this
-                ),
-            EmptyView = new Grid
-            {
-                Children =
-                {
-                    new Label
-                    {
-                        Text = "No messages yet",
-                        Opacity = .7,
-                        HorizontalOptions = LayoutOptions.Center,
-                        VerticalOptions = LayoutOptions.Center,
-                    },
-                },
-            },
-        }.Bind(ItemsView.ItemsSourceProperty, nameof(Items), source: this);
+            Header = this,
+            HeaderTemplate = new DataTemplate(CreateHeader),
+        }.Bind(VirtualizeListView.ItemsSourceProperty, nameof(Items), source: this);
         _collectionView.Scrolled += (_, eventArgs) => OnScrolled(eventArgs);
+        _collectionView.PropertyChanged += (_, eventArgs) =>
+        {
+            if (eventArgs.PropertyName == nameof(ScrollView.ContentSize) && _followingLatest)
+            {
+                QueueScrollToLatest();
+            }
+        };
         _collectionView.SizeChanged += (_, _) =>
         {
             if (_followingLatest)
@@ -118,12 +102,22 @@ public sealed partial class ChatTimeline : ContentView
             }
         };
 
+        _emptyView = new Label
+        {
+            Text = "No messages yet",
+            Opacity = .7,
+            InputTransparent = true,
+            HorizontalOptions = LayoutOptions.Center,
+            VerticalOptions = LayoutOptions.Center,
+        };
+
         Content = new Grid
         {
             BackgroundColor = Colors.Transparent,
             Children =
             {
                 _collectionView,
+                _emptyView,
                 new ActivityIndicator
                 {
                     Margin = new Thickness(12),
@@ -156,15 +150,32 @@ public sealed partial class ChatTimeline : ContentView
         Loaded += (_, _) => QueueScrollToLatest();
     }
 
-    private void OnScrolled(ItemsViewScrolledEventArgs? eventArgs)
+    private View CreateHeader() =>
+        new TemplateSwitchView<bool, bool>(value => value)
+        {
+            Padding = new Thickness(12, 8),
+            FallbackTemplate = new Label
+            {
+                Text = "Beginning of chat",
+                Opacity = .6,
+                HorizontalOptions = LayoutOptions.Center,
+            },
+        }
+            .Add(value => value, CreateLoadMoreButton())
+            .Bind(
+                TemplateSwitchView<bool, bool>.ValueProperty,
+                nameof(HasMoreHistory),
+                source: this
+            );
+
+    private void OnScrolled(ScrolledEventArgs eventArgs)
     {
-        if (eventArgs is null || Items is not { Count: > 0 })
+        if (Items is not { Count: > 0 })
         {
             return;
         }
 
-        IsNearBottom = eventArgs.LastVisibleItemIndex >= Items.Count - 1;
-        _firstVisibleItemIndex = Math.Max(0, eventArgs.FirstVisibleItemIndex);
+        IsNearBottom = eventArgs.ScrollY >= MaximumScrollY - 1;
         if (_initialScrollPending && IsNearBottom)
         {
             _initialScrollPending = false;
@@ -173,12 +184,15 @@ public sealed partial class ChatTimeline : ContentView
         if (
             !_initialScrollPending
             && _followingLatest
-            && eventArgs.VerticalDelta < 0
+            && eventArgs.ScrollY < _previousScrollY - 1
             && !IsNearBottom
         )
         {
             _followingLatest = false;
+            _scrollPending = false;
         }
+
+        _previousScrollY = eventArgs.ScrollY;
     }
 
     private static void OnItemsChanged(BindableObject bindable, object oldValue, object newValue) =>
@@ -189,18 +203,6 @@ public sealed partial class ChatTimeline : ContentView
         object oldValue,
         object newValue
     ) => ((ChatTimeline)bindable).OnPropertyChanged(nameof(IsScrollToBottomVisible));
-
-    private static void OnIsLoadingHistoryChanged(
-        BindableObject bindable,
-        object oldValue,
-        object newValue
-    )
-    {
-        if (newValue is false)
-        {
-            ((ChatTimeline)bindable).RestoreHistoryAnchor();
-        }
-    }
 
     private View CreateLoadMoreButton()
     {
@@ -220,9 +222,6 @@ public sealed partial class ChatTimeline : ContentView
                     }
 
                     _followingLatest = false;
-                    _historyAnchor = Items is { Count: > 0 }
-                        ? Items[Math.Min(_firstVisibleItemIndex, Items.Count - 1)]
-                        : null;
                     HistoryCommand.Execute(null);
                 }
             )
@@ -262,31 +261,6 @@ public sealed partial class ChatTimeline : ContentView
         };
     }
 
-    private void RestoreHistoryAnchor()
-    {
-        var anchor = _historyAnchor;
-        _historyAnchor = null;
-        if (anchor is null)
-        {
-            if (_followingLatest)
-            {
-                _scrollQueued = false;
-                QueueScrollToLatest();
-            }
-
-            return;
-        }
-
-        if (Items?.Contains(anchor) != true)
-        {
-            return;
-        }
-
-        Dispatcher.Dispatch(() =>
-            _collectionView.ScrollTo(anchor, ScrollToPosition.Start, animate: false)
-        );
-    }
-
     private void SetItemsSource()
     {
         if (_itemsSource is not null)
@@ -302,12 +276,15 @@ public sealed partial class ChatTimeline : ContentView
 
         _initialScrollPending = true;
         _followingLatest = true;
+        _previousScrollY = 0;
+        _emptyView.IsVisible = Items is not { Count: > 0 };
         OnPropertyChanged(nameof(IsScrollToBottomVisible));
         QueueScrollToLatest();
     }
 
     private void OnItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs args)
     {
+        _emptyView.IsVisible = Items is not { Count: > 0 };
         if (
             _followingLatest
             || (
@@ -323,43 +300,61 @@ public sealed partial class ChatTimeline : ContentView
 
     private void QueueScrollToLatest()
     {
-        if (_scrollQueued || Items is not { Count: > 0 })
+        if (!_followingLatest || Items is not { Count: > 0 })
         {
             return;
         }
 
-        _scrollQueued = true;
-        Dispatcher.Dispatch(() =>
+        if (_scrollQueued)
         {
-            _scrollQueued = false;
-            if (Items is not { Count: > 0 })
-            {
-                return;
-            }
+            _scrollPending = true;
+            return;
+        }
 
-            if (Items.LastOrDefault() is { } latest)
+        _scrollQueued = true;
+        Dispatcher.Dispatch(async () =>
+        {
+            try
             {
-                _collectionView.ScrollTo(latest, ScrollToPosition.End, animate: false);
-                _initialScrollPending = false;
+                if (!_followingLatest || Items is not { Count: > 0 })
+                {
+                    return;
+                }
+
+                var target = MaximumScrollY;
+                _previousScrollY = Math.Min(_previousScrollY, target);
+                await _collectionView.ScrollToAsync(0, target, animated: false);
+                _previousScrollY = _collectionView.ScrollY;
+            }
+            finally
+            {
+                _scrollQueued = false;
+                if (_scrollPending)
+                {
+                    _scrollPending = false;
+                    QueueScrollToLatest();
+                }
             }
         });
     }
 
     private sealed class ChatTimelineTemplateSelector : DataTemplateSelector
     {
-        private readonly DataTemplate _eventTemplate;
-        private readonly DataTemplate _messageTemplate;
+        public DataTemplate EventTemplate { get; }
+
+        public DataTemplate MessageTemplate { get; }
 
         public ChatTimelineTemplateSelector(ChatTimeline owner)
         {
-            _eventTemplate = new DataTemplate(() =>
-                new ChatEventView()
-                    .Bind(ChatEventView.ItemProperty, ".")
-                    .Bind(ChatEventView.MenuCommandProperty, nameof(MenuCommand), source: owner)
+            EventTemplate = new DataTemplate(() =>
+                new ChatEventView().Bind(
+                    ChatEventView.MenuCommandProperty,
+                    nameof(MenuCommand),
+                    source: owner
+                )
             );
-            _messageTemplate = new DataTemplate(() =>
+            MessageTemplate = new DataTemplate(() =>
                 new ChatMessageView()
-                    .Bind(ChatMessageView.ItemProperty, ".")
                     .Bind(ChatMessageView.ClientProperty, nameof(Client), source: owner)
                     .Bind(ChatMessageView.MembersProperty, nameof(Members), source: owner)
                     .Bind(ChatMessageView.ReplyCommandProperty, nameof(ReplyCommand), source: owner)
@@ -390,6 +385,42 @@ public sealed partial class ChatTimeline : ContentView
         }
 
         protected override DataTemplate OnSelectTemplate(object item, BindableObject container) =>
-            item is ChatTimelineItem { IsMessage: true } ? _messageTemplate : _eventTemplate;
+            item is ChatTimelineItem { IsMessage: true } ? MessageTemplate : EventTemplate;
+    }
+
+    private sealed class ChatVirtualizeListView : VirtualizeListView
+    {
+        public ChatVirtualizeListView()
+        {
+            Adapter = new ChatDataAdapter(this);
+        }
+    }
+
+    private sealed class ChatDataAdapter(VirtualizeListView listView)
+        : GroupableDataAdapter(listView)
+    {
+        private INotifyCollectionChanged? _subscribedSource;
+
+        public override void InitCollection(IEnumerable? itemsSource)
+        {
+            if (_subscribedSource is not null)
+            {
+                _subscribedSource.CollectionChanged -= ItemsSourceCollectionChanged;
+            }
+
+            _subscribedSource = itemsSource as INotifyCollectionChanged;
+            base.InitCollection(itemsSource);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (_subscribedSource is not null)
+            {
+                _subscribedSource.CollectionChanged -= ItemsSourceCollectionChanged;
+                _subscribedSource = null;
+            }
+
+            base.Dispose(disposing);
+        }
     }
 }

@@ -185,6 +185,16 @@ public sealed partial class SpaceRoomListView : ContentView, IDisposable
                             converter: new BooleanInverterConverter()
                         )
                         .Column(3),
+                    new Label
+                    {
+                        FontSize = 12,
+                        FontAttributes = FontAttributes.Bold,
+                        VerticalOptions = LayoutOptions.Center,
+                    }
+                        .Bind(Label.TextProperty, nameof(ManagedSpaceRoom.UnreadLabel))
+                        .Bind(IsVisibleProperty, nameof(ManagedSpaceRoom.HasUnread))
+                        .DynamicResource(Label.TextColorProperty, "Primary")
+                        .Column(3),
                 },
             };
 

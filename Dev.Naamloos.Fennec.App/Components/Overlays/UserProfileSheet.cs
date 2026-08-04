@@ -9,6 +9,7 @@ public sealed class UserProfileSheet : ContentView
 {
     private readonly VerticalStackLayout _profile = new() { Spacing = 16 };
     private readonly Border _sheet;
+    private int _loadId;
 
     public UserProfileSheet()
     {
@@ -78,13 +79,18 @@ public sealed class UserProfileSheet : ContentView
         string? fallbackAvatarUrl = null
     )
     {
+        var loadId = ++_loadId;
         IsVisible = true;
         _profile.Children.Clear();
         _profile.Children.Add(new ActivityIndicator { IsRunning = true, HeightRequest = 120 });
-        await LoadAsync(client, userId, fallbackName, fallbackAvatarUrl);
+        await LoadAsync(client, userId, fallbackName, fallbackAvatarUrl, loadId);
     }
 
-    public void Hide() => IsVisible = false;
+    public void Hide()
+    {
+        _loadId++;
+        IsVisible = false;
+    }
 
     private void OnPanUpdated(object? sender, PanUpdatedEventArgs e)
     {
@@ -103,7 +109,7 @@ public sealed class UserProfileSheet : ContentView
             }
             else
             {
-                _ = _sheet.TranslateTo(0, 0, 150, Easing.CubicOut);
+                _ = _sheet.TranslateToAsync(0, 0, 150, Easing.CubicOut);
             }
         }
     }
@@ -112,7 +118,8 @@ public sealed class UserProfileSheet : ContentView
         ManagedMatrixClient client,
         string userId,
         string? fallbackName,
-        string? fallbackAvatarUrl
+        string? fallbackAvatarUrl,
+        int loadId
     )
     {
         try
@@ -131,6 +138,9 @@ public sealed class UserProfileSheet : ContentView
                     ? fallbackAvatarUrl
                     : loaded.AvatarUrl,
             };
+            if (loadId != _loadId)
+                return;
+
             _profile.Children.Clear();
 
             _profile.Children.Add(
@@ -185,10 +195,17 @@ public sealed class UserProfileSheet : ContentView
                 profile.Pronouns.Count == 0 ? null : string.Join(" · ", profile.Pronouns)
             );
             AddDetail("Time zone", profile.TimeZone);
-            AddMutualRooms(await client.GetMutualRoomsAsync(userId));
+            var mutualRooms = await client.GetMutualRoomsAsync(userId);
+            if (loadId == _loadId)
+            {
+                AddMutualRooms(mutualRooms);
+            }
         }
         catch (Exception exception)
         {
+            if (loadId != _loadId)
+                return;
+
             _profile.Children.Clear();
             _profile.Children.Add(
                 new Label

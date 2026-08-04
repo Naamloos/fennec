@@ -82,6 +82,10 @@ public sealed partial class SessionsSettingsView : ContentView
                 _sessions.Children.Add(CreateSessionView(session));
             }
         }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine($"Could not refresh sessions: {exception}");
+        }
         finally
         {
             _refreshLock.Release();
@@ -201,7 +205,7 @@ public sealed partial class SessionsSettingsView : ContentView
         if (session is null || MatrixClient is null)
             return;
         if (
-            !await Shell.Current.DisplayAlert(
+            !await Shell.Current.DisplayAlertAsync(
                 "Remove session",
                 $"Remove {session.DisplayName}?",
                 "Remove",

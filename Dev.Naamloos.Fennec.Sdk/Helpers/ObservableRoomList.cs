@@ -220,7 +220,10 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
         {
             var room = this[(int)set.Index];
             room.Update(set.Value);
-            _ = room.ResolveDirectAvatarAsync();
+            if (!room.IsSpace)
+            {
+                _ = room.RefreshDetailsAsync();
+            }
         }
 
         // remove at a specific index
@@ -252,7 +255,10 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
         private static ManagedRoom CreateManagedRoom(Room room)
         {
             var managedRoom = new ManagedRoom(room);
-            _ = managedRoom.ResolveDirectAvatarAsync();
+            if (!managedRoom.IsSpace)
+            {
+                _ = managedRoom.RefreshDetailsAsync();
+            }
             return managedRoom;
         }
 

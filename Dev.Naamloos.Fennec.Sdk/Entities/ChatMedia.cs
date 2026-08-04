@@ -102,11 +102,6 @@ public sealed class ChatMedia : ObservableModel
 
     public async Task LoadFullAsync(ManagedMatrixClient client)
     {
-        if (IsLoading)
-        {
-            return;
-        }
-
         IsLoading = true;
 
         try

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using uniffi.matrix_sdk_ffi;
@@ -55,6 +56,31 @@ namespace Dev.Naamloos.Fennec.Sdk.Entities
         }
         private bool _isSpace;
 
+        public ulong UnreadCount
+        {
+            get => _unreadCount;
+            private set
+            {
+                _unreadCount = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(UnreadLabel));
+            }
+        }
+        private ulong _unreadCount;
+
+        public bool HasUnread
+        {
+            get => _hasUnread;
+            private set
+            {
+                _hasUnread = value;
+                OnPropertyChanged();
+            }
+        }
+        private bool _hasUnread;
+
+        public string UnreadLabel => UnreadCount > 0 ? UnreadCount.ToString() : "•";
+
         public Room NativeRoom
         {
             get => _room;
@@ -84,24 +110,44 @@ namespace Dev.Naamloos.Fennec.Sdk.Entities
             this.IsSpace = room.IsSpace();
         }
 
-        public async Task ResolveDirectAvatarAsync()
+        public void UpdateUnread(ulong count, bool hasUnread)
         {
-            if (!string.IsNullOrWhiteSpace(AvatarUrl))
-            {
-                return;
-            }
+            UnreadCount = count;
+            HasUnread = hasUnread;
+        }
 
-            var info = await NativeRoom.RoomInfo();
-            if (!info.IsDm)
+        public async Task RefreshDetailsAsync()
+        {
+            var room = NativeRoom;
+            try
             {
-                return;
-            }
+                var info = await room.RoomInfo();
+                if (!ReferenceEquals(room, NativeRoom))
+                {
+                    return;
+                }
 
-            using var members = await NativeRoom.Members();
-            var otherMember = members
-                .NextChunk(100)
-                ?.FirstOrDefault(member => member.UserId != NativeRoom.OwnUserId());
-            AvatarUrl = otherMember?.AvatarUrl;
+                UpdateUnread(
+                    info.NumUnreadMessages,
+                    info.IsMarkedUnread || info.NumUnreadMessages > 0
+                );
+                Debug.Assert(HasUnread || UnreadCount == 0);
+
+                if (!string.IsNullOrWhiteSpace(AvatarUrl) || !info.IsDm)
+                {
+                    return;
+                }
+
+                using var members = await room.Members();
+                var otherMember = members
+                    .NextChunk(100)
+                    ?.FirstOrDefault(member => member.UserId != room.OwnUserId());
+                AvatarUrl = otherMember?.AvatarUrl;
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine($"Could not refresh room details: {exception}");
+            }
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

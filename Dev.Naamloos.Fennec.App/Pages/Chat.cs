@@ -819,16 +819,21 @@ public sealed partial class Chat : ContentView
     {
         while (!cancellationToken.IsCancellationRequested)
         {
+            var refreshDelay = TimeSpan.FromSeconds(1);
             try
             {
                 if (client.IsLoggedIn)
                 {
+                    refreshDelay = TimeSpan.FromSeconds(15);
                     var wallpaper = await client.GetGlobalWallpaperAsync();
                     if (!ReferenceEquals(MatrixClient, client))
                         return;
 
                     Dispatcher.Dispatch(() =>
                     {
+                        if (_globalWallpaperUrl == wallpaper)
+                            return;
+
                         _globalWallpaperUrl = wallpaper;
                         UpdateWallpaper();
                     });
@@ -841,7 +846,7 @@ public sealed partial class Chat : ContentView
 
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                await Task.Delay(refreshDelay, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -874,6 +879,9 @@ public sealed partial class Chat : ContentView
 
                     Dispatcher.Dispatch(() =>
                     {
+                        if (_roomWallpaperUrl == wallpaper)
+                            return;
+
                         _roomWallpaperUrl = wallpaper;
                         UpdateWallpaper();
                     });
@@ -886,7 +894,7 @@ public sealed partial class Chat : ContentView
 
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                await Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

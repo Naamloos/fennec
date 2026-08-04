@@ -50,6 +50,7 @@ public sealed class ChatTimelineItem : ObservableModel
             {
                 Raise(nameof(ShowAvatar));
                 Raise(nameof(ShowSender));
+                Raise(nameof(VisibleAvatarUrl));
             }
         }
     }
@@ -80,6 +81,7 @@ public sealed class ChatTimelineItem : ObservableModel
             if (Set(ref _isGroupEnd, value))
             {
                 Raise(nameof(ShowAvatar));
+                Raise(nameof(VisibleAvatarUrl));
             }
         }
     }
@@ -87,6 +89,8 @@ public sealed class ChatTimelineItem : ObservableModel
     public bool ShowAvatar => !IsOwn && IsGroupEnd;
 
     public bool ShowSender => !IsOwn && IsGroupStart;
+
+    public string? VisibleAvatarUrl => ShowAvatar ? SenderAvatarUrl : null;
 
     public string Sender
     {
@@ -103,7 +107,13 @@ public sealed class ChatTimelineItem : ObservableModel
     public string? SenderAvatarUrl
     {
         get => _senderAvatarUrl;
-        set => Set(ref _senderAvatarUrl, value);
+        set
+        {
+            if (Set(ref _senderAvatarUrl, value))
+            {
+                Raise(nameof(VisibleAvatarUrl));
+            }
+        }
     }
 
     public string Body
@@ -179,22 +189,109 @@ public sealed class ChatTimelineItem : ObservableModel
         SourceJson = source.SourceJson;
         EventId = source.EventId;
         ReplyPreview = source.ReplyPreview;
-        Media = source.Media;
-        Poll = source.Poll;
+        if (!IsSameMedia(Media, source.Media))
+        {
+            Media = source.Media;
+        }
+        UpdatePoll(source.Poll);
         EventOrTransactionId = source.EventOrTransactionId;
         IsRemoteEvent = source.IsRemoteEvent;
 
-        Replace(Reactions, source.Reactions);
-        Replace(ReadReceipts, source.ReadReceipts);
+        UpdateReactions(source.Reactions);
+        UpdateReadReceipts(source.ReadReceipts);
     }
 
-    private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> source)
-    {
-        target.Clear();
+    private static bool IsSameMedia(ChatMedia? left, ChatMedia? right) =>
+        ReferenceEquals(left, right)
+        || left is not null
+            && right is not null
+            && left.Kind == right.Kind
+            && left.SourceJson == right.SourceJson
+            && left.Filename == right.Filename
+            && left.MimeType == right.MimeType
+            && left.ThumbnailSourceJson == right.ThumbnailSourceJson;
 
-        foreach (var item in source)
+    private void UpdatePoll(ChatPoll? source)
+    {
+        var current = Poll;
+        if (current is null || source is null)
         {
-            target.Add(item);
+            Poll = source;
+            return;
+        }
+
+        var sameShape =
+            current.Question == source.Question
+            && current.MaxSelections == source.MaxSelections
+            && current.IsClosed == source.IsClosed
+            && current.Answers.Count == source.Answers.Count;
+        for (var index = 0; sameShape && index < current.Answers.Count; index++)
+        {
+            sameShape =
+                current.Answers[index].Id == source.Answers[index].Id
+                && current.Answers[index].Text == source.Answers[index].Text;
+        }
+
+        if (!sameShape)
+        {
+            Poll = source;
+            return;
+        }
+
+        for (var index = 0; index < current.Answers.Count; index++)
+        {
+            current.Answers[index].VoteCount = source.Answers[index].VoteCount;
+            current.Answers[index].IsSelected = source.Answers[index].IsSelected;
+        }
+    }
+
+    private void UpdateReactions(IReadOnlyList<ChatReaction> source)
+    {
+        var sameKeys = Reactions.Count == source.Count;
+        for (var index = 0; sameKeys && index < Reactions.Count; index++)
+        {
+            sameKeys = Reactions[index].Key == source[index].Key;
+        }
+
+        if (sameKeys)
+        {
+            for (var index = 0; index < Reactions.Count; index++)
+            {
+                Reactions[index].Count = source[index].Count;
+                Reactions[index].IsOwn = source[index].IsOwn;
+            }
+            return;
+        }
+
+        Reactions.Clear();
+        foreach (var reaction in source)
+        {
+            Reactions.Add(reaction);
+        }
+    }
+
+    private void UpdateReadReceipts(IReadOnlyList<ChatReadReceipt> source)
+    {
+        var sameUsers = ReadReceipts.Count == source.Count;
+        for (var index = 0; sameUsers && index < ReadReceipts.Count; index++)
+        {
+            sameUsers = ReadReceipts[index].UserId == source[index].UserId;
+        }
+
+        if (sameUsers)
+        {
+            for (var index = 0; index < ReadReceipts.Count; index++)
+            {
+                ReadReceipts[index].Name = source[index].Name;
+                ReadReceipts[index].AvatarUrl = source[index].AvatarUrl;
+            }
+            return;
+        }
+
+        ReadReceipts.Clear();
+        foreach (var receipt in source)
+        {
+            ReadReceipts.Add(receipt);
         }
     }
 }

@@ -13,6 +13,7 @@ public sealed partial class InlineAudioPlayer : ContentView
     private AsyncAudioPlayer? _player;
     private MemoryStream? _stream;
     private CancellationTokenSource? _playbackCancellation;
+    private int _loadVersion;
 
     [BindableProperty]
     public partial ManagedMatrixClient? Client { get; set; }
@@ -105,18 +106,26 @@ public sealed partial class InlineAudioPlayer : ContentView
         {
             if (Client is null || Media is null || AudioManager is null)
                 return;
+            var client = Client;
+            var media = Media;
+            var audioManager = AudioManager;
+            var loadVersion = _loadVersion;
             IsLoading = true;
             try
             {
-                _stream = new MemoryStream(
-                    await Client.GetMediaContentAsync(Media.SourceJson),
-                    writable: false
-                );
-                _player = AudioManager.CreateAsyncPlayer(_stream);
+                var data = await client.GetMediaContentAsync(media.SourceJson);
+                if (loadVersion != _loadVersion || !ReferenceEquals(Media, media))
+                    return;
+
+                _stream = new MemoryStream(data, writable: false);
+                _player = audioManager.CreateAsyncPlayer(_stream);
             }
             finally
             {
-                IsLoading = false;
+                if (loadVersion == _loadVersion)
+                {
+                    IsLoading = false;
+                }
             }
         }
 
@@ -153,7 +162,9 @@ public sealed partial class InlineAudioPlayer : ContentView
 
     private void ReleasePlayer()
     {
+        _loadVersion++;
         Stop();
+        IsLoading = false;
         _playbackCancellation?.Dispose();
         _playbackCancellation = null;
         _player?.Dispose();

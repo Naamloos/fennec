@@ -39,7 +39,7 @@ public sealed partial class RoomAvatar : ContentView
                         converter: new SubstringConverter(1, 0),
                         source: this
                     ),
-                    new MatrixImage { Aspect = Aspect.AspectFill }
+                    new MatrixImage { Aspect = Aspect.AspectFill, UseAvatarCache = true }
                         .Bind(MatrixImage.MatrixSourceProperty, nameof(AvatarUrl), source: this)
                         .Bind(
                             IsVisibleProperty,

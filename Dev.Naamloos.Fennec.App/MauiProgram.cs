@@ -4,10 +4,8 @@ using Dev.Naamloos.Fennec.Sdk.Helpers;
 using MaterialColorUtilities.Maui;
 using MauiIcons.Material;
 using Microsoft.Extensions.Logging;
+using MPowerKit.VirtualizeListView;
 using Plugin.Maui.Audio;
-#if ANDROID || IOS || MACCATALYST
-using Nalu;
-#endif
 
 namespace Dev.Naamloos.Fennec.App;
 
@@ -36,15 +34,12 @@ public static class MauiProgram
                 );
             })
             .AddAudio()
+            .UseMPowerKitListView()
             .ConfigureFonts(fonts =>
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
-
-#if ANDROID || IOS || MACCATALYST
-        builder.UseNaluVirtualScroll();
-#endif
 
         // Services
         builder.Services.AddSingleton<AsyncSecureStorage>();

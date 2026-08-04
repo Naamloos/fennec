@@ -33,32 +33,37 @@ public sealed partial class PollMessageView : ContentView
                     $"{nameof(Item)}.{nameof(ChatTimelineItem.Poll)}.{nameof(ChatPoll.Question)}",
                     source: this
                 ),
-                new CollectionView
-                {
-                    SelectionMode = SelectionMode.None,
-                    ItemsLayout = new LinearItemsLayout(ItemsLayoutOrientation.Vertical)
-                    {
-                        ItemSpacing = 6,
-                    },
-                    ItemTemplate = new DataTemplate(() =>
-                        new Button
-                        {
-                            HorizontalOptions = LayoutOptions.Fill,
-                            Command = new Command<ChatPollAnswer>(Vote),
-                        }
-                            .Bind(Button.TextProperty, nameof(ChatPollAnswer.DisplayText))
-                            .Bind(Button.CommandParameterProperty, ".")
-                            .DynamicResource(
-                                VisualElement.BackgroundColorProperty,
-                                "SurfaceContainerHigh"
+                new VerticalStackLayout { Spacing = 6 }
+                    .Bind(
+                        BindableLayout.ItemsSourceProperty,
+                        $"{nameof(Item)}.{nameof(ChatTimelineItem.Poll)}.{nameof(ChatPoll.Answers)}",
+                        source: this
+                    )
+                    .Invoke(layout =>
+                        BindableLayout.SetItemTemplate(
+                            layout,
+                            new DataTemplate(() =>
+                                new Button
+                                {
+                                    HorizontalOptions = LayoutOptions.Fill,
+                                    Command = new Command<ChatPollAnswer>(Vote),
+                                }
+                                    .Bind(Button.TextProperty, nameof(ChatPollAnswer.DisplayText))
+                                    .Bind(Button.CommandParameterProperty, ".")
+                                    .Bind(
+                                        Button.IsEnabledProperty,
+                                        $"{nameof(Item)}.{nameof(ChatTimelineItem.Poll)}.{nameof(ChatPoll.IsClosed)}",
+                                        converter: new CommunityToolkit.Maui.Converters.InvertedBoolConverter(),
+                                        source: this
+                                    )
+                                    .DynamicResource(
+                                        VisualElement.BackgroundColorProperty,
+                                        "SurfaceContainerHigh"
+                                    )
+                                    .DynamicResource(Button.TextColorProperty, "OnSurface")
                             )
-                            .DynamicResource(Button.TextColorProperty, "OnSurface")
+                        )
                     ),
-                }.Bind(
-                    ItemsView.ItemsSourceProperty,
-                    $"{nameof(Item)}.{nameof(ChatTimelineItem.Poll)}.{nameof(ChatPoll.Answers)}",
-                    source: this
-                ),
                 new Label
                 {
                     Text = "Poll closed",
@@ -92,5 +97,5 @@ public sealed partial class PollMessageView : ContentView
     }
 
     private static void OnItemChanged(BindableObject bindable, object oldValue, object newValue) =>
-        ((PollMessageView)bindable).IsVisible = (newValue as ChatTimelineItem)?.Poll is not null;
+        ((PollMessageView)bindable).IsVisible = newValue is ChatTimelineItem { Poll: not null };
 }

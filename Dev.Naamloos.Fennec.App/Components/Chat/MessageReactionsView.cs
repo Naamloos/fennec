@@ -2,8 +2,6 @@ using System.Windows.Input;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.Sdk.Entities;
-using MauiIcons.Core;
-using MauiIcons.Material;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
@@ -17,31 +15,7 @@ public sealed partial class MessageReactionsView : ContentView
 
     public MessageReactionsView()
     {
-        Content = new HorizontalStackLayout
-        {
-            Spacing = 4,
-            Children =
-            {
-                new MauiIcon
-                {
-                    Icon = MaterialIcons.AddReaction,
-                    IconSize = 20,
-                    WidthRequest = 28,
-                    HeightRequest = 28,
-                    MinimumHeightRequest = 28,
-                    GestureRecognizers =
-                    {
-                        new TapGestureRecognizer()
-                            .BindCommand(nameof(AddReactionCommand), source: this)
-                            .Bind(
-                                TapGestureRecognizer.CommandParameterProperty,
-                                nameof(Item),
-                                source: this
-                            ),
-                    },
-                },
-            },
-        }
+        var reactions = new HorizontalStackLayout { Spacing = 4 }
             .Bind(
                 BindableLayout.ItemsSourceProperty,
                 $"{nameof(Item)}.{nameof(ChatTimelineItem.Reactions)}",
@@ -75,5 +49,7 @@ public sealed partial class MessageReactionsView : ContentView
                     )
                 )
             );
+
+        Content = reactions;
     }
 }

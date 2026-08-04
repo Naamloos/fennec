@@ -38,6 +38,8 @@ public partial class MatrixImage : Image
         {
             _loadId++;
             _loadCancellation?.Cancel();
+            _loadCancellation?.Dispose();
+            _loadCancellation = null;
             UnsubscribeFromAvatarChanges();
             Source = null;
         };
@@ -71,10 +73,24 @@ public partial class MatrixImage : Image
 
     private void Load()
     {
+        if (Dispatcher.IsDispatchRequired)
+        {
+            Dispatcher.Dispatch(Load);
+            return;
+        }
+
+        Source = null;
         _loadCancellation?.Cancel();
         _loadCancellation?.Dispose();
+        _loadCancellation = null;
+        var loadId = ++_loadId;
+        if (!IsLoaded)
+        {
+            return;
+        }
+
         _loadCancellation = new CancellationTokenSource();
-        _ = LoadAsync(++_loadId, _loadCancellation.Token);
+        _ = LoadAsync(loadId, _loadCancellation.Token);
     }
 
     private async Task LoadAsync(int loadId, CancellationToken cancellationToken)
@@ -101,7 +117,7 @@ public partial class MatrixImage : Image
                     .GetThumbnailAsync(source, 200, 200, IsJson, cancellationToken)
                     .ConfigureAwait(false);
 
-            if (loadId != _loadId)
+            if (loadId != _loadId || cancellationToken.IsCancellationRequested)
             {
                 return;
             }
@@ -109,7 +125,10 @@ public partial class MatrixImage : Image
             var imageSource = ImageSource.FromStream(() => new MemoryStream(data));
             await Dispatcher.DispatchAsync(() =>
             {
-                Source = imageSource;
+                if (loadId == _loadId && !cancellationToken.IsCancellationRequested)
+                {
+                    Source = imageSource;
+                }
             });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
@@ -144,7 +163,8 @@ public partial class MatrixImage : Image
     private void OnAvatarChanged(string? previous, string? current)
     {
         if (
-            !string.Equals(_sourceOverride ?? MatrixSource, previous, StringComparison.Ordinal)
+            string.IsNullOrWhiteSpace(previous)
+            || !string.Equals(_sourceOverride ?? MatrixSource, previous, StringComparison.Ordinal)
             || string.IsNullOrWhiteSpace(current)
         )
         {

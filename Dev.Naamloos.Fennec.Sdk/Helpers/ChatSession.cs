@@ -586,7 +586,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                 existingIndex--;
             }
 
-            Items[index++].UpdateFrom(timelineItem);
+            UpdateOrReplaceItem(index++, timelineItem);
         }
 
         while (Items.Count > index)
@@ -664,7 +664,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
             if (index < Items.Count && Items[index].Id == replacement.Id)
             {
-                Items[index].UpdateFrom(replacement);
+                UpdateOrReplaceItem(index, replacement);
             }
             else if (index < Items.Count)
             {
@@ -677,6 +677,20 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
             index++;
         }
+    }
+
+    private void UpdateOrReplaceItem(int index, ChatTimelineItem replacement)
+    {
+        if (Items[index].IsMessage == replacement.IsMessage)
+        {
+            Items[index].UpdateFrom(replacement);
+        }
+        else
+        {
+            Items[index] = replacement;
+        }
+
+        Debug.Assert(Items[index].IsMessage == replacement.IsMessage);
     }
 
     private void MoveItems(int oldIndex, int newIndex, int count)
@@ -735,8 +749,53 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
 
             PopulateContent(result, eventItem);
             PopulateReactions(result, eventItem);
+            PopulateReadReceipts(result, eventItem);
+            HydrateMember(result);
             return result;
         }
+    }
+
+    private void PopulateReadReceipts(ChatTimelineItem item, EventTimelineItem eventItem)
+    {
+        var ownUserId = _room.OwnUserId();
+        foreach (var userId in eventItem.ReadReceipts.Keys.Where(userId => userId != ownUserId))
+        {
+            var member = Members.FirstOrDefault(candidate => candidate.UserId == userId);
+            var receipt = new ChatReadReceipt(
+                userId,
+                member?.DisplayName ?? userId,
+                member?.AvatarUrl
+            );
+            item.ReadReceipts.Add(receipt);
+            if (member is null && Members.Count > 0)
+            {
+                _ = LoadMemberAsync(userId, targetReceipt: receipt);
+            }
+        }
+    }
+
+    private void HydrateMember(ChatTimelineItem item)
+    {
+        if (
+            !item.IsMessage
+            || item.IsOwn
+            || !string.IsNullOrWhiteSpace(item.SenderAvatarUrl)
+            || Members.Count == 0
+        )
+        {
+            return;
+        }
+
+        var member = Members.FirstOrDefault(candidate => candidate.UserId == item.SenderId);
+        if (member is null)
+        {
+            // ponytail: direct lookup; coalesce if large rooms show duplicate profile requests.
+            _ = LoadMemberAsync(item.SenderId, item);
+            return;
+        }
+
+        item.SenderAvatarUrl = member.AvatarUrl;
+        item.Sender = member.DisplayName ?? member.UserId;
     }
 
     private void UpdateMessageGroups()
@@ -989,6 +1048,7 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                 var joined = members
                     .Where(member => member.Membership is MembershipState.Join)
                     .ToArray();
+                var joinedByUserId = joined.ToDictionary(member => member.UserId);
                 RunOnCapturedContext(() =>
                 {
                     if (_disposed)
@@ -1006,13 +1066,45 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
                         )
                     )
                     {
-                        var member = joined.FirstOrDefault(candidate =>
-                            candidate.UserId == item.SenderId
-                        );
-                        if (member is null)
+                        if (!joinedByUserId.TryGetValue(item.SenderId, out var member))
                             continue;
                         item.SenderAvatarUrl = member.AvatarUrl;
                         item.Sender = member.DisplayName ?? member.UserId;
+                    }
+
+                    foreach (var receipt in Items.SelectMany(item => item.ReadReceipts))
+                    {
+                        if (!joinedByUserId.TryGetValue(receipt.UserId, out var member))
+                            continue;
+                        receipt.Name = member.DisplayName ?? member.UserId;
+                        receipt.AvatarUrl = member.AvatarUrl;
+                    }
+
+                    foreach (
+                        var userId in Items
+                            .Where(item =>
+                                item.IsMessage
+                                && !item.IsOwn
+                                && !string.IsNullOrWhiteSpace(item.SenderId)
+                                && string.IsNullOrWhiteSpace(item.SenderAvatarUrl)
+                                && !joinedByUserId.ContainsKey(item.SenderId)
+                            )
+                            .Select(item => item.SenderId)
+                            .Distinct()
+                    )
+                    {
+                        _ = LoadMemberAsync(userId);
+                    }
+
+                    foreach (
+                        var userId in Items
+                            .SelectMany(item => item.ReadReceipts)
+                            .Select(receipt => receipt.UserId)
+                            .Where(userId => !joinedByUserId.ContainsKey(userId))
+                            .Distinct()
+                    )
+                    {
+                        _ = LoadMemberAsync(userId);
                     }
                 });
             }
@@ -1027,6 +1119,69 @@ public sealed class ChatSession : ObservableModel, IAsyncDisposable
         finally
         {
             _membersLoadGate.Release();
+        }
+    }
+
+    private async Task LoadMemberAsync(
+        string userId,
+        ChatTimelineItem? target = null,
+        ChatReadReceipt? targetReceipt = null
+    )
+    {
+        try
+        {
+            var member = await _room.Member(userId);
+
+            RunOnCapturedContext(() =>
+            {
+                if (_disposed)
+                    return;
+
+                if (
+                    member.Membership is MembershipState.Join
+                    && Members.All(candidate => candidate.UserId != userId)
+                )
+                {
+                    Members.Add(member);
+                }
+
+                if (target is not null)
+                {
+                    target.SenderAvatarUrl = member.AvatarUrl;
+                    target.Sender = member.DisplayName ?? member.UserId;
+                    Debug.Assert(target.SenderId == userId);
+                }
+
+                if (targetReceipt is not null)
+                {
+                    targetReceipt.Name = member.DisplayName ?? member.UserId;
+                    targetReceipt.AvatarUrl = member.AvatarUrl;
+                    Debug.Assert(targetReceipt.UserId == userId);
+                }
+
+                foreach (var item in Items.Where(item => item.SenderId == userId))
+                {
+                    item.SenderAvatarUrl = member.AvatarUrl;
+                    item.Sender = member.DisplayName ?? member.UserId;
+                }
+
+                foreach (
+                    var receipt in Items
+                        .SelectMany(item => item.ReadReceipts)
+                        .Where(receipt => receipt.UserId == userId)
+                )
+                {
+                    receipt.Name = member.DisplayName ?? member.UserId;
+                    receipt.AvatarUrl = member.AvatarUrl;
+                }
+            });
+        }
+        catch (Exception exception)
+        {
+            if (!_disposed)
+            {
+                Debug.WriteLine($"Could not load room member {userId}: {exception}");
+            }
         }
     }
 

@@ -9,6 +9,8 @@ public sealed class ManagedSpaceRoom : ObservableModel
     private string? _canonicalAlias;
     private string[] _via = [];
     private bool _isJoined;
+    private ulong _unreadCount;
+    private bool _hasUnread;
 
     public ManagedSpaceRoom(SpaceRoom room) => Update(room);
 
@@ -46,6 +48,26 @@ public sealed class ManagedSpaceRoom : ObservableModel
 
     public bool IsSpace { get; private set; }
 
+    public ulong UnreadCount
+    {
+        get => _unreadCount;
+        private set
+        {
+            if (Set(ref _unreadCount, value))
+            {
+                Raise(nameof(UnreadLabel));
+            }
+        }
+    }
+
+    public bool HasUnread
+    {
+        get => _hasUnread;
+        private set => Set(ref _hasUnread, value);
+    }
+
+    public string UnreadLabel => UnreadCount > 0 ? UnreadCount.ToString() : "•";
+
     public void Update(SpaceRoom room)
     {
         Id = room.RoomId;
@@ -57,5 +79,11 @@ public sealed class ManagedSpaceRoom : ObservableModel
         IsSpace = room.RoomType is RoomType.Space;
         Raise(nameof(Id));
         Raise(nameof(IsSpace));
+    }
+
+    public void UpdateUnread(ulong count, bool hasUnread)
+    {
+        UnreadCount = count;
+        HasUnread = hasUnread;
     }
 }

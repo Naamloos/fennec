@@ -12,7 +12,7 @@ public sealed partial class UserSettingsService(ManagedMatrixClient matrixClient
     private bool _applyingRemoteSettings;
 
     [ObservableProperty]
-    private bool _experimentalFeatureEnabled;
+    public partial bool ExperimentalFeatureEnabled { get; set; }
 
     public async Task LoadAsync()
     {
@@ -30,7 +30,7 @@ public sealed partial class UserSettingsService(ManagedMatrixClient matrixClient
         {
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(1));
+                await Task.Delay(TimeSpan.FromSeconds(15));
                 if (matrixClient.IsLoggedIn)
                 {
                     await RefreshAsync();

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using Dev.Naamloos.Fennec.Sdk.Entities;
 using Dev.Naamloos.Fennec.Sdk.Events;
 using uniffi.matrix_sdk_ffi;
@@ -79,17 +80,17 @@ public sealed class ObservableSpaceRoomList : ObservableCollection<ManagedSpaceR
                 case SpaceListUpdate.Append append:
                     foreach (var room in append.Values)
                     {
-                        Add(new ManagedSpaceRoom(room));
+                        Add(CreateRoom(room));
                     }
                     break;
                 case SpaceListUpdate.Clear:
                     Clear();
                     break;
                 case SpaceListUpdate.PushFront pushFront:
-                    Insert(0, new ManagedSpaceRoom(pushFront.Value));
+                    Insert(0, CreateRoom(pushFront.Value));
                     break;
                 case SpaceListUpdate.PushBack pushBack:
-                    Add(new ManagedSpaceRoom(pushBack.Value));
+                    Add(CreateRoom(pushBack.Value));
                     break;
                 case SpaceListUpdate.PopFront when Count > 0:
                     RemoveAt(0);
@@ -98,10 +99,12 @@ public sealed class ObservableSpaceRoomList : ObservableCollection<ManagedSpaceR
                     RemoveAt(Count - 1);
                     break;
                 case SpaceListUpdate.Insert insert:
-                    Insert((int)insert.Index, new ManagedSpaceRoom(insert.Value));
+                    Insert((int)insert.Index, CreateRoom(insert.Value));
                     break;
                 case SpaceListUpdate.Set set when set.Index < Count:
-                    this[(int)set.Index].Update(set.Value);
+                    var managedRoom = this[(int)set.Index];
+                    managedRoom.Update(set.Value);
+                    _ = RefreshUnreadAsync(managedRoom);
                     break;
                 case SpaceListUpdate.Remove remove when remove.Index < Count:
                     RemoveAt((int)remove.Index);
@@ -116,9 +119,44 @@ public sealed class ObservableSpaceRoomList : ObservableCollection<ManagedSpaceR
                     Clear();
                     foreach (var room in reset.Values)
                     {
-                        Add(new ManagedSpaceRoom(room));
+                        Add(CreateRoom(room));
                     }
                     break;
+            }
+        }
+    }
+
+    private ManagedSpaceRoom CreateRoom(SpaceRoom room)
+    {
+        var managedRoom = new ManagedSpaceRoom(room);
+        _ = RefreshUnreadAsync(managedRoom);
+        return managedRoom;
+    }
+
+    private async Task RefreshUnreadAsync(ManagedSpaceRoom room)
+    {
+        if (!room.IsJoined)
+        {
+            room.UpdateUnread(0, false);
+            return;
+        }
+
+        try
+        {
+            var info = await _client.GetSyncService().RoomListService().Room(room.Id).RoomInfo();
+            if (!_disposed)
+            {
+                room.UpdateUnread(
+                    info.NumUnreadMessages,
+                    info.IsMarkedUnread || info.NumUnreadMessages > 0
+                );
+            }
+        }
+        catch (Exception exception)
+        {
+            if (!_disposed)
+            {
+                Debug.WriteLine($"Could not refresh unread state for {room.Id}: {exception}");
             }
         }
     }

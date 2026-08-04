@@ -12,7 +12,9 @@ namespace Dev.Naamloos.Fennec.App.Components;
 
 public sealed partial class MatrixHtmlView : ContentView
 {
+    private readonly Label _plainText = new() { LineBreakMode = LineBreakMode.WordWrap };
     private INotifyCollectionChanged? _membersSource;
+    private bool _buildQueued;
 
     [BindableProperty]
     public partial string? Html { get; set; }
@@ -55,25 +57,40 @@ public sealed partial class MatrixHtmlView : ContentView
                     or nameof(Members)
             )
             {
-                Build();
+                QueueBuild();
             }
         };
 
         Build();
     }
 
+    private void QueueBuild()
+    {
+        if (_buildQueued)
+        {
+            return;
+        }
+
+        _buildQueued = true;
+        Dispatcher.Dispatch(() =>
+        {
+            _buildQueued = false;
+            Build();
+        });
+    }
+
     private void Build()
     {
-        var layout = new VerticalStackLayout { Spacing = 3 };
         var html = Html;
 
         if (string.IsNullOrWhiteSpace(html))
         {
-            layout.Add(Text(FallbackText, default));
-            Content = layout;
+            _plainText.Text = FallbackText;
+            Content = string.IsNullOrEmpty(FallbackText) ? null : _plainText;
             return;
         }
 
+        var layout = new VerticalStackLayout { Spacing = 3 };
         try
         {
             var document = XDocument.Parse(
@@ -98,7 +115,7 @@ public sealed partial class MatrixHtmlView : ContentView
             == true
         )
         {
-            Build();
+            QueueBuild();
         }
     }
 
