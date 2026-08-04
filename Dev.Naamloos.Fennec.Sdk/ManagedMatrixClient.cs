@@ -268,6 +268,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
                 await _secureStore.SetAsync(SessionStorageKey, serializedSession);
 
                 await StartSyncingAsync();
+                ConnectionRecovered?.Invoke(this, EventArgs.Empty);
 
                 return true;
             }
@@ -395,6 +396,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
             {
                 await client.RestoreSession(session);
                 await StartSyncingAsync();
+                ConnectionRecovered?.Invoke(this, EventArgs.Empty);
 
                 return true;
             }
