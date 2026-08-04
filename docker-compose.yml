@@ -1,16 +1,26 @@
 services:
-  notifications:
-    build:
-      context: .
-      dockerfile: Dev.Naamloos.Fennec.Notifications/Dockerfile
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:${NOTIFICATION_PORT:-8080}:8080"
-    environment:
-      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase_credentials
-    secrets:
-      - firebase_credentials
+    notifications:
+        build:
+            context: .
+            dockerfile: Dev.Naamloos.Fennec.Notifications/Dockerfile
+        restart: unless-stopped
+        # ports:
+        #   - "127.0.0.1:${NOTIFICATION_PORT:-8080}:8080"
+        environment:
+            GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase_credentials
+        secrets:
+            - firebase_credentials
+        networks:
+            - uwu-weeb-network
+            - brug
 
 secrets:
-  firebase_credentials:
-    file: ${FIREBASE_CREDENTIALS_FILE:-./secrets/firebase-service-account.json}
+    firebase_credentials:
+        file: ${FIREBASE_CREDENTIALS_FILE:-./secrets/firebase-service-account.json}
+
+networks:
+    uwu-weeb-network:
+        external: true
+    brug:
+        external: false # bridge network, for remote network access.
+        driver: bridge
