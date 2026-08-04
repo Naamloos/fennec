@@ -1,5 +1,7 @@
 services:
     notifications:
+        hostname: fennec-notif
+        container_name: fennec-notif
         build:
             context: .
             dockerfile: Dev.Naamloos.Fennec.Notifications/Dockerfile
