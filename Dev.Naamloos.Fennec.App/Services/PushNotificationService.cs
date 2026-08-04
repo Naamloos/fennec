@@ -36,6 +36,21 @@ public sealed class PushNotificationService
     {
         try
         {
+#if ANDROID
+            if (
+                OperatingSystem.IsAndroidVersionAtLeast(33)
+                && AndroidX.Core.Content.ContextCompat.CheckSelfPermission(
+                    Android.App.Application.Context,
+                    Android.Manifest.Permission.PostNotifications
+                ) != Android.Content.PM.Permission.Granted
+            )
+            {
+                Platform.CurrentActivity?.RequestPermissions(
+                    [Android.Manifest.Permission.PostNotifications],
+                    0
+                );
+            }
+#endif
             await CrossFirebaseCloudMessaging.Current.CheckIfValidAsync();
             await RegisterAsync(await CrossFirebaseCloudMessaging.Current.GetTokenAsync());
         }

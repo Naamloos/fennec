@@ -730,7 +730,7 @@ public sealed partial class Chat : ContentView
         switch (await InAppDialogs.ChooseAsync(page, uri.AbsoluteUri, ["Open", "Copy"]))
         {
             case "Open":
-                await Launcher.Default.OpenAsync(uri);
+                await Browser.Default.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
                 break;
             case "Copy":
                 await Clipboard.Default.SetTextAsync(uri.AbsoluteUri);
