@@ -20,9 +20,9 @@ public sealed partial class StickerPickerPopup : Popup
         BackgroundColor = Colors.Transparent;
         Content = new Border
         {
-            Padding = 16,
+            Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 12 : 16,
             MaximumWidthRequest = 420,
-            HeightRequest = 480,
+            HeightRequest = DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 420 : 480,
             StrokeThickness = 0,
             StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 12 },
             Content = new Grid
@@ -60,7 +60,9 @@ public sealed partial class StickerPickerPopup : Popup
                             {
                                 IsJson = false,
                                 Aspect = Aspect.AspectFit,
-                                HeightRequest = 84,
+                                HeightRequest = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                                    ? 68
+                                    : 84,
                                 GestureRecognizers =
                                 {
                                     new TapGestureRecognizer()

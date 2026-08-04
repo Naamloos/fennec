@@ -149,6 +149,7 @@ public sealed partial class SessionsSettingsView : ContentView
                         new Button
                         {
                             Text = "Remove",
+                            MinimumHeightRequest = 44,
                             TextColor = Colors.Red,
                             BackgroundColor = Colors.Transparent,
                         }
@@ -232,6 +233,7 @@ public sealed partial class SessionsSettingsView : ContentView
         new Button
         {
             Text = text,
+            MinimumHeightRequest = 44,
             BackgroundColor = Colors.Transparent,
             Padding = new Thickness(10, 4),
             FontSize = 12,

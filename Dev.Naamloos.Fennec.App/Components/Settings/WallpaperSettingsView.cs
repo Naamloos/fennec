@@ -40,10 +40,10 @@ public sealed class WallpaperSettingsView : ContentView
         this.BindService<ManagedMatrixClient, WallpaperSettingsView>(MatrixClientProperty);
         Loaded += async (_, _) => await RefreshAsync();
 
-        _set = new Button { Text = "Choose wallpaper" }
+        _set = new Button { Text = "Choose wallpaper", MinimumHeightRequest = 44 }
             .DynamicResource(VisualElement.BackgroundColorProperty, "Primary")
             .DynamicResource(Button.TextColorProperty, "OnPrimary");
-        _clear = new Button { Text = "Clear" }
+        _clear = new Button { Text = "Clear", MinimumHeightRequest = 44 }
             .DynamicResource(VisualElement.BackgroundColorProperty, "SurfaceContainer")
             .DynamicResource(Button.TextColorProperty, "OnSurface");
         _set.Clicked += async (_, _) => await SetAsync();
@@ -65,7 +65,16 @@ public sealed class WallpaperSettingsView : ContentView
                 StrokeShape = new RoundRectangle { CornerRadius = 18 },
                 Content = new Grid { Children = { _empty, _preview } },
             }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface2"),
-            new HorizontalStackLayout { Spacing = 8, Children = { _set, _clear } },
+            new Grid
+            {
+                ColumnSpacing = 8,
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(GridLength.Star),
+                    new ColumnDefinition(GridLength.Star),
+                },
+                Children = { _set, _clear.Column(1) },
+            },
             _status
         );
     }

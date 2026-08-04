@@ -33,6 +33,7 @@ public partial class Login : ContentPage
                 _homeserver = value;
                 _selectedServer = null;
                 OnPropertyChanged(nameof(HomeServer));
+                ErrorMessage = string.Empty;
             }
         }
     }
@@ -63,6 +64,7 @@ public partial class Login : ContentPage
 
             _username = value;
             OnPropertyChanged();
+            ErrorMessage = string.Empty;
         }
     }
 
@@ -78,6 +80,7 @@ public partial class Login : ContentPage
 
             _password = value;
             OnPropertyChanged();
+            ErrorMessage = string.Empty;
         }
     }
 
@@ -110,7 +113,7 @@ public partial class Login : ContentPage
     }
 
     // Backing fields
-    private string _homeserver = string.Empty;
+    private string _homeserver = Homeservers[0].Url;
     private MatrixHomeserverOption? _selectedServer = Homeservers[0];
     private string _username = string.Empty;
     private string _password = string.Empty;
@@ -129,14 +132,17 @@ public partial class Login : ContentPage
         _appNavigation = appNavigation;
 
         BindingContext = this;
-        build();
+        Build();
     }
 
     // Commands
     [RelayCommand]
     public async Task LoginAsync()
     {
+        if (IsLoading) return;
+
         IsLoading = true;
+        ErrorMessage = string.Empty;
         try
         {
             var normalizedHomeserver = await ManagedMatrixClient.DiscoverHomeserverAsync(
@@ -194,7 +200,7 @@ public partial class Login : ContentPage
     }
 
     // UI Builder
-    private void build()
+    private void Build()
     {
         Content = new ScrollView
         {
@@ -202,9 +208,12 @@ public partial class Login : ContentPage
             Content = new VerticalStackLayout
             {
                 VerticalOptions = LayoutOptions.Center,
+                HorizontalOptions = LayoutOptions.Fill,
                 MaximumWidthRequest = 480,
                 Spacing = 12,
-                Padding = new Thickness(24, 0),
+                Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                    ? new Thickness(16, 24)
+                    : new Thickness(24),
                 Children =
                 {
                     new Label()
@@ -241,6 +250,9 @@ public partial class Login : ContentPage
                             Placeholder = "Homeserver URL",
                             Text = HomeServer,
                             ReturnType = ReturnType.Next,
+                            Keyboard = Keyboard.Url,
+                            IsSpellCheckEnabled = false,
+                            IsTextPredictionEnabled = false,
                         }
                     ).Invoke(entry => entry.Completed += (_, _) => _usernameEntry?.Focus()).Bind(Entry.TextProperty, nameof(HomeServer), BindingMode.TwoWay).Bind(Entry.IsEnabledProperty, nameof(IsLoading), BindingMode.Default, new InvertedBoolConverter()),
                     (
@@ -249,6 +261,8 @@ public partial class Login : ContentPage
                             Placeholder = "Username",
                             Text = Username,
                             ReturnType = ReturnType.Next,
+                            IsSpellCheckEnabled = false,
+                            IsTextPredictionEnabled = false,
                         }
                     ).Invoke(entry => entry.Completed += (_, _) => _passwordEntry?.Focus()).Bind(Entry.TextProperty, nameof(Username), BindingMode.TwoWay).Bind(Entry.IsEnabledProperty, nameof(IsLoading), BindingMode.Default, new InvertedBoolConverter()),
                     (
@@ -260,11 +274,18 @@ public partial class Login : ContentPage
                             ReturnType = ReturnType.Go,
                         }
                     ).Bind(Entry.ReturnCommandProperty, nameof(LoginCommand)).Bind(Entry.TextProperty, nameof(Password), BindingMode.TwoWay).Bind(Entry.IsEnabledProperty, nameof(IsLoading), BindingMode.Default, new InvertedBoolConverter()),
-                    new Label() { TextColor = Colors.Red }.Bind(
-                        Label.TextProperty,
-                        nameof(ErrorMessage)
-                    ),
-                    new Button() { Text = "Login" }
+                    new Label
+                    {
+                        TextColor = Colors.Red,
+                        LineBreakMode = LineBreakMode.WordWrap,
+                    }
+                        .Bind(Label.TextProperty, nameof(ErrorMessage))
+                        .Bind(
+                            IsVisibleProperty,
+                            nameof(ErrorMessage),
+                            converter: new IsStringNotNullOrEmptyConverter()
+                        ),
+                    new Button { Text = "Sign in", MinimumHeightRequest = 48 }
                         .Bind(Button.CommandProperty, nameof(LoginCommand))
                         .Bind(
                             Button.IsEnabledProperty,

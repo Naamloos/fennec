@@ -182,8 +182,8 @@ public partial class VerificationPopupV2 : ContentView
         return new Border
         {
             BindingContext = service,
-            Padding = 24,
-            MinimumWidthRequest = 360,
+            Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 16 : 24,
+            MinimumWidthRequest = DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 0 : 360,
             MaximumWidthRequest = 560,
             HorizontalOptions = LayoutOptions.Center,
             VerticalOptions = LayoutOptions.Center,
@@ -237,6 +237,7 @@ public partial class VerificationPopupV2 : ContentView
                         new Button
                         {
                             Text = "Cancel",
+                            MinimumHeightRequest = 44,
                             HorizontalOptions = LayoutOptions.Center,
                             Command = new AsyncRelayCommand(service.CancelOrRejectAsync),
                         }.Bind<Button, ManagedVerificationState, bool>(
@@ -247,6 +248,7 @@ public partial class VerificationPopupV2 : ContentView
                         new Button
                         {
                             Text = "Close",
+                            MinimumHeightRequest = 44,
                             HorizontalOptions = LayoutOptions.Center,
                             Command = new AsyncRelayCommand(ClosePopupAsync),
                         }.Bind<Button, ManagedVerificationState, bool>(
@@ -281,69 +283,81 @@ public partial class VerificationPopupV2 : ContentView
             );
     }
 
-    private static HorizontalStackLayout CreateRequestButtons(SessionVerificationService service)
+    private static Grid CreateRequestButtons(SessionVerificationService service)
     {
-        return new HorizontalStackLayout
+        return new Grid
         {
-            Spacing = 8,
-            HorizontalOptions = LayoutOptions.Center,
+            ColumnSpacing = 8,
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Star),
+            },
 
             Children =
             {
                 new Button
                 {
                     Text = "Accept",
+                    MinimumHeightRequest = 44,
                     Command = new AsyncRelayCommand(service.AcceptAsync),
                 },
                 new Button
                 {
                     Text = "Reject",
+                    MinimumHeightRequest = 44,
                     Command = new AsyncRelayCommand(service.CancelOrRejectAsync),
-                },
+                }.Column(1),
             },
-        }.Bind<HorizontalStackLayout, ManagedVerificationState, bool>(
+        }.Bind<Grid, ManagedVerificationState, bool>(
             IsVisibleProperty,
             nameof(SessionVerificationService.State),
             convert: static state => state == ManagedVerificationState.AwaitingUserAcceptance
         );
     }
 
-    private static HorizontalStackLayout CreateComparisonButtons(SessionVerificationService service)
+    private static Grid CreateComparisonButtons(SessionVerificationService service)
     {
-        return new HorizontalStackLayout
+        return new Grid
         {
-            Spacing = 8,
-            HorizontalOptions = LayoutOptions.Center,
+            ColumnSpacing = 8,
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Star),
+            },
 
             Children =
             {
                 new Button
                 {
                     Text = "They Match",
+                    MinimumHeightRequest = 44,
                     Command = new AsyncRelayCommand(service.ApproveAsync),
                 },
                 new Button
                 {
                     Text = "They Don't Match",
+                    MinimumHeightRequest = 44,
                     Command = new AsyncRelayCommand(service.DeclineAsync),
-                },
+                }.Column(1),
             },
-        }.Bind<HorizontalStackLayout, ManagedVerificationState, bool>(
+        }.Bind<Grid, ManagedVerificationState, bool>(
             IsVisibleProperty,
             nameof(SessionVerificationService.State),
             convert: static state => state == ManagedVerificationState.Comparing
         );
     }
 
-    private static bool IsAndroid => DeviceInfo.Current.Platform == DevicePlatform.Android;
+    private static bool IsPhone => DeviceInfo.Current.Idiom == DeviceIdiom.Phone;
 
-    private static double EmojiCardWidth => IsAndroid ? 68 : 112;
+    private static double EmojiCardWidth => IsPhone ? 68 : 112;
 
-    private static double EmojiCardHeight => IsAndroid ? 92 : 108;
+    private static double EmojiCardHeight => IsPhone ? 92 : 108;
 
-    private static double EmojiSymbolFontSize => IsAndroid ? 26 : 34;
+    private static double EmojiSymbolFontSize => IsPhone ? 26 : 34;
 
-    private static double EmojiDescriptionFontSize => IsAndroid ? 10 : 12;
+    private static double EmojiDescriptionFontSize => IsPhone ? 10 : 12;
 
     private static ContentView CreateEmojiVerificationDisplay()
     {

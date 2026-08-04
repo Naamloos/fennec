@@ -13,7 +13,7 @@ public sealed class AttachmentPreviewPopup : Popup<bool>
 
         Content = new Border
         {
-            Padding = 20,
+            Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone ? 16 : 20,
             MaximumWidthRequest = 420,
             StrokeThickness = 0,
             StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 16 },
@@ -38,7 +38,8 @@ public sealed class AttachmentPreviewPopup : Popup<bool>
                     new Label
                     {
                         Text = attachment.FileName,
-                        LineBreakMode = LineBreakMode.TailTruncation,
+                        MaxLines = 2,
+                        LineBreakMode = LineBreakMode.WordWrap,
                     },
                     new Label
                     {
@@ -59,12 +60,14 @@ public sealed class AttachmentPreviewPopup : Popup<bool>
                             new Button
                             {
                                 Text = "Cancel",
+                                MinimumHeightRequest = 44,
                                 BackgroundColor = Colors.Transparent,
                                 Command = new Command(async () => await CloseAsync(false)),
                             }.DynamicResource(Button.TextColorProperty, "Primary"),
                             new Button
                             {
                                 Text = "Send",
+                                MinimumHeightRequest = 44,
                                 Command = new Command(async () => await CloseAsync(true)),
                             }
                                 .DynamicResource(VisualElement.BackgroundColorProperty, "Primary")

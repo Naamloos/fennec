@@ -37,6 +37,7 @@ public sealed partial class MediaOverlay : ContentView
                     IconColor = Colors.White,
                     WidthRequest = 48,
                     HeightRequest = 48,
+                    Margin = 8,
                     HorizontalOptions = LayoutOptions.End,
                     VerticalOptions = LayoutOptions.Start,
                     ZIndex = 1,
@@ -44,7 +45,7 @@ public sealed partial class MediaOverlay : ContentView
                     {
                         new TapGestureRecognizer().BindCommand(nameof(CloseCommand), source: this),
                     },
-                },
+                }.Invoke(view => SemanticProperties.SetDescription(view, "Close media")),
             },
         };
     }

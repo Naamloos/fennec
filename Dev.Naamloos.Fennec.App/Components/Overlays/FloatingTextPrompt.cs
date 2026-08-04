@@ -21,6 +21,8 @@ public sealed class FloatingTextPrompt : FloatingOverlay<string>
             : new Entry { IsPassword = isPassword };
         _input.Placeholder = placeholder;
         _input.Text = initialValue;
+        if (_input is Entry entry)
+            entry.Completed += (_, _) => Complete(_input.Text);
 
         Content = new Grid
         {
@@ -33,11 +35,19 @@ public sealed class FloatingTextPrompt : FloatingOverlay<string>
                 },
                 new Border
                 {
-                    Margin = 24,
-                    Padding = 20,
+                    Margin = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                        ? new Thickness(8)
+                        : new Thickness(24),
+                    Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                        ? new Thickness(16)
+                        : new Thickness(20),
                     MaximumWidthRequest = 420,
-                    HorizontalOptions = LayoutOptions.Center,
-                    VerticalOptions = LayoutOptions.Center,
+                    HorizontalOptions = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                        ? LayoutOptions.Fill
+                        : LayoutOptions.Center,
+                    VerticalOptions = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                        ? LayoutOptions.End
+                        : LayoutOptions.Center,
                     StrokeThickness = 0,
                     StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
                     {
@@ -54,7 +64,12 @@ public sealed class FloatingTextPrompt : FloatingOverlay<string>
                                 FontSize = 20,
                                 FontAttributes = FontAttributes.Bold,
                             },
-                            new Label { Text = message, Opacity = .72 },
+                            new Label
+                            {
+                                Text = message,
+                                Opacity = .72,
+                                LineBreakMode = LineBreakMode.WordWrap,
+                            },
                             _input,
                             new Grid
                             {
@@ -90,5 +105,6 @@ public sealed class FloatingTextPrompt : FloatingOverlay<string>
                 }.DynamicResource(VisualElement.BackgroundColorProperty, "Surface"),
             },
         };
+        Loaded += (_, _) => _input.Focus();
     }
 }

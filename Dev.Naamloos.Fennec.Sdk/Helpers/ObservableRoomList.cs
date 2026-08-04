@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Text;
 using Dev.Naamloos.Fennec.Sdk.Entities;
@@ -9,7 +8,7 @@ using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.Sdk.Helpers
 {
-    public class ObservableRoomList : ObservableCollection<ManagedRoom>, IDisposable
+    public class ObservableRoomList : ObservableRangeCollection<ManagedRoom>, IDisposable
     {
         private readonly ManagedMatrixClient _client;
         private RoomListEntriesDynamicFilterKind _filter;
@@ -166,11 +165,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
         // append to the end
         private void append(RoomListEntriesUpdate.Append append)
         {
-            var values = append.Values.Select(CreateManagedRoom);
-            foreach (var value in values)
-            {
-                this.Add(value);
-            }
+            AddRange(append.Values.Select(CreateManagedRoom));
         }
 
         // clear the list
@@ -220,10 +215,7 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
         {
             var room = this[(int)set.Index];
             room.Update(set.Value);
-            if (!room.IsSpace)
-            {
-                _ = room.RefreshDetailsAsync();
-            }
+            _ = room.ResolveDirectAvatarAsync();
         }
 
         // remove at a specific index
@@ -244,22 +236,21 @@ namespace Dev.Naamloos.Fennec.Sdk.Helpers
         // reset the list with new values
         private void reset(RoomListEntriesUpdate.Reset reset)
         {
-            this.Clear();
-            var values = reset.Values.Select(CreateManagedRoom);
-            foreach (var value in values)
-            {
-                this.Add(value);
-            }
+            ReplaceAll(reset.Values.Select(CreateManagedRoom));
         }
 
-        private static ManagedRoom CreateManagedRoom(Room room)
+        private ManagedRoom CreateManagedRoom(Room room)
         {
             var managedRoom = new ManagedRoom(room);
-            if (!managedRoom.IsSpace)
-            {
-                _ = managedRoom.RefreshDetailsAsync();
-            }
+            _ = ResolveMetadataAsync(managedRoom);
             return managedRoom;
+        }
+
+        private async Task ResolveMetadataAsync(ManagedRoom room)
+        {
+            await room.ResolveDirectAvatarAsync();
+            if (room.Id is not null)
+                room.IsServerNotice = await _client.IsServerNoticeRoomAsync(room.Id);
         }
 
         public void Dispose()

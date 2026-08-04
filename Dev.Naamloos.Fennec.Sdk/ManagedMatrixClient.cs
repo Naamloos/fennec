@@ -36,8 +36,10 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     private readonly SemaphoreSlim _connectionLock = new(1, 1);
 
     private readonly SemaphoreSlim _thumbnailLoadGate = new(3, 3);
+    private readonly SemaphoreSlim _serverNoticeLoadGate = new(6, 6);
 
     private readonly ConcurrentDictionary<string, Lazy<Task<string>>> _videoCache = [];
+    private readonly ConcurrentDictionary<string, Lazy<Task<bool>>> _serverNoticeCache = [];
     private readonly ConcurrentDictionary<AvatarCacheKey, Lazy<Task<byte[]>>> _avatarCache = [];
     private readonly ConcurrentQueue<
         KeyValuePair<AvatarCacheKey, Lazy<Task<byte[]>>>
@@ -121,6 +123,9 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
                 false
             );
     }
+
+    /// <summary>Gets whether the native client store is currently paused.</summary>
+    public bool IsPaused => _isPaused;
 
     /// <summary>Resolves a Matrix server name through its client well-known record.</summary>
     public static async Task<string> DiscoverHomeserverAsync(string homeserver)
@@ -239,6 +244,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
                 .SqliteStore(storeBuilder)
                 .AutoEnableBackups(true)
                 .AutoEnableCrossSigning(true)
+                .ThreadsEnabled(true, true)
                 .SlidingSyncVersionBuilder(SlidingSyncVersionBuilder.DiscoverNative)
                 .HomeserverUrl(homeserver)
                 .Build();
@@ -378,6 +384,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
                 )
                 .AutoEnableBackups(true)
                 .AutoEnableCrossSigning(true)
+                .ThreadsEnabled(true, true)
                 .SlidingSyncVersionBuilder(SlidingSyncVersionBuilder.DiscoverNative)
                 .HomeserverUrl(session.HomeserverUrl)
                 .Build();
@@ -403,6 +410,10 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
             _initializationLock.Release();
         }
     }
+
+    /// <summary>Returns whether local secure storage still contains a session to recover.</summary>
+    public async Task<bool> HasSavedSessionAsync() =>
+        !string.IsNullOrWhiteSpace(await _secureStore.GetAsync(SessionStorageKey));
 
     /// <summary>
     /// Determines whether the Matrix client and sync infrastructure currently
@@ -790,9 +801,18 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
                 .Select(result => new MatrixSearchResult(
                     result.RoomId,
                     result.Result.EventId,
+                    result.Result.SenderProfile is ProfileDetails.Ready ready
+                    && !string.IsNullOrWhiteSpace(ready.DisplayName)
+                        ? ready.DisplayName!
+                        : result.Result.Sender,
                     result.Result.Sender,
                     SearchResultBody(result.Result.Content),
-                    result.Result.Timestamp.ToString()
+                    DateTimeOffset
+                        .FromUnixTimeMilliseconds(
+                            (long)Math.Min(result.Result.Timestamp, 253402300799999UL)
+                        )
+                        .ToLocalTime()
+                        .ToString("g")
                 ))
                 .ToArray();
         }
@@ -831,6 +851,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     /// </param>
     public async Task<ObservableTimeline> GetObservableTimelineAsync(
         Room room,
+        TimelineFocus? focus = null,
         CancellationToken cancellationToken = default
     )
     {
@@ -840,13 +861,25 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var timeline = await room.Timeline();
+        var timeline = focus is null
+            ? await room.Timeline()
+            : await room.TimelineWithConfiguration(
+                new TimelineConfiguration(
+                    focus,
+                    new TimelineFilter.All(),
+                    null,
+                    DateDividerMode.Daily,
+                    uniffi.matrix_sdk_ui.TimelineReadReceiptTracking.AllEvents,
+                    false
+                )
+            );
 
         cancellationToken.ThrowIfCancellationRequested();
 
         return await ObservableTimeline.CreateAsync(
             this,
             timeline,
+            subscribeToPaginationStatus: focus is null,
             cancellationToken: cancellationToken
         );
     }
@@ -1164,6 +1197,61 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         return GetRequiredClient().SetAccountData(eventType, content);
     }
 
+    public Task SetRoomUnreadAsync(string roomId, bool unread) =>
+        GetRoomAsync(roomId).SetUnreadFlag(unread);
+
+    public async Task<bool> IsServerNoticeRoomAsync(string roomId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(roomId);
+        try
+        {
+            return await GetCachedValueAsync(
+                _serverNoticeCache,
+                roomId,
+                async () =>
+                {
+                    await _serverNoticeLoadGate.WaitAsync();
+                    try
+                    {
+                        using var response = await SendHttpRequestAsync(
+                            HttpMethod.Get,
+                            RoomTagsPath(roomId)
+                        );
+                        using var document = JsonDocument.Parse(
+                            await response.Content.ReadAsStringAsync()
+                        );
+                        return document.RootElement.TryGetProperty("tags", out var tags)
+                            && tags.TryGetProperty("m.server_notice", out _);
+                    }
+                    finally
+                    {
+                        _serverNoticeLoadGate.Release();
+                    }
+                }
+            );
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public RoomDirectorySession CreateRoomDirectorySession() =>
+        new(GetRequiredClient().RoomDirectorySearch());
+
+    public async Task<MatrixSearchSession> CreateSearchSessionAsync(
+        string query,
+        SearchRoomFilter filter = SearchRoomFilter.Rooms,
+        uint pageSize = 50
+    )
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        return new MatrixSearchSession(
+            await GetRequiredClient().SearchMessages(query.Trim(), filter, pageSize),
+            SearchResultBody
+        );
+    }
+
     private const string WallpaperTag = "u.fennec.wallpaper";
     private const string LegacyWallpaperTagPrefix = WallpaperTag + ".";
     private const string GlobalWallpaperEventType = "dev.naamloos.fennec.wallpaper";
@@ -1215,20 +1303,28 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
             return url.GetString();
         }
 
-        var tag = tags.EnumerateObject()
-            .FirstOrDefault(tag =>
-                tag.Name.StartsWith(LegacyWallpaperTagPrefix, StringComparison.Ordinal)
+        var tagName = tags.EnumerateObject()
+            .Select(tag => tag.Name)
+            .FirstOrDefault(name =>
+                name.StartsWith(LegacyWallpaperTagPrefix, StringComparison.Ordinal)
             );
-        if (tag.Name is null)
+        if (tagName is null)
             return null;
-        var encoded = tag.Name[LegacyWallpaperTagPrefix.Length..]
+        var encoded = tagName[LegacyWallpaperTagPrefix.Length..]
             .Replace('-', '+')
             .Replace('_', '/');
-        return Encoding.UTF8.GetString(
-            Convert.FromBase64String(
-                encoded.PadRight(encoded.Length + (4 - encoded.Length % 4) % 4, '=')
-            )
-        );
+        try
+        {
+            return Encoding.UTF8.GetString(
+                Convert.FromBase64String(
+                    encoded.PadRight(encoded.Length + (4 - encoded.Length % 4) % 4, '=')
+                )
+            );
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
     }
 
     public async Task SetRoomWallpaperAsync(string roomId, string mxcUrl)
@@ -2127,6 +2223,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
     private async Task NativeCleanupAsync()
     {
         _videoCache.Clear();
+        _serverNoticeCache.Clear();
         _avatarCache.Clear();
         while (_avatarCacheOrder.TryDequeue(out _)) { }
         _roomImageCache.Clear();

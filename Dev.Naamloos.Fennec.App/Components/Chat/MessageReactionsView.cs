@@ -2,11 +2,25 @@ using System.Windows.Input;
 using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.Sdk.Entities;
+using MauiIcons.Core;
+using MauiIcons.Material;
 
 namespace Dev.Naamloos.Fennec.App.Components;
 
 public sealed partial class MessageReactionsView : ContentView
 {
+    public static readonly BindableProperty UserSettingsProperty = BindableProperty.Create(
+        nameof(UserSettings),
+        typeof(UserSettingsService),
+        typeof(MessageReactionsView)
+    );
+
+    public UserSettingsService? UserSettings
+    {
+        get => (UserSettingsService?)GetValue(UserSettingsProperty);
+        set => SetValue(UserSettingsProperty, value);
+    }
+
     [BindableProperty]
     public partial ChatTimelineItem? Item { get; set; }
 
@@ -15,7 +29,32 @@ public sealed partial class MessageReactionsView : ContentView
 
     public MessageReactionsView()
     {
-        var reactions = new HorizontalStackLayout { Spacing = 4 }
+        this.BindService<UserSettingsService, MessageReactionsView>(UserSettingsProperty);
+        Content = new HorizontalStackLayout
+        {
+            Spacing = 4,
+            Children =
+            {
+                new MauiIcon
+                {
+                    Icon = MaterialIcons.AddReaction,
+                    IconSize = 20,
+                    WidthRequest = 28,
+                    HeightRequest = 28,
+                    MinimumHeightRequest = 28,
+                    GestureRecognizers =
+                    {
+                        new TapGestureRecognizer()
+                            .BindCommand(nameof(AddReactionCommand), source: this)
+                            .Bind(
+                                TapGestureRecognizer.CommandParameterProperty,
+                                nameof(Item),
+                                source: this
+                            ),
+                    },
+                },
+            },
+        }
             .Bind(
                 BindableLayout.ItemsSourceProperty,
                 $"{nameof(Item)}.{nameof(ChatTimelineItem.Reactions)}",
@@ -38,7 +77,13 @@ public sealed partial class MessageReactionsView : ContentView
                                 Spacing = 2,
                                 Children =
                                 {
-                                    new Label().Bind(Label.TextProperty, nameof(ChatReaction.Key)),
+                                    new Label()
+                                        .Bind(Label.TextProperty, nameof(ChatReaction.Key))
+                                        .Bind(
+                                            Label.FontFamilyProperty,
+                                            $"{nameof(UserSettings)}.{nameof(UserSettingsService.SelectedEmojiFontFamily)}",
+                                            source: this
+                                        ),
                                     new Label { FontSize = 11 }.Bind(
                                         Label.TextProperty,
                                         nameof(ChatReaction.Count)
@@ -49,7 +94,5 @@ public sealed partial class MessageReactionsView : ContentView
                     )
                 )
             );
-
-        Content = reactions;
     }
 }

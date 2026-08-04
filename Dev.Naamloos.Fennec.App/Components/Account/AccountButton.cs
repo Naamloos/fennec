@@ -34,13 +34,14 @@ public sealed partial class AccountButton : ContentView
     public AccountButton()
     {
         BindingContext = this;
-        build();
+        Build();
     }
 
-    private void build()
+    private void Build()
     {
         Content = new Border
         {
+            MinimumHeightRequest = 44,
             Padding = new Thickness(8, 6),
             StrokeThickness = 0,
             StrokeShape = new RoundRectangle { CornerRadius = 12 },
@@ -140,6 +141,10 @@ public sealed partial class AccountButton : ContentView
             },
         }
             .DynamicResource(BackgroundColorProperty, "Surface2")
-            .Invoke(view => SemanticProperties.SetDescription(view, "Open user settings"));
+            .Invoke(view =>
+            {
+                SemanticProperties.SetDescription(view, "Open user settings");
+                ToolTipProperties.SetText(view, "Account settings");
+            });
     }
 }

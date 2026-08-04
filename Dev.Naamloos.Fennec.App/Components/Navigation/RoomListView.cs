@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using CommunityToolkit.Maui;
@@ -6,6 +5,8 @@ using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.Sdk;
 using Dev.Naamloos.Fennec.Sdk.Entities;
 using Dev.Naamloos.Fennec.Sdk.Helpers;
+using MauiIcons.Core;
+using MauiIcons.Material;
 using uniffi.matrix_sdk_ffi;
 
 namespace Dev.Naamloos.Fennec.App.Components;
@@ -13,7 +14,7 @@ namespace Dev.Naamloos.Fennec.App.Components;
 public sealed partial class RoomListView : ContentView, IDisposable
 {
     private readonly CollectionView _roomsView;
-    private readonly ObservableCollection<ManagedRoom> _visibleRooms = [];
+    private readonly ObservableRangeCollection<ManagedRoom> _visibleRooms = [];
     private ObservableRoomList? _rooms;
     private ObservableSpaceRoomIds? _spaceRoomIds;
     private bool _disposed;
@@ -153,24 +154,45 @@ public sealed partial class RoomListView : ContentView, IDisposable
 
     private void SyncRooms()
     {
-        _visibleRooms.Clear();
+        var desired =
+            _rooms
+                ?.Where(room =>
+                    !ExcludeSpaceRooms
+                    || _spaceRoomIds is null
+                    || !_spaceRoomIds.RoomIds.Contains(room.Id ?? string.Empty)
+                )
+                .ToArray()
+            ?? [];
 
-        if (_rooms is null)
+        var prefix = 0;
+        while (
+            prefix < _visibleRooms.Count
+            && prefix < desired.Length
+            && ReferenceEquals(_visibleRooms[prefix], desired[prefix])
+        )
+            prefix++;
+
+        var suffix = 0;
+        while (
+            suffix < _visibleRooms.Count - prefix
+            && suffix < desired.Length - prefix
+            && ReferenceEquals(_visibleRooms[^(suffix + 1)], desired[^(suffix + 1)])
+        )
+            suffix++;
+
+        var oldMiddleCount = _visibleRooms.Count - prefix - suffix;
+        var newMiddleCount = desired.Length - prefix - suffix;
+        if (oldMiddleCount + newMiddleCount > 20)
         {
+            // ponytail: a reset beats dozens of UI notifications; preserve rows for small edits.
+            _visibleRooms.ReplaceAll(desired);
             return;
         }
 
-        foreach (var room in _rooms)
-        {
-            if (
-                !ExcludeSpaceRooms
-                || _spaceRoomIds is null
-                || !_spaceRoomIds.RoomIds.Contains(room.Id ?? string.Empty)
-            )
-            {
-                _visibleRooms.Add(room);
-            }
-        }
+        while (oldMiddleCount-- > 0)
+            _visibleRooms.RemoveAt(prefix);
+        for (var index = prefix; index < desired.Length - suffix; index++)
+            _visibleRooms.Insert(index, desired[index]);
     }
 
     private static View CreateEmptyView(string message) =>
@@ -186,8 +208,7 @@ public sealed partial class RoomListView : ContentView, IDisposable
 
     private DataTemplate CreateRoomTemplate() =>
         new(() =>
-        {
-            var row = new Grid
+            new Grid
             {
                 Padding = new Thickness(0, 8, 10, 8),
                 ColumnSpacing = 8,
@@ -223,33 +244,101 @@ public sealed partial class RoomListView : ContentView, IDisposable
                         .Bind(RoomAvatar.AvatarUrlProperty, nameof(ManagedRoom.AvatarUrl))
                         .Bind(RoomAvatar.DisplayNameProperty, nameof(ManagedRoom.DisplayName))
                         .Column(1),
-                    new Label
+                    new VerticalStackLayout
                     {
-                        FontSize = 16,
+                        Spacing = 1,
                         VerticalOptions = LayoutOptions.Center,
-                        HorizontalOptions = LayoutOptions.Fill,
-                        LineBreakMode = LineBreakMode.TailTruncation,
-                    }
-                        .Bind(Label.TextProperty, nameof(ManagedRoom.DisplayName))
-                        .Column(2),
-                    new Label
+                        Children =
+                        {
+                            new Grid
+                            {
+                                ColumnSpacing = 6,
+                                ColumnDefinitions =
+                                {
+                                    new ColumnDefinition(GridLength.Star),
+                                    new ColumnDefinition(GridLength.Auto),
+                                },
+                                Children =
+                                {
+                                    new Label
+                                    {
+                                        FontSize = 16,
+                                        HorizontalOptions = LayoutOptions.Fill,
+                                        LineBreakMode = LineBreakMode.TailTruncation,
+                                    }
+                                        .Bind(Label.TextProperty, nameof(ManagedRoom.DisplayName))
+                                        .Bind<Label, bool, FontAttributes>(
+                                            Label.FontAttributesProperty,
+                                            nameof(ManagedRoom.HasUnread),
+                                            convert: static unread =>
+                                                unread ? FontAttributes.Bold : FontAttributes.None
+                                        ),
+                                    new MauiIcon
+                                    {
+                                        Icon = MaterialIcons.Lock,
+                                        IconSize = 14,
+                                        InputTransparent = true,
+                                        VerticalOptions = LayoutOptions.Center,
+                                    }
+                                        .Bind(IsVisibleProperty, nameof(ManagedRoom.IsEncrypted))
+                                        .Invoke(view =>
+                                            SemanticProperties.SetDescription(
+                                                view,
+                                                "Encrypted room"
+                                            )
+                                        )
+                                        .Column(1),
+                                },
+                            },
+                            new Label
+                            {
+                                Text = "Server notice",
+                                FontSize = 11,
+                                Opacity = .7,
+                            }.Bind(IsVisibleProperty, nameof(ManagedRoom.IsServerNotice)),
+                        },
+                    }.Column(2),
+                    new Border
                     {
-                        FontSize = 12,
-                        FontAttributes = FontAttributes.Bold,
+                        MinimumWidthRequest = 22,
+                        HeightRequest = 22,
+                        Padding = new Thickness(5, 0),
+                        StrokeThickness = 0,
+                        StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
+                        {
+                            CornerRadius = 11,
+                        },
                         VerticalOptions = LayoutOptions.Center,
+                        Content = new Label
+                        {
+                            FontSize = 11,
+                            HorizontalTextAlignment = TextAlignment.Center,
+                            VerticalTextAlignment = TextAlignment.Center,
+                        }
+                            .Bind(Label.TextProperty, nameof(ManagedRoom.UnreadBadge))
+                            .DynamicResource(Label.TextColorProperty, "OnPrimary"),
                     }
-                        .Bind(Label.TextProperty, nameof(ManagedRoom.UnreadLabel))
                         .Bind(IsVisibleProperty, nameof(ManagedRoom.HasUnread))
-                        .DynamicResource(Label.TextColorProperty, "Primary")
+                        .DynamicResource(BackgroundColorProperty, "Primary")
                         .Column(3),
                 },
-            };
-
-            var tap = new TapGestureRecognizer();
-            tap.Tapped += (_, _) => SelectedRoom = row.BindingContext as ManagedRoom;
-            row.GestureRecognizers.Add(tap);
-            return row;
-        });
+            }
+                .Bind(
+                    SemanticProperties.DescriptionProperty,
+                    nameof(ManagedRoom.DisplayName),
+                    stringFormat: "Room: {0}"
+                )
+                .Invoke(row =>
+                    row.GestureRecognizers.Add(
+                        new TapGestureRecognizer
+                        {
+                            Command = new Command(() =>
+                                SelectedRoom = row.BindingContext as ManagedRoom
+                            ),
+                        }
+                    )
+                )
+        );
 
     private void OnUnloaded(object? sender, EventArgs eventArgs) => Dispose();
 

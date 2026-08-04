@@ -114,6 +114,8 @@ public sealed class RoomInfoFlyout : ContentView
             BackgroundColor = Colors.Transparent,
         };
         close.Clicked += (_, _) => IsOpen = false;
+        SemanticProperties.SetDescription(close, "Close room information");
+        ToolTipProperties.SetText(close, "Close room information");
 
         var actions = new Button
         {
@@ -125,6 +127,8 @@ public sealed class RoomInfoFlyout : ContentView
             BackgroundColor = Colors.Transparent,
         };
         actions.Clicked += async (_, _) => await ShowActionsAsync();
+        SemanticProperties.SetDescription(actions, "Open room actions");
+        ToolTipProperties.SetText(actions, "Room actions");
 
         var members = new CollectionView
         {
@@ -156,9 +160,14 @@ public sealed class RoomInfoFlyout : ContentView
 
         _drawer = new Border
         {
-            WidthRequest = 360,
-            MaximumWidthRequest = 420,
-            HorizontalOptions = LayoutOptions.End,
+            WidthRequest = DeviceInfo.Current.Platform == DevicePlatform.Android
+                || DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                ? -1
+                : 360,
+            HorizontalOptions = DeviceInfo.Current.Platform == DevicePlatform.Android
+                || DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                ? LayoutOptions.Fill
+                : LayoutOptions.End,
             VerticalOptions = LayoutOptions.Fill,
             StrokeThickness = 0,
             Content = new Grid
@@ -206,6 +215,7 @@ public sealed class RoomInfoFlyout : ContentView
     {
         var row = new Grid
         {
+            MinimumHeightRequest = 48,
             Padding = new Thickness(20, 7),
             ColumnSpacing = 12,
             ColumnDefinitions =
@@ -239,6 +249,10 @@ public sealed class RoomInfoFlyout : ContentView
                 }.Column(1),
             },
         };
+        row.SetBinding(
+            SemanticProperties.DescriptionProperty,
+            new Binding(nameof(RoomMember.DisplayName), stringFormat: "Room member: {0}")
+        );
         var tap = new TapGestureRecognizer();
         tap.Tapped += async (_, _) =>
         {
@@ -319,10 +333,20 @@ public sealed class RoomInfoFlyout : ContentView
 
     private View WallpaperControls()
     {
-        var set = new Button { Text = "Set wallpaper", Padding = new Thickness(18, 10) }
+        var set = new Button
+        {
+            Text = "Set wallpaper",
+            Padding = new Thickness(18, 10),
+            MinimumHeightRequest = 44,
+        }
             .DynamicResource(VisualElement.BackgroundColorProperty, "Primary")
             .DynamicResource(Button.TextColorProperty, "OnPrimary");
-        var clear = new Button { Text = "Clear", Padding = new Thickness(18, 10) }
+        var clear = new Button
+        {
+            Text = "Clear",
+            Padding = new Thickness(18, 10),
+            MinimumHeightRequest = 44,
+        }
             .DynamicResource(VisualElement.BackgroundColorProperty, "SurfaceContainer")
             .DynamicResource(Button.TextColorProperty, "OnSurface");
 
@@ -386,7 +410,16 @@ public sealed class RoomInfoFlyout : ContentView
             }
         };
 
-        return new HorizontalStackLayout { Spacing = 8, Children = { set, clear } };
+        return new Grid
+        {
+            ColumnSpacing = 8,
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Star),
+            },
+            Children = { set, clear.Column(1) },
+        };
     }
 
     private async Task ShowActionsAsync()
@@ -397,8 +430,10 @@ public sealed class RoomInfoFlyout : ContentView
         var actions = new List<string>
         {
             info.IsFavourite ? "Remove from favorites" : "Add to favorites",
-            "Mute notifications",
-            "Unmute notifications",
+            info.IsMarkedUnread ? "Mark read" : "Mark unread",
+            info.CachedUserDefinedNotificationMode == RoomNotificationMode.Mute
+                ? "Unmute notifications"
+                : "Mute notifications",
             "Invite member",
             "Change room name",
             "Change topic",
@@ -406,6 +441,8 @@ public sealed class RoomInfoFlyout : ContentView
             "Report room",
             "Leave room",
         };
+        if (await Client.IsServerNoticeRoomAsync(Room.Id()))
+            actions.Remove("Leave room");
         var action = await InAppDialogs.ChooseAsync(page, "Room actions", actions);
         if (action is null)
             return;
@@ -419,6 +456,16 @@ public sealed class RoomInfoFlyout : ContentView
                     break;
                 case "Remove from favorites":
                     await Client.SetRoomFavouriteAsync(Room.Id(), false);
+                    break;
+                case "Mark unread":
+                    await Client.SetRoomUnreadAsync(Room.Id(), true);
+                    IsOpen = false;
+                    break;
+                case "Mark read":
+                    await Room.MarkAsRead(ReceiptType.Read);
+                    await Room.MarkAsRead(ReceiptType.FullyRead);
+                    await Client.SetRoomUnreadAsync(Room.Id(), false);
+                    IsOpen = false;
                     break;
                 case "Mute notifications":
                     await Client.SetRoomMutedAsync(Room.Id(), true);

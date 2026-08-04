@@ -27,6 +27,7 @@ public sealed class UserProfileSheet : ContentView
             StrokeThickness = 0,
             HorizontalOptions = LayoutOptions.Center,
             VerticalOptions = LayoutOptions.Start,
+            IsVisible = DeviceInfo.Current.Idiom == DeviceIdiom.Phone,
             StrokeShape = new RoundRectangle { CornerRadius = 3 },
         }.DynamicResource(BackgroundColorProperty, "OutlineVariant");
         var pan = new PanGestureRecognizer();
@@ -35,13 +36,25 @@ public sealed class UserProfileSheet : ContentView
 
         _sheet = new Border
         {
-            Padding = new Thickness(24, 10, 24, 28),
+            Margin = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                ? new Thickness(0)
+                : new Thickness(24),
+            Padding = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                ? new Thickness(20, 8, 20, 24)
+                : new Thickness(24),
             MaximumWidthRequest = 620,
             MaximumHeightRequest = 680,
             HorizontalOptions = LayoutOptions.Fill,
-            VerticalOptions = LayoutOptions.End,
+            VerticalOptions = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                ? LayoutOptions.End
+                : LayoutOptions.Center,
             StrokeThickness = 0,
-            StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(28, 28, 0, 0) },
+            StrokeShape = new RoundRectangle
+            {
+                CornerRadius = DeviceInfo.Current.Idiom == DeviceIdiom.Phone
+                    ? new CornerRadius(28, 28, 0, 0)
+                    : new CornerRadius(24),
+            },
             Content = new Grid
             {
                 RowDefinitions =
@@ -51,7 +64,36 @@ public sealed class UserProfileSheet : ContentView
                 },
                 Children =
                 {
-                    new Grid { Children = { handle }, Padding = new Thickness(0, 0, 0, 10) },
+                    new Grid
+                    {
+                        Padding = new Thickness(0, 0, 0, 10),
+                        ColumnDefinitions =
+                        {
+                            new ColumnDefinition(GridLength.Star),
+                            new ColumnDefinition(GridLength.Auto),
+                            new ColumnDefinition(GridLength.Star),
+                        },
+                        Children =
+                        {
+                            handle.Column(1),
+                            new Button
+                            {
+                                Text = "×",
+                                FontSize = 24,
+                                WidthRequest = 44,
+                                HeightRequest = 44,
+                                Padding = 0,
+                                HorizontalOptions = LayoutOptions.End,
+                                BackgroundColor = Colors.Transparent,
+                                Command = new Command(Hide),
+                            }
+                                .DynamicResource(Button.TextColorProperty, "OnSurfaceVariant")
+                                .Invoke(view =>
+                                    SemanticProperties.SetDescription(view, "Close profile")
+                                )
+                                .Column(2),
+                        },
+                    },
                     new ScrollView { Content = _profile }.Row(1),
                 },
             },

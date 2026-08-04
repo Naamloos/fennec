@@ -37,22 +37,13 @@ public sealed class ClientSettingsView : ContentView
                         Spacing = 2,
                         Children =
                         {
-                            new Label { Text = "Experimental feature" },
-                            new Label
-                            {
-                                Text = "Reserved for a future Fennec feature.",
-                                Opacity = .7,
-                                FontSize = 12,
-                            },
+                            new Label { Text = "Emoji font" },
+                            new Label { Text = "Only applies to emoji glyphs.", Opacity = .7, FontSize = 12 },
                         },
                     },
-                    new Switch()
-                        .Bind(
-                            Switch.IsToggledProperty,
-                            $"{nameof(UserSettings)}.{nameof(UserSettingsService.ExperimentalFeatureEnabled)}",
-                            BindingMode.TwoWay,
-                            source: this
-                        )
+                    new Picker { Title = "System default", ItemDisplayBinding = new Binding(nameof(EmojiFontOption.DisplayName)) }
+                        .Bind(Picker.ItemsSourceProperty, $"{nameof(UserSettings)}.{nameof(UserSettingsService.EmojiFontOptions)}", source: this)
+                        .Bind(Picker.SelectedItemProperty, $"{nameof(UserSettings)}.{nameof(UserSettingsService.SelectedEmojiFont)}", BindingMode.TwoWay, source: this)
                         .Column(1),
                 },
             }

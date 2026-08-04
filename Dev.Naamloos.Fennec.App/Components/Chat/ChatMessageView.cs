@@ -44,6 +44,9 @@ public sealed partial class ChatMessageView : VirtualizeListViewCell
     [BindableProperty]
     public partial ICommand? PollVoteCommand { get; set; }
 
+    [BindableProperty]
+    public partial ICommand? ThreadCommand { get; set; }
+
     public ChatMessageView()
     {
         GestureRecognizers.Clear();
@@ -153,6 +156,11 @@ public sealed partial class ChatMessageView : VirtualizeListViewCell
                             .Bind(
                                 MessageBubbleView.PollVoteCommandProperty,
                                 nameof(PollVoteCommand),
+                                source: this
+                            )
+                            .Bind(
+                                MessageBubbleView.ThreadCommandProperty,
+                                nameof(ThreadCommand),
                                 source: this
                             ),
                     },

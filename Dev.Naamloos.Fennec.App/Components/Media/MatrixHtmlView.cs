@@ -1,4 +1,6 @@
 using System.Collections.Specialized;
+using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Input;
 using System.Xml.Linq;
@@ -12,8 +14,8 @@ namespace Dev.Naamloos.Fennec.App.Components;
 
 public sealed partial class MatrixHtmlView : ContentView
 {
-    private readonly Label _plainText = new() { LineBreakMode = LineBreakMode.WordWrap };
     private INotifyCollectionChanged? _membersSource;
+    private int _emojiOnlyCount;
     private bool _buildQueued;
 
     [BindableProperty]
@@ -31,8 +33,18 @@ public sealed partial class MatrixHtmlView : ContentView
     [BindableProperty]
     public partial ICommand? LinkCommand { get; set; }
 
+    [BindableProperty]
+    public partial string? EmojiFontFamily { get; set; }
+
     public MatrixHtmlView()
     {
+        SetBinding(
+            EmojiFontFamilyProperty,
+            new Binding(
+                nameof(UserSettingsService.SelectedEmojiFontFamily),
+                source: App.Services.GetRequiredService<UserSettingsService>()
+            )
+        );
         PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(Members))
@@ -55,6 +67,7 @@ public sealed partial class MatrixHtmlView : ContentView
                     or nameof(FallbackText)
                     or nameof(Client)
                     or nameof(Members)
+                    or nameof(EmojiFontFamily)
             )
             {
                 QueueBuild();
@@ -67,9 +80,7 @@ public sealed partial class MatrixHtmlView : ContentView
     private void QueueBuild()
     {
         if (_buildQueued)
-        {
             return;
-        }
 
         _buildQueued = true;
         Dispatcher.Dispatch(() =>
@@ -81,26 +92,29 @@ public sealed partial class MatrixHtmlView : ContentView
 
     private void Build()
     {
+        var layout = new VerticalStackLayout { Spacing = 3 };
         var html = Html;
 
         if (string.IsNullOrWhiteSpace(html))
         {
-            _plainText.Text = FallbackText;
-            Content = string.IsNullOrEmpty(FallbackText) ? null : _plainText;
+            _emojiOnlyCount = EmojiOnlyCount(FallbackText);
+            layout.Add(Text(FallbackText, default));
+            Content = layout;
             return;
         }
 
-        var layout = new VerticalStackLayout { Spacing = 3 };
         try
         {
             var document = XDocument.Parse(
                 $"<root>{NormalizeHtml(html)}</root>",
                 LoadOptions.PreserveWhitespace
             );
+            _emojiOnlyCount = EmojiOnlyCount(document.Root!);
             AddBlocks(layout, document.Root!.Nodes());
         }
         catch
         {
+            _emojiOnlyCount = EmojiOnlyCount(FallbackText);
             layout.Add(Text(FallbackText, default));
         }
 
@@ -110,9 +124,15 @@ public sealed partial class MatrixHtmlView : ContentView
     private void OnMembersChanged(object? sender, NotifyCollectionChangedEventArgs args)
     {
         if (
-            args.NewItems?.OfType<RoomMember>()
+            (
+                args.Action == NotifyCollectionChangedAction.Reset
+                && Members?.Any(member =>
+                    Html?.Contains(member.UserId, StringComparison.Ordinal) == true
+                ) == true
+            )
+            || args.NewItems?.OfType<RoomMember>()
                 .Any(member => Html?.Contains(member.UserId, StringComparison.Ordinal) == true)
-            == true
+                == true
         )
         {
             QueueBuild();
@@ -288,13 +308,14 @@ public sealed partial class MatrixHtmlView : ContentView
             var source = element.Attribute("src")?.Value;
             if (source?.StartsWith("mxc://", StringComparison.OrdinalIgnoreCase) == true)
             {
+                var size = EmojiOnlyFontSize > 0 ? EmojiOnlyFontSize : 28;
                 layout.Add(
                     new MatrixImage
                     {
                         Client = Client,
                         MatrixSource = source,
-                        WidthRequest = 28,
-                        HeightRequest = 28,
+                        WidthRequest = size,
+                        HeightRequest = size,
                         Aspect = Aspect.AspectFit,
                         Margin = new Thickness(1, 0),
                     }
@@ -346,7 +367,6 @@ public sealed partial class MatrixHtmlView : ContentView
     {
         var label = new Label
         {
-            Text = value,
             FontAttributes =
                 style.Bold && style.Italic ? FontAttributes.Bold | FontAttributes.Italic
                 : style.Bold ? FontAttributes.Bold
@@ -356,9 +376,17 @@ public sealed partial class MatrixHtmlView : ContentView
             TextDecorations = style.Strike ? TextDecorations.Strikethrough : TextDecorations.None,
             LineBreakMode = LineBreakMode.WordWrap,
         };
+        if (style.Code || string.IsNullOrWhiteSpace(EmojiFontFamily))
+            label.Text = value;
+        else
+            label.FormattedText(EmojiText(value, style));
         if (style.Size > 0)
         {
             label.FontSize = style.Size;
+        }
+        else if (EmojiOnlyFontSize > 0)
+        {
+            label.FontSize = EmojiOnlyFontSize;
         }
         if (style.Mention)
         {
@@ -382,6 +410,144 @@ public sealed partial class MatrixHtmlView : ContentView
         return label;
     }
 
+    private Microsoft.Maui.Controls.Span[] EmojiText(string value, InlineStyle style)
+    {
+        var result = new List<Microsoft.Maui.Controls.Span>();
+        var text = new StringBuilder();
+        bool? emoji = null;
+        var elements = StringInfo.GetTextElementEnumerator(value);
+        while (elements.MoveNext())
+        {
+            var element = (string)elements.Current!;
+            var isEmoji = IsEmoji(element);
+            if (emoji is not null && emoji != isEmoji)
+            {
+                result.Add(EmojiSpan(text.ToString(), emoji.Value, style));
+                text.Clear();
+            }
+            emoji = isEmoji;
+            text.Append(element);
+        }
+        if (text.Length > 0)
+            result.Add(EmojiSpan(text.ToString(), emoji == true, style));
+        return result.ToArray();
+    }
+
+    private Microsoft.Maui.Controls.Span EmojiSpan(string text, bool emoji, InlineStyle style)
+    {
+        return new Microsoft.Maui.Controls.Span
+        {
+            Text = text,
+            FontFamily = emoji ? EmojiFontFamily : null,
+            FontAttributes =
+                style.Bold && style.Italic ? FontAttributes.Bold | FontAttributes.Italic
+                : style.Bold ? FontAttributes.Bold
+                : style.Italic ? FontAttributes.Italic
+                : FontAttributes.None,
+            TextDecorations = style.Strike ? TextDecorations.Strikethrough : TextDecorations.None,
+            FontSize = style.Size > 0 ? style.Size : EmojiOnlyFontSize,
+        };
+    }
+
+    private double EmojiOnlyFontSize =>
+        _emojiOnlyCount switch
+        {
+            1 => 64,
+            2 => 52,
+            3 => 44,
+            >= 4 and <= 5 => 36,
+            _ => 0,
+        };
+
+    private static int EmojiOnlyCount(string value)
+    {
+        var count = 0;
+        return TryAddEmojiText(value, ref count) ? count : 0;
+    }
+
+    private static int EmojiOnlyCount(XContainer container)
+    {
+        var count = 0;
+        foreach (var node in container.Nodes())
+        {
+            if (!TryAddEmojiNode(node, ref count))
+            {
+                return 0;
+            }
+        }
+
+        return count;
+    }
+
+    private static bool TryAddEmojiNode(XNode node, ref int count) =>
+        node switch
+        {
+            XText text => TryAddEmojiText(text.Value, ref count),
+            XElement { Name.LocalName: "br" } => true,
+            XElement { Name.LocalName: "img" } image => image.Attribute("data-mx-emoticon")
+                is not null
+                && image
+                    .Attribute("src")
+                    ?.Value.StartsWith("mxc://", StringComparison.OrdinalIgnoreCase) == true
+                && ++count <= 5,
+            XElement { Name.LocalName: "mx-reply" } => false,
+            XElement element => EmojiNodes(element.Nodes(), ref count),
+            _ => true,
+        };
+
+    private static bool EmojiNodes(IEnumerable<XNode> nodes, ref int count)
+    {
+        foreach (var node in nodes)
+        {
+            if (!TryAddEmojiNode(node, ref count))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryAddEmojiText(string value, ref int count)
+    {
+        var elements = StringInfo.GetTextElementEnumerator(value);
+        while (elements.MoveNext())
+        {
+            var element = (string)elements.Current!;
+            if (string.IsNullOrWhiteSpace(element))
+            {
+                continue;
+            }
+
+            if (!IsEmoji(element) || ++count > 5)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsEmoji(string value) =>
+        value
+            .EnumerateRunes()
+            .Any(rune =>
+                (rune.Value >= 0x1F000 && rune.Value <= 0x1FAFF)
+                || (rune.Value >= 0x2600 && rune.Value <= 0x27BF)
+                || rune.Value
+                    is 0x00A9
+                        or 0x00AE
+                        or 0x203C
+                        or 0x2049
+                        or 0x20E3
+                        or 0x2122
+                        or 0x2139
+                        or 0x3030
+                        or 0x303D
+                        or 0x3297
+                        or 0x3299
+            );
+
     private static bool IsBlock(string name) =>
         name.ToLowerInvariant()
             is "p"
@@ -401,10 +567,21 @@ public sealed partial class MatrixHtmlView : ContentView
                 or "mx-reply";
 
     private static string NormalizeHtml(string html) =>
-        VoidTag.Replace(html.Replace("&nbsp;", "&#160;"), "<$1$2 />");
+        VoidTag.Replace(
+            EmoticonAttribute.Replace(
+                html.Replace("&nbsp;", "&#160;"),
+                "data-mx-emoticon=\"true\""
+            ),
+            "<$1$2 />"
+        );
 
     private static readonly Regex VoidTag = new(
         @"<(br|hr|img)(\s[^>]*?)?(?<!/)>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
+
+    private static readonly Regex EmoticonAttribute = new(
+        @"\bdata-mx-emoticon(?=\s|/|>)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled
     );
 

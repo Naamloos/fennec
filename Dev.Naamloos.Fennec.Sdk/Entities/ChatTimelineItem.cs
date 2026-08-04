@@ -21,6 +21,11 @@ public sealed class ChatTimelineItem : ObservableModel
     private string? _replyPreview;
     private ChatMedia? _media;
     private ChatPoll? _poll;
+    private bool _isServerNotice;
+    private string? _replyToEventId;
+    private string? _threadRootEventId;
+    private ulong _threadReplyCount;
+    private bool _isReadMarker;
 
     public ChatTimelineItem(string id)
     {
@@ -164,6 +169,42 @@ public sealed class ChatTimelineItem : ObservableModel
         set => Set(ref _poll, value);
     }
 
+    public bool IsServerNotice
+    {
+        get => _isServerNotice;
+        set => Set(ref _isServerNotice, value);
+    }
+
+    public string? ReplyToEventId
+    {
+        get => _replyToEventId;
+        set => Set(ref _replyToEventId, value);
+    }
+
+    public string? ThreadRootEventId
+    {
+        get => _threadRootEventId;
+        set => Set(ref _threadRootEventId, value);
+    }
+
+    public ulong ThreadReplyCount
+    {
+        get => _threadReplyCount;
+        set
+        {
+            if (Set(ref _threadReplyCount, value))
+                Raise(nameof(HasThread));
+        }
+    }
+
+    public bool HasThread => ThreadReplyCount > 0 || ThreadRootEventId is not null;
+
+    public bool IsReadMarker
+    {
+        get => _isReadMarker;
+        set => Set(ref _isReadMarker, value);
+    }
+
     public ObservableCollection<ChatReaction> Reactions { get; } = [];
 
     public ObservableCollection<ChatReadReceipt> ReadReceipts { get; } = [];
@@ -194,6 +235,11 @@ public sealed class ChatTimelineItem : ObservableModel
             Media = source.Media;
         }
         UpdatePoll(source.Poll);
+        IsServerNotice = source.IsServerNotice;
+        ReplyToEventId = source.ReplyToEventId;
+        ThreadRootEventId = source.ThreadRootEventId;
+        ThreadReplyCount = source.ThreadReplyCount;
+        IsReadMarker = source.IsReadMarker;
         EventOrTransactionId = source.EventOrTransactionId;
         IsRemoteEvent = source.IsRemoteEvent;
 

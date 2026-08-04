@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Maui.LifecycleEvents;
 using MPowerKit.VirtualizeListView;
 using Plugin.Maui.Audio;
-
 #if ANDROID
 using Plugin.Firebase.Core.Platforms.Android;
 #elif IOS
@@ -47,28 +46,37 @@ public static class MauiProgram
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+                fonts.AddFont("FluentEmojiColor.ttf", "FluentEmojiColor");
+                fonts.AddFont("TwitterColorEmoji.ttf", "TwitterColorEmoji");
+                fonts.AddFont("NotoColorEmoji-Regular.ttf", "NotoColorEmoji");
+                fonts.AddFont("OpenMoji-color-colr1_svg.ttf", "OpenMojiColor");
+                fonts.AddFont("Mona12ColorEmoji.ttf", "Mona12ColorEmoji");
+                fonts.AddFont("SerenityOS-Emoji.ttf", "SerenityOSEmoji");
             });
 
 #if ANDROID
         builder.ConfigureLifecycleEvents(events =>
             events.AddAndroid(android =>
-                android.OnCreate((activity, _) =>
-                    CrossFirebase.Initialize(
-                        activity,
-                        () => Platform.CurrentActivity ?? activity
-                    )
+                android.OnCreate(
+                    (activity, _) =>
+                        CrossFirebase.Initialize(
+                            activity,
+                            () => Platform.CurrentActivity ?? activity
+                        )
                 )
             )
         );
 #elif IOS
         builder.ConfigureLifecycleEvents(events =>
             events.AddiOS(ios =>
-                ios.WillFinishLaunching((_, _) =>
-                {
-                    CrossFirebase.Initialize();
-                    FirebaseCloudMessagingImplementation.Initialize();
-                    return false;
-                })
+                ios.WillFinishLaunching(
+                    (_, _) =>
+                    {
+                        CrossFirebase.Initialize();
+                        FirebaseCloudMessagingImplementation.Initialize();
+                        return false;
+                    }
+                )
             )
         );
 #endif
@@ -90,6 +98,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<MatrixRecoveryService>();
         builder.Services.AddSingleton<UserSettingsService>();
         builder.Services.AddSingleton<PushNotificationService>();
+        builder.Services.AddSingleton<EmojiUsageService>();
 
         builder.ConfigureMauiHandlers(handlers =>
         {

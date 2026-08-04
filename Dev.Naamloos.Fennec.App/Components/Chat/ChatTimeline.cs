@@ -6,6 +6,7 @@ using CommunityToolkit.Maui;
 using CommunityToolkit.Maui.Markup;
 using Dev.Naamloos.Fennec.Sdk;
 using Dev.Naamloos.Fennec.Sdk.Entities;
+using Dev.Naamloos.Fennec.Sdk.Helpers;
 using MPowerKit.VirtualizeListView;
 using uniffi.matrix_sdk_ffi;
 
@@ -15,6 +16,9 @@ public sealed partial class ChatTimeline : ContentView
 {
     private readonly ChatVirtualizeListView _collectionView;
     private readonly Label _emptyView;
+    private readonly Dev.Naamloos.Fennec.Sdk.Helpers.ObservableRangeCollection<object> _displayItems =
+    [];
+    private readonly Dictionary<string, ChatEventGroup> _eventGroups = [];
     private INotifyCollectionChanged? _itemsSource;
     private bool _initialScrollPending = true;
     private bool _followingLatest = true;
@@ -61,6 +65,9 @@ public sealed partial class ChatTimeline : ContentView
     [BindableProperty]
     public partial ICommand? PollVoteCommand { get; set; }
 
+    [BindableProperty]
+    public partial ICommand? ThreadCommand { get; set; }
+
     [BindableProperty(
         DefaultBindingMode = BindingMode.TwoWay,
         PropertyChangedMethodName = nameof(OnIsNearBottomChanged)
@@ -72,6 +79,12 @@ public sealed partial class ChatTimeline : ContentView
 
     [BindableProperty]
     public partial bool HasMoreHistory { get; set; }
+
+    [BindableProperty]
+    public partial string EmptyMessage { get; set; } = "No messages yet";
+
+    [BindableProperty(PropertyChangedMethodName = nameof(OnFocusedEventIdChanged))]
+    public partial string? FocusedEventId { get; set; }
 
     public bool IsScrollToBottomVisible => !IsNearBottom && Items is { Count: > 0 };
 
@@ -85,7 +98,8 @@ public sealed partial class ChatTimeline : ContentView
             ItemTemplate = new ChatTimelineTemplateSelector(this),
             Header = this,
             HeaderTemplate = new DataTemplate(CreateHeader),
-        }.Bind(VirtualizeListView.ItemsSourceProperty, nameof(Items), source: this);
+        };
+        _collectionView.ItemsSource = _displayItems;
         _collectionView.Scrolled += (_, eventArgs) => OnScrolled(eventArgs);
         _collectionView.PropertyChanged += (_, eventArgs) =>
         {
@@ -104,12 +118,11 @@ public sealed partial class ChatTimeline : ContentView
 
         _emptyView = new Label
         {
-            Text = "No messages yet",
             Opacity = .7,
             InputTransparent = true,
             HorizontalOptions = LayoutOptions.Center,
             VerticalOptions = LayoutOptions.Center,
-        };
+        }.Bind(Label.TextProperty, nameof(EmptyMessage), source: this);
 
         Content = new Grid
         {
@@ -204,6 +217,17 @@ public sealed partial class ChatTimeline : ContentView
         object newValue
     ) => ((ChatTimeline)bindable).OnPropertyChanged(nameof(IsScrollToBottomVisible));
 
+    private static void OnFocusedEventIdChanged(
+        BindableObject bindable,
+        object oldValue,
+        object newValue
+    )
+    {
+        var timeline = (ChatTimeline)bindable;
+        timeline.SyncDisplayItems();
+        timeline.QueueScrollToFocusedEvent();
+    }
+
     private View CreateLoadMoreButton()
     {
         var button = new Button { Text = string.Empty, MinimumWidthRequest = 120 }
@@ -274,6 +298,7 @@ public sealed partial class ChatTimeline : ContentView
             _itemsSource.CollectionChanged += OnItemsCollectionChanged;
         }
 
+        SyncDisplayItems();
         _initialScrollPending = true;
         _followingLatest = true;
         _previousScrollY = 0;
@@ -285,6 +310,15 @@ public sealed partial class ChatTimeline : ContentView
     private void OnItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs args)
     {
         _emptyView.IsVisible = Items is not { Count: > 0 };
+        if (!TryAppendDisplayItems(args))
+            SyncDisplayItems();
+        if (!string.IsNullOrWhiteSpace(FocusedEventId))
+        {
+            _followingLatest = false;
+            QueueScrollToFocusedEvent();
+            return;
+        }
+
         if (
             _followingLatest
             || (
@@ -296,6 +330,42 @@ public sealed partial class ChatTimeline : ContentView
         {
             QueueScrollToLatest();
         }
+    }
+
+    private bool TryAppendDisplayItems(NotifyCollectionChangedEventArgs args)
+    {
+        if (
+            args.Action != NotifyCollectionChangedAction.Add
+            || args.NewStartingIndex < 0
+            || Items is null
+            || args.NewItems is null
+            || args.NewStartingIndex + args.NewItems.Count != Items.Count
+        )
+            return false;
+
+        var added = args.NewItems.OfType<ChatTimelineItem>().ToArray();
+        if (added.Length != args.NewItems.Count || added.Any(IsGroupableEvent))
+            return false;
+
+        _displayItems.AddRange(added);
+        return true;
+    }
+
+    private void QueueScrollToFocusedEvent()
+    {
+        if (
+            string.IsNullOrWhiteSpace(FocusedEventId)
+            || Items?.FirstOrDefault(item => item.EventId == FocusedEventId) is not { } item
+            || DisplayItemFor(item) is not { } displayItem
+        )
+            return;
+
+        if (displayItem is ChatEventGroup group)
+            group.IsExpanded = true;
+
+        Dispatcher.Dispatch(async () =>
+            await _collectionView.ScrollToItem(displayItem, ScrollToPosition.Center, false)
+        );
     }
 
     private void QueueScrollToLatest()
@@ -338,9 +408,96 @@ public sealed partial class ChatTimeline : ContentView
         });
     }
 
+    private void SyncDisplayItems()
+    {
+        var desired = new List<object>();
+        var activeGroupKeys = new HashSet<string>(StringComparer.Ordinal);
+
+        if (Items is not null)
+        {
+            for (var index = 0; index < Items.Count; )
+            {
+                if (!IsGroupableEvent(Items[index]))
+                {
+                    desired.Add(Items[index++]);
+                    continue;
+                }
+
+                var start = index;
+                while (index < Items.Count && IsGroupableEvent(Items[index]))
+                    index++;
+
+                var count = index - start;
+                if (count == 1)
+                {
+                    desired.Add(Items[start]);
+                    continue;
+                }
+
+                var key = Items[start].Id;
+                activeGroupKeys.Add(key);
+                if (!_eventGroups.TryGetValue(key, out var group))
+                {
+                    group = new ChatEventGroup();
+                    _eventGroups.Add(key, group);
+                }
+
+                group.Replace(Items.Skip(start).Take(count));
+                desired.Add(group);
+            }
+        }
+
+        foreach (
+            var key in _eventGroups.Keys.Where(key => !activeGroupKeys.Contains(key)).ToArray()
+        )
+            _eventGroups.Remove(key);
+
+        var prefix = 0;
+        while (
+            prefix < _displayItems.Count
+            && prefix < desired.Count
+            && ReferenceEquals(_displayItems[prefix], desired[prefix])
+        )
+            prefix++;
+
+        var suffix = 0;
+        while (
+            suffix < _displayItems.Count - prefix
+            && suffix < desired.Count - prefix
+            && ReferenceEquals(_displayItems[^(suffix + 1)], desired[^(suffix + 1)])
+        )
+            suffix++;
+
+        var oldMiddleCount = _displayItems.Count - prefix - suffix;
+        var newMiddleCount = desired.Count - prefix - suffix;
+        if (oldMiddleCount + newMiddleCount > 100 && suffix == 0)
+        {
+            _displayItems.ReplaceAll(desired);
+            return;
+        }
+
+        while (oldMiddleCount-- > 0)
+            _displayItems.RemoveAt(prefix);
+        _displayItems.InsertRange(prefix, desired.Skip(prefix).Take(newMiddleCount));
+    }
+
+    private object? DisplayItemFor(ChatTimelineItem item) =>
+        _displayItems.FirstOrDefault(candidate =>
+            ReferenceEquals(candidate, item)
+            || candidate is ChatEventGroup group && group.Items.Contains(item)
+        );
+
+    private bool IsGroupableEvent(ChatTimelineItem item) =>
+        !item.IsMessage
+        && !item.IsReadMarker
+        && item.EventId != FocusedEventId
+        && item.EventType is not "date divider" and not "timeline start" and not "timeline marker";
+
     private sealed class ChatTimelineTemplateSelector : DataTemplateSelector
     {
         public DataTemplate EventTemplate { get; }
+
+        public DataTemplate EventGroupTemplate { get; }
 
         public DataTemplate MessageTemplate { get; }
 
@@ -349,6 +506,13 @@ public sealed partial class ChatTimeline : ContentView
             EventTemplate = new DataTemplate(() =>
                 new ChatEventView().Bind(
                     ChatEventView.MenuCommandProperty,
+                    nameof(MenuCommand),
+                    source: owner
+                )
+            );
+            EventGroupTemplate = new DataTemplate(() =>
+                new ChatEventGroupView().Bind(
+                    ChatEventGroupView.MenuCommandProperty,
                     nameof(MenuCommand),
                     source: owner
                 )
@@ -381,11 +545,21 @@ public sealed partial class ChatTimeline : ContentView
                         nameof(PollVoteCommand),
                         source: owner
                     )
+                    .Bind(
+                        ChatMessageView.ThreadCommandProperty,
+                        nameof(ThreadCommand),
+                        source: owner
+                    )
             );
         }
 
         protected override DataTemplate OnSelectTemplate(object item, BindableObject container) =>
-            item is ChatTimelineItem { IsMessage: true } ? MessageTemplate : EventTemplate;
+            item switch
+            {
+                ChatEventGroup => EventGroupTemplate,
+                ChatTimelineItem { IsMessage: true } => MessageTemplate,
+                _ => EventTemplate,
+            };
     }
 
     private sealed class ChatVirtualizeListView : VirtualizeListView
