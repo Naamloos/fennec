@@ -73,10 +73,10 @@ I will be tracking feature support in the following table. This table is based o
 | Ignoring Users                   | Both                     | ✅          |       |
 | Instant Messaging                | Both                     | ✅          |       |
 | Presence                         | Both                     | ✅          |       |
-| Push Notifications               | Mobile                   |             |       |
+| Push Notifications               | Mobile                   | ✅          | Android and iOS via FCM |
 | Receipts                         | Both                     | ✅          |       |
 | Room History Visibility          | Both                     | ✅          |       |
-| Room Upgrades                    | Both                     |             |       |
+| Room Upgrades                    | Both                     | 〰️          | Only shown as a chat event |
 | Third-party Invites              | Mobile                   |             |       |
 | Typing Notifications             | Both                     | ✅          |       |
 | User and Room Mentions           | Both                     | ✅          |       |
@@ -85,7 +85,7 @@ I will be tracking feature support in the following table. This table is based o
 | Device Management                | Optional                 | ✅          |       |
 | End-to-End Encryption            | Optional                 | ✅          |       |
 | Event Annotations and reactions  | Optional                 | 〰️           |       |
-| Event Context                    | Optional                 |             |       |
+| Event Context                    | Optional                 | ✅          |       |
 | Event Replacements               | Optional                 | ✅          |       |
 | Read and Unread Markers          | Optional                 | ✅          |       |
 | Guest Access                     | Optional                 |             |       |
@@ -93,7 +93,7 @@ I will be tracking feature support in the following table. This table is based o
 | Moderation Policy Lists          | Optional                 |             |       |
 | Policy Servers                   | Optional                 |             |       |
 | OpenID                           | Optional                 |             |       |
-| Recently used emoji              | Optional                 |             |       |
+| Recently used emoji              | Optional                 | ✅          |       |
 | Reference Relations              | Optional                 |             |       |
 | Reporting Content                | Optional                 | ✅          |       |
 | Rich replies                     | Optional                 | ✅          |       |
@@ -105,7 +105,7 @@ I will be tracking feature support in the following table. This table is based o
 | Server Access Control Lists      | Optional                 |             |       |
 | Server Administration            | Optional                 |             |       |
 | Server Notices                   | Optional                 | ✅          |       |
-| Server Side Search               | Optional                 |             |       |
+| Server Side Search               | Optional                 | ✅          |       |
 | Spaces                           | Optional                 | ✅          |       |
 | Sticker Messages                 | Optional                 | ✅          |       |
 | Third-party Networks             | Optional                 |             |       |
