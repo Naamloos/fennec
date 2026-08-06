@@ -376,8 +376,20 @@ public sealed partial class ThreadView : ContentView
     [RelayCommand]
     private async Task OpenLinkAsync(string? value)
     {
-        if (Uri.TryCreate(value, UriKind.Absolute, out var uri))
-            await Browser.Default.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
+        if (
+            !Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+        )
+            return;
+
+        try
+        {
+            await Browser.Default.OpenAsync(uri);
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine($"Could not open link: {exception}");
+        }
     }
 
     [RelayCommand]

@@ -15,6 +15,7 @@ public sealed class App : Microsoft.Maui.Controls.Application
     {
         _startupPage = startupPage;
         Services = services;
+        services.GetRequiredService<PushNotificationService>();
 
         Resources.MergedDictionaries.Add(new Resources.Styles.Colors());
         Resources.MergedDictionaries.Add(new Resources.Styles.Style());

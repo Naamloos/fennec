@@ -114,7 +114,7 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
             .SetPusher(
                 new PusherIdentifiers(pushKey, appId),
                 new PusherKind.Http(
-                    new HttpPusherData(gateway.AbsoluteUri, PushFormat.EventIdOnly, null)
+                    new HttpPusherData(gateway.AbsoluteUri, null, null)
                 ),
                 "Fennec",
                 $"Fennec ({_platformName})",
@@ -126,6 +126,64 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
 
     /// <summary>Gets whether the native client store is currently paused.</summary>
     public bool IsPaused => _isPaused;
+
+    /// <summary>Fetches and decrypts a pushed event for a local notification.</summary>
+    public async Task<MatrixNotificationPreview?> ResolvePushNotificationAsync(
+        string roomId,
+        string eventId
+    )
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(roomId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
+
+        await _connectionLock.WaitAsync();
+        try
+        {
+            var client = GetRequiredClient();
+            var wasPaused = _isPaused;
+            if (wasPaused)
+            {
+                await client.Resume();
+            }
+
+            try
+            {
+                using var notifications = await client.NotificationClient(
+                    wasPaused
+                        ? new NotificationProcessSetup.MultipleProcesses()
+                        : new NotificationProcessSetup.SingleProcess(GetSyncService())
+                );
+                using var status = await notifications.GetNotification(roomId, eventId);
+                if (status is not NotificationStatus.Event { Item: var item })
+                {
+                    return null;
+                }
+
+                var title = string.IsNullOrWhiteSpace(item.RoomInfo.DisplayName)
+                    ? item.SenderInfo.DisplayName ?? "Fennec"
+                    : item.RoomInfo.DisplayName;
+                var body = NotificationBody(item.RawEvent);
+                var timestamp = item.Event is NotificationEvent.Timeline { Event: var @event }
+                    ? DateTimeOffset.FromUnixTimeMilliseconds(
+                        (long)Math.Min(@event.Timestamp(), 253402300799999UL)
+                    )
+                    : DateTimeOffset.UtcNow;
+
+                return new MatrixNotificationPreview(title, body, timestamp);
+            }
+            finally
+            {
+                if (wasPaused)
+                {
+                    await client.Pause();
+                }
+            }
+        }
+        finally
+        {
+            _connectionLock.Release();
+        }
+    }
 
     /// <summary>Resolves a Matrix server name through its client well-known record.</summary>
     public static async Task<string> DiscoverHomeserverAsync(string homeserver)
@@ -1720,6 +1778,24 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         return _client ?? throw new InvalidOperationException("The client is not logged in.");
     }
 
+    private static string NotificationBody(string rawEvent)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(rawEvent);
+            return document.RootElement.TryGetProperty("content", out var content)
+                && content.TryGetProperty("body", out var body)
+                && body.ValueKind is JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(body.GetString())
+                ? body.GetString()!
+                : "New Matrix message";
+        }
+        catch (JsonException)
+        {
+            return "New Matrix message";
+        }
+    }
+
     private Room GetRoomAsync(string roomId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(roomId);
@@ -2488,3 +2564,9 @@ public sealed class ManagedMatrixClient : IAsyncDisposable
         }
     }
 }
+
+public readonly record struct MatrixNotificationPreview(
+    string Title,
+    string Body,
+    DateTimeOffset Timestamp
+);

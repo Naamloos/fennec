@@ -727,10 +727,17 @@ public sealed partial class Chat : ContentView
             return;
         }
 
-        switch (await InAppDialogs.ChooseAsync(page, uri.AbsoluteUri, ["Open", "Copy"]))
+        switch (await InAppDialogs.ChooseAsync(page, "Open link?", ["Open", "Copy"], uri.AbsoluteUri))
         {
             case "Open":
-                await Browser.Default.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
+                try
+                {
+                    await Browser.Default.OpenAsync(uri);
+                }
+                catch (Exception exception)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Could not open link: {exception}");
+                }
                 break;
             case "Copy":
                 await Clipboard.Default.SetTextAsync(uri.AbsoluteUri);

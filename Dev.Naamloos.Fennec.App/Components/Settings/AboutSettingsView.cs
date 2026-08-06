@@ -80,10 +80,10 @@ public sealed partial class AboutSettingsView : ContentView
 
     [RelayCommand]
     private Task OpenSourceCodeAsync() =>
-        Launcher.Default.OpenAsync("https://github.com/Naamloos/fennec");
+        Browser.Default.OpenAsync("https://github.com/Naamloos/fennec");
 
     [RelayCommand]
-    private Task OpenDonateAsync() => Launcher.Default.OpenAsync("https://ko-fi.com/naamloos");
+    private Task OpenDonateAsync() => Browser.Default.OpenAsync("https://ko-fi.com/naamloos");
 
     private View CreateLinkCard(string title, string description, string command) =>
         new Border
